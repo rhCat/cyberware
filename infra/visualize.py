@@ -97,34 +97,59 @@ def drawio(bp, perk_steps=None):
             f'      <root>\n        <mxCell id="0"/>\n        <mxCell id="1" parent="0"/>\n        {body}\n      </root>\n    </mxGraphModel>\n  </diagram>\n</mxfile>\n')
 
 
+def _pretty(expr):
+    """L++ operators → readable glyphs for the diagram."""
+    return expr.replace("/\\", "∧").replace("\\/", "∨").replace("/=", "≠").replace("~", "¬")
+
+
 def svg(bp, perk_steps=None):
+    """Render the blueprint as a cyberpunk SVG — states, plus each transition's trigger / action / gate."""
     states = annotated_states(bp, perk_steps)
     terms, entry = set(bp.get("terminal_states", {})), bp["entry_state"]
-    pos, d, W, H, width, height = _layout(bp)
-    o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" font-family="-apple-system,Segoe UI,Roboto,sans-serif">',
-         '<defs><marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 z" fill="#444"/></marker></defs>',
-         f'<rect width="{width}" height="{height}" fill="#ffffff"/>',
-         f'<text x="14" y="20" font-size="13" font-weight="700" fill="#333">{E(bp.get("id","skill"))}</text>']
+    gates, actions = bp.get("gates", {}), bp.get("actions", {})
+    pos, d, W, H, lw, height = _layout(bp)
+    width = lw + 270
+    NEON, ON, DIM, BG = "#39ff14", "#aaff7a", "#4fc23a", "#0a0f0a"
+    o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+         'font-family="ui-monospace,Menlo,Consolas,monospace">',
+         '<defs>'
+         '<filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2" result="b"/>'
+         '<feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+         f'<pattern id="px" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="{BG}"/>'
+         f'<rect width="1" height="1" fill="{NEON}" fill-opacity="0.16"/></pattern>'
+         f'<marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 z" fill="{NEON}"/></marker>'
+         '</defs>',
+         f'<rect width="{width}" height="{height}" fill="{BG}"/>',
+         f'<rect width="{width}" height="{height}" fill="url(#px)"/>',
+         f'<text x="14" y="24" font-size="14" font-weight="700" letter-spacing="3" fill="{NEON}" filter="url(#glow)">{E(bp.get("id","skill")).upper()}</text>']
     for t in bp["transitions"]:
-        sx, sy = pos[t["from"]]; tx, ty = pos[t["to"]]
+        sx, sy = pos[t["from"]]
+        tx, ty = pos[t["to"]]
         if d[t["to"]] > d[t["from"]]:
             x1, y1, x2, y2 = sx + W / 2, sy + H, tx + W / 2, ty
-            path = f'M{x1},{y1} C{x1},{y1+45} {x2},{y2-45} {x2},{y2}'
+            path = f'M{x1},{y1} L{x2},{y2}'
         else:
             x1, y1, x2, y2 = sx + W, sy + H / 2, tx + W, ty + H / 2
-            path = f'M{x1},{y1} C{x1+70},{y1} {x2+70},{y2} {x2},{y2}'
-        o.append(f'<path d="{path}" fill="none" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>')
-        mx, my = (x1 + x2) / 2, (y1 + y2) / 2
-        o.append(f'<text x="{mx+5:.0f}" y="{my-2:.0f}" font-size="11" font-weight="600" fill="#333">{E(t.get("trigger",""))}</text>')
-        if t.get("action"):
-            o.append(f'<text x="{mx+5:.0f}" y="{my+11:.0f}" font-size="9" fill="#999">{E(t["action"])}</text>')
+            path = f'M{x1},{y1} C{x1+60},{y1} {x2+60},{y2} {x2},{y2}'
+        o.append(f'<path d="{path}" fill="none" stroke="{NEON}" stroke-width="1.6" marker-end="url(#arr)" filter="url(#glow)" opacity="0.92"/>')
+        lx, ly = sx + W + 20, (y1 + y2) / 2 - 8
+        o.append(f'<text x="{lx:.0f}" y="{ly:.0f}" font-size="11" font-weight="700" fill="{ON}">{E(t.get("trigger",""))}</text>')
+        cu = actions.get(t.get("action", ""), {}).get("compute_unit", t.get("action", ""))
+        if cu:
+            o.append(f'<text x="{lx:.0f}" y="{ly+13:.0f}" font-size="9" fill="{DIM}">▸ {E(cu)}</text>')
+        gid = t.get("gate", "")
+        if gid and gid in gates:
+            o.append(f'<text x="{lx:.0f}" y="{ly+25:.0f}" font-size="9" fill="{DIM}">⊨ {E(_pretty(gates[gid].get("expression","")))}</text>')
     for s in bp["states"]:
         x, y = pos[s]
-        fill, stroke = ("#d5e8d4", "#82b366") if s in terms else (("#dae8fc", "#6c8ebf") if s == entry else ("#f5f5f5", "#aaaaaa"))
-        o.append(f'<rect x="{x}" y="{y}" width="{W}" height="{H}" rx="9" fill="{fill}" stroke="{stroke}" stroke-width="1.5"/>')
-        o.append(f'<text x="{x+11}" y="{y+20}" font-size="13" font-weight="700" fill="#222">{E(s)}</text>')
-        for j, line in enumerate(wrap(states[s].get("description", ""), 33)[:4]):
-            o.append(f'<text x="{x+11}" y="{y+37+j*12}" font-size="9.5" fill="#555">{E(line)}</text>')
+        is_term, is_entry = s in terms, s == entry
+        border = ON if (is_entry or is_term) else NEON
+        fill = "#0f2410" if is_term else ("#0e1d0d" if is_entry else "#0b140a")
+        o.append(f'<rect x="{x}" y="{y}" width="{W}" height="{H}" fill="{fill}" stroke="{border}" stroke-width="{2 if (is_term or is_entry) else 1.3}" filter="url(#glow)"/>')
+        tag = "  ▶ entry" if is_entry else ("  ■ terminal" if is_term else "")
+        o.append(f'<text x="{x+11}" y="{y+21}" font-size="13" font-weight="700" letter-spacing="1" fill="{border}" filter="url(#glow)">{E(s).upper()}<tspan font-size="8" letter-spacing="0" fill="{DIM}">{tag}</tspan></text>')
+        for j, line in enumerate(wrap(states[s].get("description", ""), 31)[:4]):
+            o.append(f'<text x="{x+11}" y="{y+38+j*12}" font-size="9.5" fill="{DIM}">{E(line)}</text>')
     o.append("</svg>")
     return "\n".join(o) + "\n"
 
