@@ -1,0 +1,20 @@
+{
+  "perk": "github_ci",
+  "skill": "datadog",
+  "description": "Generate/update a Datadog CI Visibility GitHub Actions workflow (datadog-ci junit upload).",
+  "rules": [
+    "idempotent \u2014 existing workflow backed up to .bk before overwrite",
+    "writes only .github/workflows/datadog-ci.yml",
+    "needs the DD_API_KEY repo secret at run time"
+  ],
+  "usage": "Set PROJECT_DIR (+ SERVICE, TEST_CMD, JUNIT_PATH, DD_SITE, BRANCH). Output: .github/workflows/datadog-ci.yml.",
+  "limitation": "Test (JUnit) visibility via datadog-ci; pipeline visibility uses the Datadog GitHub App (a one-time integration, not a workflow).",
+  "minimal_example": {
+    "perk": "github_ci",
+    "vars": {
+      "PROJECT_DIR": "/path/to/repo",
+      "SERVICE": "my-app",
+      "TEST_CMD": "pytest --junitxml=junit.xml"
+    }
+  }
+}

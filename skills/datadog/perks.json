@@ -1,0 +1,13 @@
+{
+  "skill": "datadog",
+  "perks": [
+    {
+      "id": "github_ci",
+      "summary": "write/update .github/workflows/datadog-ci.yml (datadog-ci junit upload)",
+      "destructive": false,
+      "tools": [
+        "datadog_github_ci"
+      ]
+    }
+  ]
+}

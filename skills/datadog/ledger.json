@@ -1,0 +1,14 @@
+{
+  "_schema": "task-ledger TEMPLATE for datadog \u2014 fill PROJECT_DIR (+ optional SERVICE, TEST_CMD, JUNIT_PATH, DD_SITE, BRANCH).",
+  "skill": "datadog",
+  "perk": "github_ci",
+  "record_store": "<absolute dir for the datadog-ci.yml copy + run-ledger>",
+  "vars": {
+    "PROJECT_DIR": "<repo path>",
+    "SERVICE": "",
+    "TEST_CMD": "pytest --junitxml=junit.xml",
+    "JUNIT_PATH": "junit.xml",
+    "DD_SITE": "datadoghq.com",
+    "BRANCH": "main"
+  }
+}

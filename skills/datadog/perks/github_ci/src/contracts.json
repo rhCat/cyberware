@@ -1,0 +1,39 @@
+{
+  "tool": "datadog_github_ci",
+  "inputs": {
+    "PROJECT_DIR": {
+      "type": "dir",
+      "required": true
+    },
+    "SERVICE": {
+      "type": "string",
+      "required": false
+    },
+    "TEST_CMD": {
+      "type": "string",
+      "required": false
+    },
+    "JUNIT_PATH": {
+      "type": "string",
+      "required": false
+    },
+    "DD_SITE": {
+      "type": "string",
+      "required": false
+    },
+    "BRANCH": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "outputs": {
+    "workflow": {
+      "path": "${RECORD_STORE}/datadog-ci.yml",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/datadog-ci.yml"
+  }
+}

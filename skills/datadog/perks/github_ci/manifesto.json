@@ -1,0 +1,31 @@
+{
+  "_perk": "github_ci",
+  "sequence": [
+    "datadog_github_ci"
+  ],
+  "tools": {
+    "datadog_github_ci": {
+      "binary": "bash",
+      "params": {
+        "PROJECT_DIR": "${PROJECT_DIR}",
+        "SERVICE": "${SERVICE}",
+        "TEST_CMD": "${TEST_CMD}",
+        "JUNIT_PATH": "${JUNIT_PATH}",
+        "DD_SITE": "${DD_SITE}",
+        "BRANCH": "${BRANCH}"
+      }
+    }
+  },
+  "env": {
+    "PROJECT_DIR": "${PROJECT_DIR}",
+    "SERVICE": "${SERVICE}",
+    "TEST_CMD": "${TEST_CMD}",
+    "JUNIT_PATH": "${JUNIT_PATH}",
+    "DD_SITE": "${DD_SITE}",
+    "BRANCH": "${BRANCH}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "bash"
+  ]
+}
