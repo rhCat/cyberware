@@ -81,15 +81,20 @@ def main():
     text, seq = build_script(L)
     open(out, "w").write(text)
     os.chmod(out, 0o755)
-    # the blueprint diagram (annotated with this perk's tools), beside the script
+    # the TASK blueprint = the skill's blueprint specialised for THIS task (its perk, vars, run dir),
+    # saved to the run dir; the run diagrams are compiled from IT, not the general blueprint.
     base = out[:-3] if out.endswith(".sh") else out
+    task_bp_path = os.path.join(run, "task-blueprint.json")
     diagrams = []
     try:
         import visualize
         bp = load(os.path.join(ROOT, "skills", skill, "blueprint.json"))
-        diagrams = visualize.render(bp, seq, base, ["drawio", "svg"])
+        task_bp = {**bp, "task": {"skill": skill, "perk": perk, "vars": dict(L.get("vars", {})),
+                                  "tools": seq, "run_dir": run}}
+        open(task_bp_path, "w").write(json.dumps(task_bp, indent=2) + "\n")
+        diagrams = visualize.render(task_bp, seq, base, ["drawio", "svg"])
     except Exception as e:
-        print(f"  (diagram skipped: {e})", file=sys.stderr)
+        print(f"  (task blueprint / diagram skipped: {e})", file=sys.stderr)
     # a copy of the task-ledger in the run dir, carrying a pointer to the outputs + logs
     contract = load(os.path.join(ROOT, "skills", skill, "perks", perk, "src", "contracts.json"))
     # resolve EVERY var (not just RECORD_STORE): an output designed for a given dir (e.g. ${TARGET_DIR})
@@ -103,7 +108,7 @@ def main():
         if p and p not in outs:
             outs.append(p)
     led = {**L, "record_store": run,
-           "run": {"dir": run, "script": out, "diagrams": diagrams,
+           "run": {"dir": run, "script": out, "blueprint": task_bp_path, "diagrams": diagrams,
                    "outputs": outs, "logs": os.path.join(run, "run-ledger.json")}}
     open(os.path.join(run, "task-ledger.json"), "w").write(json.dumps(led, indent=2) + "\n")
     print(f"compiled {skill}/{perk} → {out}  ({len(seq)} steps)")

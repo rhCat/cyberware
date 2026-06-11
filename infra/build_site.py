@@ -43,6 +43,8 @@ def perk_data(pdir: str, pm: dict, bp: dict, sid: str, tpl_vars: dict) -> dict:
     ex = meta.get("minimal_example", {}).get("vars", {})
     dvars = {v: ex.get(v, tpl_vars.get(v, "")) for v in man.get("env", {}) if v != "RECORD_STORE"}
     ledger = {"skill": sid, "perk": pm["id"], "record_store": "<default: ~/cyberware_run_logs>", "vars": dvars}
+    run = compiler.run_dir(ledger).replace(os.path.expanduser("~"), "~")
+    task_bp = {**bp, "task": {"skill": sid, "perk": pm["id"], "vars": dvars, "tools": seq, "run_dir": run}}
     try:
         text, _ = compiler.build_script(ledger)
         compiled = text.replace(ROOT + "/", "").replace(os.path.expanduser("~"), "~")   # readable paths
@@ -53,8 +55,8 @@ def perk_data(pdir: str, pm: dict, bp: dict, sid: str, tpl_vars: dict) -> dict:
         "metadata": meta, "sequence": seq, "tools": man.get("tools", {}),
         "env": man.get("env", {}), "requires": man.get("requires", []),
         "contracts": load(os.path.join(pdir, "src", "contracts.json")), "snippets": snippets,
-        "svg": visualize.svg(bp, seq),
-        "demo": {"ledger": ledger, "compiled": compiled},
+        "svg": visualize.svg(task_bp, seq),
+        "demo": {"ledger": ledger, "compiled": compiled, "blueprint": task_bp},
     }
 
 

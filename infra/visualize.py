@@ -82,8 +82,17 @@ def drawio(bp, perk_steps=None):
     terms, entry = set(bp.get("terminal_states", {})), bp["entry_state"]
     pos, d, W, H, _, _ = _layout(bp)
     cells = []
+    task = bp.get("task") or {}
+    note_lines = ([f"TASK · {task.get('skill', '')} / {task.get('perk', '')}"]
+                  + [f"{k} = {v}" for k, v in (task.get("vars") or {}).items()]
+                  + ([f"run → {task['run_dir']}"] if task.get("run_dir") else [])) if task else []
+    yoff = (44 + len(note_lines) * 16) if note_lines else 0   # push states below the task note
+    if note_lines:
+        note = E("\n".join(note_lines)).replace("\n", "&#10;")
+        cells.append(f'<mxCell id="task_note" value="{note}" style="shape=note;whiteSpace=wrap;html=1;fillColor=#0c160b;strokeColor=#74ad68;fontColor=#93d98a;align=left;spacingLeft=10;spacingTop=6;fontSize=11;" vertex="1" parent="1"><mxGeometry x="20" y="16" width="440" height="{yoff - 28}" as="geometry"/></mxCell>')
     for s in bp["states"]:
         x, y = pos[s]
+        y += yoff
         fill, stroke = ("#d5e8d4", "#82b366") if s in terms else (("#dae8fc", "#6c8ebf") if s == entry else ("#f5f5f5", "#666666"))
         val = E(f"{s}\n{states[s].get('description','')}").replace("\n", "&#10;")
         cells.append(f'<mxCell id="s_{s}" value="{val}" style="rounded=1;whiteSpace=wrap;html=1;fillColor={fill};strokeColor={stroke};align=left;verticalAlign=top;spacing=6;spacingTop=4;fontSize=11;" vertex="1" parent="1"><mxGeometry x="{x}" y="{y}" width="{W}" height="{H}" as="geometry"/></mxCell>')
@@ -145,14 +154,19 @@ def svg(bp, perk_steps=None):
         cu = actions.get(ident, {}).get("compute_unit", ident)
         return "▶ " + " → ".join(perk_steps) if (perk_steps and "perk:sequence" in cu) else ""
 
-    y, nodes, maxside = 48, [], 12
+    task = bp.get("task") or {}
+    task_lines = [f"{k} = {str(v)[:56]}" for k, v in (task.get("vars") or {}).items()]
+    if task.get("run_dir"):
+        task_lines.append(f"run → {str(task['run_dir'])[:56]}")
+    th = (26 + len(task_lines) * 15 + 8) if task_lines else 0   # task-settings header height
+    y, nodes, maxside = 48 + th, [], 12
     for kind, ident, trig in seq:
         w, h = _SIZE[kind]
         nodes.append((kind, ident, CX - w / 2, y, w, h, trig))
         maxside = max(maxside, len(expr_of(ident)) if kind == "gate" else (len(steps_of(ident)) if kind == "action" else 0))
         y += h + GAP
     height = y + 8
-    width = max(600, CX + 95 + maxside * 7 + 28)
+    width = max(600, CX + 95 + maxside * 7 + 28, max((len(s) for s in task_lines), default=0) * 7 + 44)
 
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
          'font-family="ui-monospace,Menlo,Consolas,monospace">',
@@ -166,6 +180,14 @@ def svg(bp, perk_steps=None):
          f'<rect width="{width}" height="{height}" fill="{_BG}"/>',
          f'<rect width="{width}" height="{height}" fill="url(#px)"/>',
          f'<text x="16" y="28" font-size="14" font-weight="700" letter-spacing="3" fill="{_NEON}" filter="url(#glow)">{E(bp.get("id","skill")).upper()}</text>']
+
+    if task_lines:                                              # the task-specific settings (perk · vars · run dir)
+        by0 = 40
+        o.append(f'<rect x="14" y="{by0}" width="{width - 28}" height="{th - 6}" fill="#0c160b" stroke="{_DIM}" stroke-width="1"/>')
+        o.append(f'<text x="22" y="{by0 + 17}" font-size="11" font-weight="700" letter-spacing="1" fill="{_ON}">'
+                 f'TASK · {E(task.get("skill", ""))} / {E(task.get("perk", ""))}</text>')
+        for i, line in enumerate(task_lines):
+            o.append(f'<text x="22" y="{by0 + 17 + (i + 1) * 15}" font-size="11" fill="{_DIM}">{E(line)}</text>')
 
     # transitions = lines (glow underlay + crisp wide stroke, so they read clearly)
     for k in range(len(nodes) - 1):
