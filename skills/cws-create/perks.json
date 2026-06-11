@@ -1,0 +1,21 @@
+{
+  "skill": "cws-create",
+  "perks": [
+    {
+      "id": "evaluate",
+      "summary": "classify a candidate skill: execution | design | transformable",
+      "destructive": false,
+      "tools": [
+        "cws_evaluate"
+      ]
+    },
+    {
+      "id": "scaffold",
+      "summary": "lay down the cyberware skeleton for a fitting skill (via scaffold.py)",
+      "destructive": false,
+      "tools": [
+        "cws_scaffold"
+      ]
+    }
+  ]
+}

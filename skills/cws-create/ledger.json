@@ -1,0 +1,10 @@
+{
+  "_schema": "task-ledger TEMPLATE for cws-create \u2014 evaluate a candidate skill.",
+  "skill": "cws-create",
+  "perk": "evaluate",
+  "record_store": "<absolute dir for the evaluation>",
+  "vars": {
+    "SKILL_NAME": "<candidate name>",
+    "SKILL_DESC": "<plain description of what it does>"
+  }
+}

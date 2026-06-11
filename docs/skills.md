@@ -17,6 +17,7 @@ Tool skills (operational pathways) — not design/taste skills. Each runs throug
 | **data** | `csv2json` · `jq` | python3 · jq | CSV → JSON array (python core); jq query over a JSON file. |
 | **search** | `grep` · `loc` | ripgrep/grep · find | pattern search (rg, fallback grep); line counts by extension. Read-only. |
 | **release** | `tag` | git | annotated git tag at HEAD; no-op if it exists. No force, no push (push stays gated). |
+| **cws-create** | `evaluate` · `scaffold` | python3 · scaffold.py | **the on-ramp** — classify a candidate skill (execution / design / transformable / unclear) and, if it fits, scaffold it into cyberware format. |
 
 ## Choosing a perk
 

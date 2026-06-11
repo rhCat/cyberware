@@ -1,0 +1,19 @@
+{
+  "perk": "scaffold",
+  "skill": "cws-create",
+  "description": "Lay down a cyberware skill skeleton (blueprint + perks + contracts + snippet stubs).",
+  "rules": [
+    "calls infra/scaffold.py",
+    "creates skills/<NEW_SKILL>/ \u2014 composes out of the box; fill the snippets"
+  ],
+  "usage": "Set NEW_SKILL + NEW_NAME + PERKS (space-separated <pid>:<tool>[:<binary>]). Output: scaffold.log.",
+  "limitation": "Creates the skeleton only; you fill the snippets + vars.",
+  "minimal_example": {
+    "perk": "scaffold",
+    "vars": {
+      "NEW_SKILL": "pg_backup",
+      "NEW_NAME": "Postgres backup",
+      "PERKS": "dump:pg_dump:pg_dump"
+    }
+  }
+}

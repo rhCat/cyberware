@@ -1,0 +1,25 @@
+{
+  "_perk": "scaffold",
+  "sequence": [
+    "cws_scaffold"
+  ],
+  "tools": {
+    "cws_scaffold": {
+      "binary": "python3",
+      "params": {
+        "NEW_SKILL": "${NEW_SKILL}",
+        "NEW_NAME": "${NEW_NAME}",
+        "PERKS": "${PERKS}"
+      }
+    }
+  },
+  "env": {
+    "NEW_SKILL": "${NEW_SKILL}",
+    "NEW_NAME": "${NEW_NAME}",
+    "PERKS": "${PERKS}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "python3"
+  ]
+}
