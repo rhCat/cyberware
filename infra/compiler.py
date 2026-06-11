@@ -70,7 +70,16 @@ def main():
     if a.out:
         open(a.out, "w").write(text)
         os.chmod(a.out, 0o755)
-        print(f"compiled {skill}/{perk} → {a.out}  ({len(seq)} steps)")
+        # quick-inspect artifacts beside the script: the blueprint diagram annotated with THIS perk's
+        # tool sequence, in both draw.io XML and self-contained SVG — the only fast way to eyeball it.
+        try:
+            import visualize
+            bp = load(os.path.join(ROOT, "skills", skill, "blueprint.json"))
+            base = a.out[:-3] if a.out.endswith(".sh") else a.out
+            extra = ", ".join(os.path.basename(w) for w in visualize.render(bp, seq, base, ["drawio", "svg"]))
+            print(f"compiled {skill}/{perk} → {a.out}  (+ {extra} · {len(seq)} steps)")
+        except Exception as e:
+            print(f"compiled {skill}/{perk} → {a.out}  ({len(seq)} steps; diagram skipped: {e})")
     else:
         sys.stdout.write(text)
 
