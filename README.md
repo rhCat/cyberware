@@ -80,8 +80,13 @@ python3 infra/executor.py   --script /tmp/run.sh --step 1        # governed run 
 # scaffold a new skill skeleton — composes out of the box; fill the snippets + vars
 python3 infra/scaffold.py --skill myskill --name "My Skill" --perk fetch:my_fetch:curl --perk store:my_store:python3
 
-# render a blueprint as draw.io XML (entry blue, terminal green; open in app.diagrams.net)
-python3 infra/visualize.py --skill pg_ops -o skills/pg_ops/blueprint.drawio
+# render a blueprint as draw.io XML + self-contained SVG (entry blue, terminal green)
+python3 infra/visualize.py --skill pg_ops               # → skills/pg_ops/blueprint.{drawio,svg}
+python3 infra/visualize.py --ledger task.json -o run    # annotated with the chosen perk's steps
 ```
+
+**Every `compiler.py` run also drops `<script>.drawio` + `<script>.svg` beside the compiled bash**,
+the operate step annotated with that task's actual tool sequence. The SVG renders in any browser —
+the only fast way to eyeball what a compiled task will do before the executor runs it.
 
 See [`SPEC.md`](SPEC.md) for the original specification.
