@@ -1,0 +1,35 @@
+{
+  "tool": "psql_select",
+  "inputs": {
+    "QUERY": {
+      "type": "string",
+      "required": true
+    },
+    "LIMIT": {
+      "type": "integer",
+      "default": "100"
+    },
+    "PGHOST": {
+      "type": "string",
+      "required": true
+    },
+    "PGDATABASE": {
+      "type": "string",
+      "required": true
+    },
+    "PGUSER": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "rows_csv": {
+      "path": "${RECORD_STORE}/select_rows.csv",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/select_rows.csv"
+  }
+}

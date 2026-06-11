@@ -1,0 +1,117 @@
+{
+  "$schema": "lpp/v0.2.0",
+  "id": "pg_ops",
+  "name": "Governed PostgreSQL operations",
+  "description": "The general, perk-agnostic lifecycle of a governed DB operation. Tells the intelligence what to look out for (the guardrails) and which logs to check (the per-tool structured output + the executor's run-ledger). Perks are optional: any proven pathway plugs into a_operate.",
+  "entry_state": "ready",
+  "states": {
+    "ready": {
+      "description": "task-ledger submitted, nothing run"
+    },
+    "connected": {
+      "description": "connection validated \u2014 host reachable, creds present, record_store writable"
+    },
+    "operated": {
+      "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+    },
+    "verified": {
+      "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+    },
+    "recorded": {
+      "description": "run metadata + outputs recorded to the run-ledger"
+    }
+  },
+  "terminal_states": {
+    "recorded": {}
+  },
+  "gates": {
+    "g_connected": {
+      "type": "expression",
+      "expression": "host_reachable /\\ store_writable",
+      "description": "connection + store validated"
+    },
+    "g_operated": {
+      "type": "expression",
+      "expression": "governed_run",
+      "description": "ran ONLY through executor.py"
+    },
+    "g_verified": {
+      "type": "expression",
+      "expression": "contract_checks_pass",
+      "description": "the perk's contract is satisfied"
+    }
+  },
+  "actions": {
+    "a_connect": {
+      "type": "compute",
+      "compute_unit": "validator:check_connection",
+      "description": "validator confirms host + creds + writable record_store"
+    },
+    "a_operate": {
+      "type": "compute",
+      "compute_unit": "perk:sequence",
+      "description": "run the chosen perk's tool sequence (perk OPTIONAL). LOOK OUT FOR: each tool's structured JSON on stdout."
+    },
+    "a_verify": {
+      "type": "compute",
+      "compute_unit": "validator:check_contract",
+      "description": "the perk's src/contracts.json checks. LOGS TO CHECK: per-tool JSON + ${record_store}/run-ledger.json"
+    },
+    "a_record": {
+      "type": "compute",
+      "compute_unit": "executor:record",
+      "description": "persist run metadata + outputs to the run-ledger"
+    }
+  },
+  "transitions": [
+    {
+      "from": "ready",
+      "to": "connected",
+      "trigger": "CONNECT",
+      "action": "a_connect",
+      "gate": "g_connected"
+    },
+    {
+      "from": "connected",
+      "to": "operated",
+      "trigger": "OPERATE",
+      "action": "a_operate",
+      "gate": "g_operated"
+    },
+    {
+      "from": "operated",
+      "to": "verified",
+      "trigger": "VERIFY",
+      "action": "a_verify",
+      "gate": "g_verified"
+    },
+    {
+      "from": "verified",
+      "to": "recorded",
+      "trigger": "RECORD",
+      "action": "a_record"
+    }
+  ],
+  "safety_invariants": [
+    {
+      "name": "operate_only_when_connected",
+      "expression": "state /= 'operated' \\/ host_reachable",
+      "description": "GUARDRAIL: no operation before the connection is validated."
+    },
+    {
+      "name": "governed_execution_only",
+      "expression": "state /= 'operated' \\/ governed_run",
+      "description": "GUARDRAIL: the perk's tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+    },
+    {
+      "name": "verify_before_record",
+      "expression": "state /= 'recorded' \\/ contract_checks_pass",
+      "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+    },
+    {
+      "name": "no_destructive_without_approval",
+      "expression": "TRUE",
+      "description": "GUARDRAIL: destructive SQL (DROP/TRUNCATE) is refused by OVERSIGHT_RULE unless explicitly approved (oversight.py --approve)."
+    }
+  ]
+}

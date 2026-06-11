@@ -1,0 +1,31 @@
+{
+  "tool": "psql_migrate",
+  "inputs": {
+    "MIGRATION": {
+      "type": "file",
+      "required": true
+    },
+    "PGHOST": {
+      "type": "string",
+      "required": true
+    },
+    "PGDATABASE": {
+      "type": "string",
+      "required": true
+    },
+    "PGUSER": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "applied_log": {
+      "path": "${RECORD_STORE}/migrate_applied.log",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/migrate_applied.log"
+  }
+}

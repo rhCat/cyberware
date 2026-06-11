@@ -1,0 +1,25 @@
+{
+  "_perk": "select",
+  "sequence": [
+    "psql_select"
+  ],
+  "tools": {
+    "psql_select": {
+      "binary": "psql",
+      "params": {
+        "query": "${QUERY}",
+        "limit": "${LIMIT}"
+      }
+    }
+  },
+  "env": {
+    "PGHOST": "${PGHOST}",
+    "PGPORT": "${PGPORT}",
+    "PGDATABASE": "${PGDATABASE}",
+    "PGUSER": "${PGUSER}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "psql"
+  ]
+}

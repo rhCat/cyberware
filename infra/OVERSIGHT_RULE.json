@@ -1,0 +1,53 @@
+{
+  "_schema": "oversight rules \u2014 the compiled script must violate NONE (unless an approvable rule is approved). regex over the bash.",
+  "deny": [
+    {
+      "id": "drop_table",
+      "pattern": "(?i)\\bdrop\\s+table\\b",
+      "reason": "DROP TABLE is destructive",
+      "approvable": true
+    },
+    {
+      "id": "drop_schema",
+      "pattern": "(?i)\\bdrop\\s+schema\\b",
+      "reason": "DROP SCHEMA is destructive",
+      "approvable": true
+    },
+    {
+      "id": "drop_database",
+      "pattern": "(?i)\\bdrop\\s+database\\b",
+      "reason": "DROP DATABASE is catastrophic",
+      "approvable": false
+    },
+    {
+      "id": "truncate",
+      "pattern": "(?i)\\btruncate\\b",
+      "reason": "TRUNCATE deletes all rows",
+      "approvable": true
+    },
+    {
+      "id": "delete_nowhere",
+      "pattern": "(?i)\\bdelete\\s+from\\s+\\w+\\s*;",
+      "reason": "DELETE without WHERE",
+      "approvable": true
+    },
+    {
+      "id": "rm_rf",
+      "pattern": "\\brm\\s+-[a-z]*[rf]",
+      "reason": "recursive/forced delete",
+      "approvable": false
+    },
+    {
+      "id": "pipe_to_shell",
+      "pattern": "\\b(curl|wget)\\b[^\\n|]*\\|\\s*(ba)?sh",
+      "reason": "pipe-to-shell (RCE)",
+      "approvable": false
+    },
+    {
+      "id": "sudo",
+      "pattern": "\\bsudo\\b",
+      "reason": "privilege escalation",
+      "approvable": false
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "skill": "pg_ops",
+  "perk": "select",
+  "record_store": "/tmp/cyberware_demo",
+  "vars": {
+    "PGHOST": "localhost",
+    "PGPORT": "5432",
+    "PGDATABASE": "demo",
+    "PGUSER": "reader",
+    "QUERY": "SELECT id, name FROM users WHERE active",
+    "LIMIT": "100"
+  }
+}
