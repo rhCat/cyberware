@@ -230,16 +230,10 @@ function blueprintHtml(s) {
       <div class="perkhead"><b>demo · ${esc(p.id)}</b><span class="sum">${esc(p.summary)}</span>
         <span class="badge ${p.destructive?'dx':'ro'}">${p.destructive?'destructive':'read-only'}</span></div>
       <p class="muted" style="font-size:12.5px">The intelligence fills the <b>task config</b>; it compiles to the <b>script</b> the executor runs — its shape visualized in <b>this task's blueprint</b> (the lifecycle annotated with the perk's tool sequence).</p>
-      <div class="demo-grid">
-        <div>
-          <div class="lbl">task config <span class="muted">— task-ledger.json</span></div>
-          <pre>${esc(JSON.stringify(d.ledger || {}, null, 2))}</pre>
-        </div>
-        <div>
-          <div class="lbl">task blueprint <span class="muted">— lifecycle annotated with this perk's tools</span></div>
-          <div class="card" id="bp">${p.svg || ""}</div>
-        </div>
-      </div>
+      <div class="lbl">task config <span class="muted">— task-ledger.json</span></div>
+      <pre>${esc(JSON.stringify(d.ledger || {}, null, 2))}</pre>
+      <div class="lbl">task blueprint <span class="muted">— lifecycle annotated with this perk's tools</span></div>
+      <div class="card" id="bp">${p.svg || ""}</div>
       <div class="lbl">task blueprint — L++ source <span class="muted">— blueprint.json; the perk's tool sequence fills the a_operate step</span></div>
       <pre class="tall">${esc(JSON.stringify(s.blueprint || {}, null, 2))}</pre>
       <div class="lbl">compiled script <span class="muted">— what the executor runs, step by step</span></div>
