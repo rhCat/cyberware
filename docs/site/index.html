@@ -200,7 +200,7 @@ function setTab(t) { cur.tab = t; render(); }
 
 function render() {
   const s = S[cur.i];
-  document.querySelectorAll("#list .item").forEach((el,j)=>el.classList.toggle("active", j===cur.i));
+  document.querySelectorAll("#list .item").forEach(el => el.classList.toggle("active", +el.dataset.i === cur.i));
   const tabs = `<span class="tab ov ${cur.tab==='overview'?'active':''}" data-tab="overview">Overview</span>` +
     `<span class="tab ov ${cur.tab==='blueprint'?'active':''}" data-tab="blueprint">Blueprints</span>` +
     s.perks.map(p=>`<span class="tab ${p.id===cur.tab?'active':''}" data-tab="${esc(p.id)}"><span class="muted" style="font-weight:400">perk ·</span> ${esc(p.id)}</span>`).join("");
