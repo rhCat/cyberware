@@ -1,0 +1,11 @@
+{
+  "_schema": "task-ledger TEMPLATE for py_qc \u2014 set perk, fill record_store + the vars the perk's manifesto declares. The LLM outputs ONLY these fields.",
+  "skill": "py_qc",
+  "perk": "test",
+  "record_store": "<absolute dir for outputs + run-ledger>",
+  "vars": {
+    "PROJECT_DIR": "<project_dir>",
+    "TEST_DIR": "tests",
+    "PYTEST_ARGS": ""
+  }
+}

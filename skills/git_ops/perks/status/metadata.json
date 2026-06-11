@@ -1,0 +1,16 @@
+{
+  "perk": "status",
+  "skill": "git_ops",
+  "description": "porcelain status (read-only)",
+  "rules": [
+    "read-only"
+  ],
+  "usage": "Set REPO_DIR. Output: git_status.txt.",
+  "limitation": "Reporting only.",
+  "minimal_example": {
+    "perk": "status",
+    "vars": {
+      "REPO_DIR": "/path/to/repo"
+    }
+  }
+}

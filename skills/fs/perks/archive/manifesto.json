@@ -1,0 +1,21 @@
+{
+  "_perk": "archive",
+  "sequence": [
+    "fs_archive"
+  ],
+  "tools": {
+    "fs_archive": {
+      "binary": "tar",
+      "params": {
+        "SOURCE_DIR": "${SOURCE_DIR}"
+      }
+    }
+  },
+  "env": {
+    "SOURCE_DIR": "${SOURCE_DIR}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "tar"
+  ]
+}

@@ -32,9 +32,45 @@
       "approvable": true
     },
     {
+      "id": "git_force_push",
+      "pattern": "\\bgit\\s+push\\b[^\\n]*--force",
+      "reason": "force-push rewrites remote history",
+      "approvable": true
+    },
+    {
+      "id": "git_reset_hard",
+      "pattern": "\\bgit\\s+reset\\b[^\\n]*--hard",
+      "reason": "hard reset discards work",
+      "approvable": true
+    },
+    {
       "id": "rm_rf",
       "pattern": "\\brm\\s+-[a-z]*[rf]",
       "reason": "recursive/forced delete",
+      "approvable": true
+    },
+    {
+      "id": "rm_root",
+      "pattern": "\\brm\\s+-[a-z]*[rf][a-z]*\\s+/(\\s|$)",
+      "reason": "rm at filesystem root",
+      "approvable": false
+    },
+    {
+      "id": "chmod_777",
+      "pattern": "\\bchmod\\s+-?R?\\s*0?777\\b",
+      "reason": "world-writable",
+      "approvable": true
+    },
+    {
+      "id": "dd_disk",
+      "pattern": "\\bdd\\s+if=",
+      "reason": "raw disk write",
+      "approvable": false
+    },
+    {
+      "id": "mkfs",
+      "pattern": "\\bmkfs\\b",
+      "reason": "filesystem format",
       "approvable": false
     },
     {
@@ -47,6 +83,12 @@
       "id": "sudo",
       "pattern": "\\bsudo\\b",
       "reason": "privilege escalation",
+      "approvable": false
+    },
+    {
+      "id": "fork_bomb",
+      "pattern": ":\\(\\)\\s*\\{[^}]*:\\s*\\|\\s*:",
+      "reason": "fork bomb",
       "approvable": false
     }
   ]

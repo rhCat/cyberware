@@ -1,0 +1,21 @@
+{
+  "skill": "py_qc",
+  "perks": [
+    {
+      "id": "test",
+      "summary": "run pytest",
+      "destructive": false,
+      "tools": [
+        "py_test"
+      ]
+    },
+    {
+      "id": "lint",
+      "summary": "run ruff (fallback flake8)",
+      "destructive": false,
+      "tools": [
+        "py_lint"
+      ]
+    }
+  ]
+}

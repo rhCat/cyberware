@@ -1,0 +1,23 @@
+{
+  "_perk": "post",
+  "sequence": [
+    "http_post"
+  ],
+  "tools": {
+    "http_post": {
+      "binary": "curl",
+      "params": {
+        "URL": "${URL}",
+        "BODY": "${BODY}"
+      }
+    }
+  },
+  "env": {
+    "URL": "${URL}",
+    "BODY": "${BODY}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "curl"
+  ]
+}

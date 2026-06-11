@@ -1,0 +1,23 @@
+{
+  "_perk": "snapshot",
+  "sequence": [
+    "git_snapshot"
+  ],
+  "tools": {
+    "git_snapshot": {
+      "binary": "git",
+      "params": {
+        "REPO_DIR": "${REPO_DIR}",
+        "MESSAGE": "${MESSAGE}"
+      }
+    }
+  },
+  "env": {
+    "REPO_DIR": "${REPO_DIR}",
+    "MESSAGE": "${MESSAGE}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "git"
+  ]
+}

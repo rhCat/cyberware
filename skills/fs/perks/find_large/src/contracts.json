@@ -1,0 +1,23 @@
+{
+  "tool": "fs_find_large",
+  "inputs": {
+    "SEARCH_DIR": {
+      "type": "string",
+      "required": true
+    },
+    "MIN_SIZE": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "outputs": {
+    "fs_find_large_out": {
+      "path": "${RECORD_STORE}/large_files.txt",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/large_files.txt"
+  }
+}

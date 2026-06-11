@@ -1,0 +1,23 @@
+{
+  "tool": "py_lint",
+  "inputs": {
+    "PROJECT_DIR": {
+      "type": "string",
+      "required": true
+    },
+    "LINT_TARGET": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "outputs": {
+    "py_lint_out": {
+      "path": "${RECORD_STORE}/lint.out",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/lint.out"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "skill": "git_ops",
+  "perks": [
+    {
+      "id": "snapshot",
+      "summary": "stage all + commit in a repo",
+      "destructive": false,
+      "tools": [
+        "git_snapshot"
+      ]
+    },
+    {
+      "id": "status",
+      "summary": "porcelain status (read-only)",
+      "destructive": false,
+      "tools": [
+        "git_status"
+      ]
+    }
+  ]
+}

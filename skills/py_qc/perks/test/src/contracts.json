@@ -1,0 +1,27 @@
+{
+  "tool": "py_test",
+  "inputs": {
+    "PROJECT_DIR": {
+      "type": "string",
+      "required": true
+    },
+    "TEST_DIR": {
+      "type": "string",
+      "required": false
+    },
+    "PYTEST_ARGS": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "outputs": {
+    "py_test_out": {
+      "path": "${RECORD_STORE}/pytest.out",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/pytest.out"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "tool": "git_snapshot",
+  "inputs": {
+    "REPO_DIR": {
+      "type": "string",
+      "required": true
+    },
+    "MESSAGE": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "git_snapshot_out": {
+      "path": "${RECORD_STORE}/git_snapshot.json",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/git_snapshot.json"
+  }
+}

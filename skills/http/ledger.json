@@ -1,0 +1,10 @@
+{
+  "_schema": "task-ledger TEMPLATE for http \u2014 set perk, fill record_store + the vars the perk's manifesto declares. The LLM outputs ONLY these fields.",
+  "skill": "http",
+  "perk": "get",
+  "record_store": "<absolute dir for outputs + run-ledger>",
+  "vars": {
+    "URL": "<url>",
+    "HEADER": ""
+  }
+}

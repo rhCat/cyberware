@@ -1,0 +1,16 @@
+{
+  "perk": "lint",
+  "skill": "py_qc",
+  "description": "run ruff (fallback flake8)",
+  "rules": [
+    "report to record_store"
+  ],
+  "usage": "Set PROJECT_DIR (+ LINT_TARGET). Output: lint.out.",
+  "limitation": "ruff or flake8 must be installed.",
+  "minimal_example": {
+    "perk": "lint",
+    "vars": {
+      "PROJECT_DIR": "/path/to/proj"
+    }
+  }
+}

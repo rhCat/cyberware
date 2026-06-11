@@ -1,0 +1,23 @@
+{
+  "tool": "http_get",
+  "inputs": {
+    "URL": {
+      "type": "string",
+      "required": true
+    },
+    "HEADER": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "outputs": {
+    "http_get_out": {
+      "path": "${RECORD_STORE}/response.body",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/response.body"
+  }
+}

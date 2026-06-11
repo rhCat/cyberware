@@ -1,0 +1,21 @@
+{
+  "skill": "fs",
+  "perks": [
+    {
+      "id": "archive",
+      "summary": "tar.gz a directory",
+      "destructive": false,
+      "tools": [
+        "fs_archive"
+      ]
+    },
+    {
+      "id": "find_large",
+      "summary": "list files over a size threshold (read-only)",
+      "destructive": false,
+      "tools": [
+        "fs_find_large"
+      ]
+    }
+  ]
+}

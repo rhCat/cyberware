@@ -1,0 +1,17 @@
+{
+  "perk": "get",
+  "skill": "http",
+  "description": "GET a URL into a response file",
+  "rules": [
+    "response written to record_store",
+    "status code in structured output"
+  ],
+  "usage": "Set URL (+ optional HEADER). Output: response.body.",
+  "limitation": "No retries/auth helpers in this pathway.",
+  "minimal_example": {
+    "perk": "get",
+    "vars": {
+      "URL": "https://api.example.com/v1/x"
+    }
+  }
+}
