@@ -1,0 +1,13 @@
+{
+  "skill": "ci-codeqc",
+  "perks": [
+    {
+      "id": "github_actions",
+      "summary": "write/update .github/workflows/codeqc.yml (ruff+mypy+pytest)",
+      "destructive": false,
+      "tools": [
+        "ci_github_actions"
+      ]
+    }
+  ]
+}

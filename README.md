@@ -89,4 +89,10 @@ python3 infra/visualize.py --ledger task.json -o run    # annotated with the cho
 the operate step annotated with that task's actual tool sequence. The SVG renders in any browser —
 the only fast way to eyeball what a compiled task will do before the executor runs it.
 
+## Docs
+
+- [architecture](docs/architecture.md) — the two sides, the pipeline, the governance model
+- [authoring](docs/authoring.md) — scaffold + the perk / manifesto / contract / snippet pattern
+- [skills](docs/skills.md) — the catalog
+
 See [`SPEC.md`](SPEC.md) for the original specification.
