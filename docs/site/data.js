@@ -3,78 +3,123 @@ window.SKILLS = [
   "id": "ci-codeqc",
   "name": "CI code-QC generator",
   "description": "Generate or update a GitHub Actions code-QC workflow (ruff + mypy + pytest) for a repo. Idempotent \u2014 creates, or backs up and updates an existing workflow. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
-  "states": {
-   "ready": {
-    "description": "task-ledger submitted, nothing run"
+  "blueprint": {
+   "$schema": "lpp/v0.2.0",
+   "id": "ci-codeqc",
+   "name": "CI code-QC generator",
+   "description": "Generate or update a GitHub Actions code-QC workflow (ruff + mypy + pytest) for a repo. Idempotent \u2014 creates, or backs up and updates an existing workflow. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+   "entry_state": "ready",
+   "states": {
+    "ready": {
+     "description": "task-ledger submitted, nothing run"
+    },
+    "prepared": {
+     "description": "inputs validated \u2014 required vars present, runtime + store ready"
+    },
+    "operated": {
+     "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+    },
+    "verified": {
+     "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+    },
+    "recorded": {
+     "description": "run metadata + outputs recorded to the run-ledger"
+    }
    },
-   "prepared": {
-    "description": "inputs validated \u2014 required vars present, runtime + store ready"
+   "terminal_states": {
+    "recorded": {}
    },
-   "operated": {
-    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   "gates": {
+    "g_prepared": {
+     "type": "expression",
+     "expression": "inputs_present /\\ store_writable",
+     "description": "inputs + store validated"
+    },
+    "g_operated": {
+     "type": "expression",
+     "expression": "governed_run",
+     "description": "ran ONLY through executor.py"
+    },
+    "g_verified": {
+     "type": "expression",
+     "expression": "contract_checks_pass",
+     "description": "the perk's contract is satisfied"
+    }
    },
-   "verified": {
-    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   "actions": {
+    "a_prepare": {
+     "type": "compute",
+     "compute_unit": "validator:check_inputs",
+     "description": "validator confirms required vars + writable record_store + reachable runtime"
+    },
+    "a_operate": {
+     "type": "compute",
+     "compute_unit": "perk:sequence",
+     "description": "run the chosen perk's tool sequence (perk OPTIONAL)"
+    },
+    "a_verify": {
+     "type": "compute",
+     "compute_unit": "validator:check_contract",
+     "description": "the perk's src/contracts.json checks"
+    },
+    "a_record": {
+     "type": "compute",
+     "compute_unit": "executor:record",
+     "description": "persist run metadata + outputs"
+    }
    },
-   "recorded": {
-    "description": "run metadata + outputs recorded to the run-ledger"
-   }
+   "transitions": [
+    {
+     "from": "ready",
+     "to": "prepared",
+     "trigger": "PREPARE",
+     "action": "a_prepare",
+     "gate": "g_prepared"
+    },
+    {
+     "from": "prepared",
+     "to": "operated",
+     "trigger": "OPERATE",
+     "action": "a_operate",
+     "gate": "g_operated"
+    },
+    {
+     "from": "operated",
+     "to": "verified",
+     "trigger": "VERIFY",
+     "action": "a_verify",
+     "gate": "g_verified"
+    },
+    {
+     "from": "verified",
+     "to": "recorded",
+     "trigger": "RECORD",
+     "action": "a_record"
+    }
+   ],
+   "safety_invariants": [
+    {
+     "name": "operate_only_when_prepared",
+     "expression": "state /= 'operated' \\/ inputs_present",
+     "description": "GUARDRAIL: no operation before inputs are validated."
+    },
+    {
+     "name": "governed_execution_only",
+     "expression": "state /= 'operated' \\/ governed_run",
+     "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+    },
+    {
+     "name": "verify_before_record",
+     "expression": "state /= 'recorded' \\/ contract_checks_pass",
+     "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+    },
+    {
+     "name": "oversight_clears_script",
+     "expression": "TRUE",
+     "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+    }
+   ]
   },
-  "transitions": [
-   {
-    "from": "ready",
-    "to": "prepared",
-    "trigger": "PREPARE",
-    "action": "a_prepare",
-    "gate": "g_prepared"
-   },
-   {
-    "from": "prepared",
-    "to": "operated",
-    "trigger": "OPERATE",
-    "action": "a_operate",
-    "gate": "g_operated"
-   },
-   {
-    "from": "operated",
-    "to": "verified",
-    "trigger": "VERIFY",
-    "action": "a_verify",
-    "gate": "g_verified"
-   },
-   {
-    "from": "verified",
-    "to": "recorded",
-    "trigger": "RECORD",
-    "action": "a_record"
-   }
-  ],
-  "terminal": [
-   "recorded"
-  ],
-  "entry": "ready",
-  "safety_invariants": [
-   {
-    "name": "operate_only_when_prepared",
-    "expression": "state /= 'operated' \\/ inputs_present",
-    "description": "GUARDRAIL: no operation before inputs are validated."
-   },
-   {
-    "name": "governed_execution_only",
-    "expression": "state /= 'operated' \\/ governed_run",
-    "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
-   },
-   {
-    "name": "verify_before_record",
-    "expression": "state /= 'recorded' \\/ contract_checks_pass",
-    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
-   },
-   {
-    "name": "oversight_clears_script",
-    "expression": "TRUE",
-    "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
-   }
-  ],
   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">ci-codeqc</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
   "skill_md": "---\nskill: ci-codeqc\nname: CI code-QC generator\nperks: [github_actions]\n---\n\n# ci-codeqc \u2014 generate/update a code-QC CI for any repo\n\nWrites a GitHub Actions **code-qc** workflow (`.github/workflows/codeqc.yml`) into a target repo:\ncheckout \u2192 setup Python \u2192 install \u2192 **ruff** (lint) \u2192 **mypy** (types) \u2192 **pytest --cov** (test).\nIdempotent \u2014 re-running regenerates it; an existing workflow is backed up to `.bk` first, so the same\nskill both *creates* and *updates* the CI.\n\n## What to look out for\nThe tool emits structured JSON with `action` = `created | updated` and the workflow path; LOGS TO\nCHECK: that line + `${record_store}/codeqc.yml` (a copy) + the executor run-ledger.\n\n## How to use it\nFill `PROJECT_DIR` (+ optional `SRC_DIR`, `TEST_DIR`, `PYTHON_VERSION`, `BRANCH`), then\nvalidate \u2192 compose \u2192 compile \u2192 oversight \u2192 executor. The workflow lands in the target repo; commit it.\n",
   "perks": [
@@ -189,78 +234,123 @@ window.SKILLS = [
   "id": "codebaseqc",
   "name": "Codebase QC (usage / contract / coverage)",
   "description": "Pure-Python ast quality checks for a Python repo over three dimensions \u2014 USAGE (dead code), CONTRACT (missing docstring/return type), COVERAGE (not referenced in tests). No alembic; name-based heuristics (sound resolution is the open frontier). Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
-  "states": {
-   "ready": {
-    "description": "task-ledger submitted, nothing run"
+  "blueprint": {
+   "$schema": "lpp/v0.2.0",
+   "id": "codebaseqc",
+   "name": "Codebase QC (usage / contract / coverage)",
+   "description": "Pure-Python ast quality checks for a Python repo over three dimensions \u2014 USAGE (dead code), CONTRACT (missing docstring/return type), COVERAGE (not referenced in tests). No alembic; name-based heuristics (sound resolution is the open frontier). Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+   "entry_state": "ready",
+   "states": {
+    "ready": {
+     "description": "task-ledger submitted, nothing run"
+    },
+    "prepared": {
+     "description": "inputs validated \u2014 required vars present, runtime + store ready"
+    },
+    "operated": {
+     "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+    },
+    "verified": {
+     "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+    },
+    "recorded": {
+     "description": "run metadata + outputs recorded to the run-ledger"
+    }
    },
-   "prepared": {
-    "description": "inputs validated \u2014 required vars present, runtime + store ready"
+   "terminal_states": {
+    "recorded": {}
    },
-   "operated": {
-    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   "gates": {
+    "g_prepared": {
+     "type": "expression",
+     "expression": "inputs_present /\\ store_writable",
+     "description": "inputs + store validated"
+    },
+    "g_operated": {
+     "type": "expression",
+     "expression": "governed_run",
+     "description": "ran ONLY through executor.py"
+    },
+    "g_verified": {
+     "type": "expression",
+     "expression": "contract_checks_pass",
+     "description": "the perk's contract is satisfied"
+    }
    },
-   "verified": {
-    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   "actions": {
+    "a_prepare": {
+     "type": "compute",
+     "compute_unit": "validator:check_inputs",
+     "description": "validator confirms required vars + writable record_store + reachable runtime"
+    },
+    "a_operate": {
+     "type": "compute",
+     "compute_unit": "perk:sequence",
+     "description": "run the chosen perk's tool sequence (perk OPTIONAL)"
+    },
+    "a_verify": {
+     "type": "compute",
+     "compute_unit": "validator:check_contract",
+     "description": "the perk's src/contracts.json checks"
+    },
+    "a_record": {
+     "type": "compute",
+     "compute_unit": "executor:record",
+     "description": "persist run metadata + outputs"
+    }
    },
-   "recorded": {
-    "description": "run metadata + outputs recorded to the run-ledger"
-   }
+   "transitions": [
+    {
+     "from": "ready",
+     "to": "prepared",
+     "trigger": "PREPARE",
+     "action": "a_prepare",
+     "gate": "g_prepared"
+    },
+    {
+     "from": "prepared",
+     "to": "operated",
+     "trigger": "OPERATE",
+     "action": "a_operate",
+     "gate": "g_operated"
+    },
+    {
+     "from": "operated",
+     "to": "verified",
+     "trigger": "VERIFY",
+     "action": "a_verify",
+     "gate": "g_verified"
+    },
+    {
+     "from": "verified",
+     "to": "recorded",
+     "trigger": "RECORD",
+     "action": "a_record"
+    }
+   ],
+   "safety_invariants": [
+    {
+     "name": "operate_only_when_prepared",
+     "expression": "state /= 'operated' \\/ inputs_present",
+     "description": "GUARDRAIL: no operation before inputs are validated."
+    },
+    {
+     "name": "governed_execution_only",
+     "expression": "state /= 'operated' \\/ governed_run",
+     "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+    },
+    {
+     "name": "verify_before_record",
+     "expression": "state /= 'recorded' \\/ contract_checks_pass",
+     "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+    },
+    {
+     "name": "oversight_clears_script",
+     "expression": "TRUE",
+     "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+    }
+   ]
   },
-  "transitions": [
-   {
-    "from": "ready",
-    "to": "prepared",
-    "trigger": "PREPARE",
-    "action": "a_prepare",
-    "gate": "g_prepared"
-   },
-   {
-    "from": "prepared",
-    "to": "operated",
-    "trigger": "OPERATE",
-    "action": "a_operate",
-    "gate": "g_operated"
-   },
-   {
-    "from": "operated",
-    "to": "verified",
-    "trigger": "VERIFY",
-    "action": "a_verify",
-    "gate": "g_verified"
-   },
-   {
-    "from": "verified",
-    "to": "recorded",
-    "trigger": "RECORD",
-    "action": "a_record"
-   }
-  ],
-  "terminal": [
-   "recorded"
-  ],
-  "entry": "ready",
-  "safety_invariants": [
-   {
-    "name": "operate_only_when_prepared",
-    "expression": "state /= 'operated' \\/ inputs_present",
-    "description": "GUARDRAIL: no operation before inputs are validated."
-   },
-   {
-    "name": "governed_execution_only",
-    "expression": "state /= 'operated' \\/ governed_run",
-    "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
-   },
-   {
-    "name": "verify_before_record",
-    "expression": "state /= 'recorded' \\/ contract_checks_pass",
-    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
-   },
-   {
-    "name": "oversight_clears_script",
-    "expression": "TRUE",
-    "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
-   }
-  ],
   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">codebaseqc</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
   "skill_md": "---\nskill: codebaseqc\nname: Codebase QC (usage / contract / coverage)\nperks: [audit]\n---\n\n# codebaseqc \u2014 pure-Python codebase QC\n\nThree-dimension quality check for a Python repo, **pure-Python ast** \u2014 no alembic, no dependencies:\n- **usage**   \u2014 functions defined but never referenced by name (dead-code heuristic)\n- **contract**\u2014 public functions missing a docstring or a return type\n- **coverage**\u2014 public functions whose name never appears in the test dir\n\n## What to look out for\nThe `audit` perk runs the three tools in sequence; each emits structured JSON and writes a\n`*_gaps.json` report to `record_store`. LOGS TO CHECK: `usage_gaps.json`, `contract_gaps.json`,\n`coverage_gaps.json`, plus the executor `run-ledger.json`.\n\n> **Honest scope:** these are *name-based* heuristics (the pure-Python pathway). Sound resolution \u2014\n> distinguishing `obj.method()` calls, jedi/pyright-grade \u2014 is the Intent-Fidelity frontier and the\n> reason the original codebaseqc reached for alembic. This migration is the dependency-free version.\n\n## How to use it\nFill `PROJECT_DIR` (+ optional `SRC_DIR`, `TEST_DIR`), then validate \u2192 compose \u2192 compile \u2192 oversight \u2192\nexecutor (the run is 3 governed steps).\n",
   "perks": [
@@ -377,78 +467,123 @@ window.SKILLS = [
   "id": "data",
   "name": "Data wrangling",
   "description": "Data transforms through proven pathways \u2014 CSV\u2192JSON and jq queries. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
-  "states": {
-   "ready": {
-    "description": "task-ledger submitted, nothing run"
+  "blueprint": {
+   "$schema": "lpp/v0.2.0",
+   "id": "data",
+   "name": "Data wrangling",
+   "description": "Data transforms through proven pathways \u2014 CSV\u2192JSON and jq queries. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+   "entry_state": "ready",
+   "states": {
+    "ready": {
+     "description": "task-ledger submitted, nothing run"
+    },
+    "prepared": {
+     "description": "inputs validated \u2014 required vars present, runtime + store ready"
+    },
+    "operated": {
+     "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+    },
+    "verified": {
+     "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+    },
+    "recorded": {
+     "description": "run metadata + outputs recorded to the run-ledger"
+    }
    },
-   "prepared": {
-    "description": "inputs validated \u2014 required vars present, runtime + store ready"
+   "terminal_states": {
+    "recorded": {}
    },
-   "operated": {
-    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   "gates": {
+    "g_prepared": {
+     "type": "expression",
+     "expression": "inputs_present /\\ store_writable",
+     "description": "inputs + store validated"
+    },
+    "g_operated": {
+     "type": "expression",
+     "expression": "governed_run",
+     "description": "ran ONLY through executor.py"
+    },
+    "g_verified": {
+     "type": "expression",
+     "expression": "contract_checks_pass",
+     "description": "the perk's contract is satisfied"
+    }
    },
-   "verified": {
-    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   "actions": {
+    "a_prepare": {
+     "type": "compute",
+     "compute_unit": "validator:check_inputs",
+     "description": "validator confirms required vars + writable record_store + reachable runtime"
+    },
+    "a_operate": {
+     "type": "compute",
+     "compute_unit": "perk:sequence",
+     "description": "run the chosen perk's tool sequence (perk OPTIONAL)"
+    },
+    "a_verify": {
+     "type": "compute",
+     "compute_unit": "validator:check_contract",
+     "description": "the perk's src/contracts.json checks"
+    },
+    "a_record": {
+     "type": "compute",
+     "compute_unit": "executor:record",
+     "description": "persist run metadata + outputs"
+    }
    },
-   "recorded": {
-    "description": "run metadata + outputs recorded to the run-ledger"
-   }
+   "transitions": [
+    {
+     "from": "ready",
+     "to": "prepared",
+     "trigger": "PREPARE",
+     "action": "a_prepare",
+     "gate": "g_prepared"
+    },
+    {
+     "from": "prepared",
+     "to": "operated",
+     "trigger": "OPERATE",
+     "action": "a_operate",
+     "gate": "g_operated"
+    },
+    {
+     "from": "operated",
+     "to": "verified",
+     "trigger": "VERIFY",
+     "action": "a_verify",
+     "gate": "g_verified"
+    },
+    {
+     "from": "verified",
+     "to": "recorded",
+     "trigger": "RECORD",
+     "action": "a_record"
+    }
+   ],
+   "safety_invariants": [
+    {
+     "name": "operate_only_when_prepared",
+     "expression": "state /= 'operated' \\/ inputs_present",
+     "description": "GUARDRAIL: no operation before inputs are validated."
+    },
+    {
+     "name": "governed_execution_only",
+     "expression": "state /= 'operated' \\/ governed_run",
+     "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+    },
+    {
+     "name": "verify_before_record",
+     "expression": "state /= 'recorded' \\/ contract_checks_pass",
+     "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+    },
+    {
+     "name": "oversight_clears_script",
+     "expression": "TRUE",
+     "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+    }
+   ]
   },
-  "transitions": [
-   {
-    "from": "ready",
-    "to": "prepared",
-    "trigger": "PREPARE",
-    "action": "a_prepare",
-    "gate": "g_prepared"
-   },
-   {
-    "from": "prepared",
-    "to": "operated",
-    "trigger": "OPERATE",
-    "action": "a_operate",
-    "gate": "g_operated"
-   },
-   {
-    "from": "operated",
-    "to": "verified",
-    "trigger": "VERIFY",
-    "action": "a_verify",
-    "gate": "g_verified"
-   },
-   {
-    "from": "verified",
-    "to": "recorded",
-    "trigger": "RECORD",
-    "action": "a_record"
-   }
-  ],
-  "terminal": [
-   "recorded"
-  ],
-  "entry": "ready",
-  "safety_invariants": [
-   {
-    "name": "operate_only_when_prepared",
-    "expression": "state /= 'operated' \\/ inputs_present",
-    "description": "GUARDRAIL: no operation before inputs are validated."
-   },
-   {
-    "name": "governed_execution_only",
-    "expression": "state /= 'operated' \\/ governed_run",
-    "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
-   },
-   {
-    "name": "verify_before_record",
-    "expression": "state /= 'recorded' \\/ contract_checks_pass",
-    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
-   },
-   {
-    "name": "oversight_clears_script",
-    "expression": "TRUE",
-    "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
-   }
-  ],
   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">data</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
   "skill_md": "---\nskill: data\nname: Data wrangling\nperks: [csv2json, jq]\n---\n\n# data \u2014 Data wrangling\n\nData transforms through proven pathways \u2014 CSV\u2192JSON and jq queries.\n\n## What to look out for\nEach tool emits one line of structured JSON (the audit + debug log) and writes its\nartifacts under `record_store`. LOGS TO CHECK: that line + the named report + the executor run-ledger.\n\n## Perks\n| perk | tool | nature |\n|---|---|---|\n| `csv2json` | `data_csv2json` | read-only / safe |\n| `jq` | `data_jq` | read-only / safe |\n\n## How to use it\nPick a perk, copy `ledger.json` \u2192 `task-ledger.json`, fill its vars + `record_store`, then\nvalidate \u2192 compose \u2192 compile \u2192 oversight \u2192 executor.\n",
   "perks": [
@@ -614,78 +749,123 @@ window.SKILLS = [
   "id": "docker",
   "name": "Docker operations",
   "description": "Container operations through proven pathways \u2014 build images, inspect running containers. Requires a reachable Docker daemon. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
-  "states": {
-   "ready": {
-    "description": "task-ledger submitted, nothing run"
+  "blueprint": {
+   "$schema": "lpp/v0.2.0",
+   "id": "docker",
+   "name": "Docker operations",
+   "description": "Container operations through proven pathways \u2014 build images, inspect running containers. Requires a reachable Docker daemon. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+   "entry_state": "ready",
+   "states": {
+    "ready": {
+     "description": "task-ledger submitted, nothing run"
+    },
+    "prepared": {
+     "description": "inputs validated \u2014 required vars present, runtime + store ready"
+    },
+    "operated": {
+     "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+    },
+    "verified": {
+     "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+    },
+    "recorded": {
+     "description": "run metadata + outputs recorded to the run-ledger"
+    }
    },
-   "prepared": {
-    "description": "inputs validated \u2014 required vars present, runtime + store ready"
+   "terminal_states": {
+    "recorded": {}
    },
-   "operated": {
-    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   "gates": {
+    "g_prepared": {
+     "type": "expression",
+     "expression": "inputs_present /\\ store_writable",
+     "description": "inputs + store validated"
+    },
+    "g_operated": {
+     "type": "expression",
+     "expression": "governed_run",
+     "description": "ran ONLY through executor.py"
+    },
+    "g_verified": {
+     "type": "expression",
+     "expression": "contract_checks_pass",
+     "description": "the perk's contract is satisfied"
+    }
    },
-   "verified": {
-    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   "actions": {
+    "a_prepare": {
+     "type": "compute",
+     "compute_unit": "validator:check_inputs",
+     "description": "validator confirms required vars + writable record_store + reachable runtime"
+    },
+    "a_operate": {
+     "type": "compute",
+     "compute_unit": "perk:sequence",
+     "description": "run the chosen perk's tool sequence (perk OPTIONAL)"
+    },
+    "a_verify": {
+     "type": "compute",
+     "compute_unit": "validator:check_contract",
+     "description": "the perk's src/contracts.json checks"
+    },
+    "a_record": {
+     "type": "compute",
+     "compute_unit": "executor:record",
+     "description": "persist run metadata + outputs"
+    }
    },
-   "recorded": {
-    "description": "run metadata + outputs recorded to the run-ledger"
-   }
+   "transitions": [
+    {
+     "from": "ready",
+     "to": "prepared",
+     "trigger": "PREPARE",
+     "action": "a_prepare",
+     "gate": "g_prepared"
+    },
+    {
+     "from": "prepared",
+     "to": "operated",
+     "trigger": "OPERATE",
+     "action": "a_operate",
+     "gate": "g_operated"
+    },
+    {
+     "from": "operated",
+     "to": "verified",
+     "trigger": "VERIFY",
+     "action": "a_verify",
+     "gate": "g_verified"
+    },
+    {
+     "from": "verified",
+     "to": "recorded",
+     "trigger": "RECORD",
+     "action": "a_record"
+    }
+   ],
+   "safety_invariants": [
+    {
+     "name": "operate_only_when_prepared",
+     "expression": "state /= 'operated' \\/ inputs_present",
+     "description": "GUARDRAIL: no operation before inputs are validated."
+    },
+    {
+     "name": "governed_execution_only",
+     "expression": "state /= 'operated' \\/ governed_run",
+     "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+    },
+    {
+     "name": "verify_before_record",
+     "expression": "state /= 'recorded' \\/ contract_checks_pass",
+     "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+    },
+    {
+     "name": "oversight_clears_script",
+     "expression": "TRUE",
+     "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+    }
+   ]
   },
-  "transitions": [
-   {
-    "from": "ready",
-    "to": "prepared",
-    "trigger": "PREPARE",
-    "action": "a_prepare",
-    "gate": "g_prepared"
-   },
-   {
-    "from": "prepared",
-    "to": "operated",
-    "trigger": "OPERATE",
-    "action": "a_operate",
-    "gate": "g_operated"
-   },
-   {
-    "from": "operated",
-    "to": "verified",
-    "trigger": "VERIFY",
-    "action": "a_verify",
-    "gate": "g_verified"
-   },
-   {
-    "from": "verified",
-    "to": "recorded",
-    "trigger": "RECORD",
-    "action": "a_record"
-   }
-  ],
-  "terminal": [
-   "recorded"
-  ],
-  "entry": "ready",
-  "safety_invariants": [
-   {
-    "name": "operate_only_when_prepared",
-    "expression": "state /= 'operated' \\/ inputs_present",
-    "description": "GUARDRAIL: no operation before inputs are validated."
-   },
-   {
-    "name": "governed_execution_only",
-    "expression": "state /= 'operated' \\/ governed_run",
-    "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
-   },
-   {
-    "name": "verify_before_record",
-    "expression": "state /= 'recorded' \\/ contract_checks_pass",
-    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
-   },
-   {
-    "name": "oversight_clears_script",
-    "expression": "TRUE",
-    "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
-   }
-  ],
   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">docker</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
   "skill_md": "---\nskill: docker\nname: Docker operations\nperks: [build, ps]\n---\n\n# docker \u2014 Docker operations\n\nContainer operations through proven pathways \u2014 build images, inspect running containers. Requires a reachable Docker daemon.\n\n## What to look out for\nEach tool emits one line of structured JSON (the audit + debug log) and writes its\nartifacts under `record_store`. LOGS TO CHECK: that line + the named report + the executor run-ledger.\n\n## Perks\n| perk | tool | nature |\n|---|---|---|\n| `build` | `docker_build` | read-only / safe |\n| `ps` | `docker_ps` | read-only / safe |\n\n## How to use it\nPick a perk, copy `ledger.json` \u2192 `task-ledger.json`, fill its vars + `record_store`, then\nvalidate \u2192 compose \u2192 compile \u2192 oversight \u2192 executor.\n",
   "perks": [
@@ -856,78 +1036,123 @@ window.SKILLS = [
   "id": "fs",
   "name": "Filesystem operations",
   "description": "Filesystem work through proven pathways; outputs + manifests captured to record_store. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
-  "states": {
-   "ready": {
-    "description": "task-ledger submitted, nothing run"
+  "blueprint": {
+   "$schema": "lpp/v0.2.0",
+   "id": "fs",
+   "name": "Filesystem operations",
+   "description": "Filesystem work through proven pathways; outputs + manifests captured to record_store. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+   "entry_state": "ready",
+   "states": {
+    "ready": {
+     "description": "task-ledger submitted, nothing run"
+    },
+    "prepared": {
+     "description": "inputs validated \u2014 required vars present, runtime + store ready"
+    },
+    "operated": {
+     "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+    },
+    "verified": {
+     "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+    },
+    "recorded": {
+     "description": "run metadata + outputs recorded to the run-ledger"
+    }
    },
-   "prepared": {
-    "description": "inputs validated \u2014 required vars present, runtime + store ready"
+   "terminal_states": {
+    "recorded": {}
    },
-   "operated": {
-    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   "gates": {
+    "g_prepared": {
+     "type": "expression",
+     "expression": "inputs_present /\\ store_writable",
+     "description": "inputs + store validated"
+    },
+    "g_operated": {
+     "type": "expression",
+     "expression": "governed_run",
+     "description": "ran ONLY through executor.py"
+    },
+    "g_verified": {
+     "type": "expression",
+     "expression": "contract_checks_pass",
+     "description": "the perk's contract is satisfied"
+    }
    },
-   "verified": {
-    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   "actions": {
+    "a_prepare": {
+     "type": "compute",
+     "compute_unit": "validator:check_inputs",
+     "description": "validator confirms required vars + writable record_store + reachable runtime"
+    },
+    "a_operate": {
+     "type": "compute",
+     "compute_unit": "perk:sequence",
+     "description": "run the chosen perk's tool sequence (perk OPTIONAL)"
+    },
+    "a_verify": {
+     "type": "compute",
+     "compute_unit": "validator:check_contract",
+     "description": "the perk's src/contracts.json checks"
+    },
+    "a_record": {
+     "type": "compute",
+     "compute_unit": "executor:record",
+     "description": "persist run metadata + outputs"
+    }
    },
-   "recorded": {
-    "description": "run metadata + outputs recorded to the run-ledger"
-   }
+   "transitions": [
+    {
+     "from": "ready",
+     "to": "prepared",
+     "trigger": "PREPARE",
+     "action": "a_prepare",
+     "gate": "g_prepared"
+    },
+    {
+     "from": "prepared",
+     "to": "operated",
+     "trigger": "OPERATE",
+     "action": "a_operate",
+     "gate": "g_operated"
+    },
+    {
+     "from": "operated",
+     "to": "verified",
+     "trigger": "VERIFY",
+     "action": "a_verify",
+     "gate": "g_verified"
+    },
+    {
+     "from": "verified",
+     "to": "recorded",
+     "trigger": "RECORD",
+     "action": "a_record"
+    }
+   ],
+   "safety_invariants": [
+    {
+     "name": "operate_only_when_prepared",
+     "expression": "state /= 'operated' \\/ inputs_present",
+     "description": "GUARDRAIL: no operation before inputs are validated."
+    },
+    {
+     "name": "governed_execution_only",
+     "expression": "state /= 'operated' \\/ governed_run",
+     "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+    },
+    {
+     "name": "verify_before_record",
+     "expression": "state /= 'recorded' \\/ contract_checks_pass",
+     "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+    },
+    {
+     "name": "oversight_clears_script",
+     "expression": "TRUE",
+     "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+    }
+   ]
   },
-  "transitions": [
-   {
-    "from": "ready",
-    "to": "prepared",
-    "trigger": "PREPARE",
-    "action": "a_prepare",
-    "gate": "g_prepared"
-   },
-   {
-    "from": "prepared",
-    "to": "operated",
-    "trigger": "OPERATE",
-    "action": "a_operate",
-    "gate": "g_operated"
-   },
-   {
-    "from": "operated",
-    "to": "verified",
-    "trigger": "VERIFY",
-    "action": "a_verify",
-    "gate": "g_verified"
-   },
-   {
-    "from": "verified",
-    "to": "recorded",
-    "trigger": "RECORD",
-    "action": "a_record"
-   }
-  ],
-  "terminal": [
-   "recorded"
-  ],
-  "entry": "ready",
-  "safety_invariants": [
-   {
-    "name": "operate_only_when_prepared",
-    "expression": "state /= 'operated' \\/ inputs_present",
-    "description": "GUARDRAIL: no operation before inputs are validated."
-   },
-   {
-    "name": "governed_execution_only",
-    "expression": "state /= 'operated' \\/ governed_run",
-    "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
-   },
-   {
-    "name": "verify_before_record",
-    "expression": "state /= 'recorded' \\/ contract_checks_pass",
-    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
-   },
-   {
-    "name": "oversight_clears_script",
-    "expression": "TRUE",
-    "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
-   }
-  ],
   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">fs</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
   "skill_md": "",
   "perks": [
@@ -1092,78 +1317,123 @@ window.SKILLS = [
   "id": "git_ops",
   "name": "Git operations",
   "description": "Git work through proven pathways; the oversight ruleset refuses force-push and hard reset unless approved. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
-  "states": {
-   "ready": {
-    "description": "task-ledger submitted, nothing run"
+  "blueprint": {
+   "$schema": "lpp/v0.2.0",
+   "id": "git_ops",
+   "name": "Git operations",
+   "description": "Git work through proven pathways; the oversight ruleset refuses force-push and hard reset unless approved. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+   "entry_state": "ready",
+   "states": {
+    "ready": {
+     "description": "task-ledger submitted, nothing run"
+    },
+    "prepared": {
+     "description": "inputs validated \u2014 required vars present, runtime + store ready"
+    },
+    "operated": {
+     "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+    },
+    "verified": {
+     "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+    },
+    "recorded": {
+     "description": "run metadata + outputs recorded to the run-ledger"
+    }
    },
-   "prepared": {
-    "description": "inputs validated \u2014 required vars present, runtime + store ready"
+   "terminal_states": {
+    "recorded": {}
    },
-   "operated": {
-    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   "gates": {
+    "g_prepared": {
+     "type": "expression",
+     "expression": "inputs_present /\\ store_writable",
+     "description": "inputs + store validated"
+    },
+    "g_operated": {
+     "type": "expression",
+     "expression": "governed_run",
+     "description": "ran ONLY through executor.py"
+    },
+    "g_verified": {
+     "type": "expression",
+     "expression": "contract_checks_pass",
+     "description": "the perk's contract is satisfied"
+    }
    },
-   "verified": {
-    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   "actions": {
+    "a_prepare": {
+     "type": "compute",
+     "compute_unit": "validator:check_inputs",
+     "description": "validator confirms required vars + writable record_store + reachable runtime"
+    },
+    "a_operate": {
+     "type": "compute",
+     "compute_unit": "perk:sequence",
+     "description": "run the chosen perk's tool sequence (perk OPTIONAL)"
+    },
+    "a_verify": {
+     "type": "compute",
+     "compute_unit": "validator:check_contract",
+     "description": "the perk's src/contracts.json checks"
+    },
+    "a_record": {
+     "type": "compute",
+     "compute_unit": "executor:record",
+     "description": "persist run metadata + outputs"
+    }
    },
-   "recorded": {
-    "description": "run metadata + outputs recorded to the run-ledger"
-   }
+   "transitions": [
+    {
+     "from": "ready",
+     "to": "prepared",
+     "trigger": "PREPARE",
+     "action": "a_prepare",
+     "gate": "g_prepared"
+    },
+    {
+     "from": "prepared",
+     "to": "operated",
+     "trigger": "OPERATE",
+     "action": "a_operate",
+     "gate": "g_operated"
+    },
+    {
+     "from": "operated",
+     "to": "verified",
+     "trigger": "VERIFY",
+     "action": "a_verify",
+     "gate": "g_verified"
+    },
+    {
+     "from": "verified",
+     "to": "recorded",
+     "trigger": "RECORD",
+     "action": "a_record"
+    }
+   ],
+   "safety_invariants": [
+    {
+     "name": "operate_only_when_prepared",
+     "expression": "state /= 'operated' \\/ inputs_present",
+     "description": "GUARDRAIL: no operation before inputs are validated."
+    },
+    {
+     "name": "governed_execution_only",
+     "expression": "state /= 'operated' \\/ governed_run",
+     "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+    },
+    {
+     "name": "verify_before_record",
+     "expression": "state /= 'recorded' \\/ contract_checks_pass",
+     "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+    },
+    {
+     "name": "oversight_clears_script",
+     "expression": "TRUE",
+     "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+    }
+   ]
   },
-  "transitions": [
-   {
-    "from": "ready",
-    "to": "prepared",
-    "trigger": "PREPARE",
-    "action": "a_prepare",
-    "gate": "g_prepared"
-   },
-   {
-    "from": "prepared",
-    "to": "operated",
-    "trigger": "OPERATE",
-    "action": "a_operate",
-    "gate": "g_operated"
-   },
-   {
-    "from": "operated",
-    "to": "verified",
-    "trigger": "VERIFY",
-    "action": "a_verify",
-    "gate": "g_verified"
-   },
-   {
-    "from": "verified",
-    "to": "recorded",
-    "trigger": "RECORD",
-    "action": "a_record"
-   }
-  ],
-  "terminal": [
-   "recorded"
-  ],
-  "entry": "ready",
-  "safety_invariants": [
-   {
-    "name": "operate_only_when_prepared",
-    "expression": "state /= 'operated' \\/ inputs_present",
-    "description": "GUARDRAIL: no operation before inputs are validated."
-   },
-   {
-    "name": "governed_execution_only",
-    "expression": "state /= 'operated' \\/ governed_run",
-    "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
-   },
-   {
-    "name": "verify_before_record",
-    "expression": "state /= 'recorded' \\/ contract_checks_pass",
-    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
-   },
-   {
-    "name": "oversight_clears_script",
-    "expression": "TRUE",
-    "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
-   }
-  ],
   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">git_ops</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
   "skill_md": "",
   "perks": [
@@ -1328,78 +1598,123 @@ window.SKILLS = [
   "id": "http",
   "name": "HTTP requests",
   "description": "Make HTTP requests through proven, contract-bound pathways; responses captured to record_store with status + size in structured output. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
-  "states": {
-   "ready": {
-    "description": "task-ledger submitted, nothing run"
+  "blueprint": {
+   "$schema": "lpp/v0.2.0",
+   "id": "http",
+   "name": "HTTP requests",
+   "description": "Make HTTP requests through proven, contract-bound pathways; responses captured to record_store with status + size in structured output. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+   "entry_state": "ready",
+   "states": {
+    "ready": {
+     "description": "task-ledger submitted, nothing run"
+    },
+    "prepared": {
+     "description": "inputs validated \u2014 required vars present, runtime + store ready"
+    },
+    "operated": {
+     "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+    },
+    "verified": {
+     "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+    },
+    "recorded": {
+     "description": "run metadata + outputs recorded to the run-ledger"
+    }
    },
-   "prepared": {
-    "description": "inputs validated \u2014 required vars present, runtime + store ready"
+   "terminal_states": {
+    "recorded": {}
    },
-   "operated": {
-    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   "gates": {
+    "g_prepared": {
+     "type": "expression",
+     "expression": "inputs_present /\\ store_writable",
+     "description": "inputs + store validated"
+    },
+    "g_operated": {
+     "type": "expression",
+     "expression": "governed_run",
+     "description": "ran ONLY through executor.py"
+    },
+    "g_verified": {
+     "type": "expression",
+     "expression": "contract_checks_pass",
+     "description": "the perk's contract is satisfied"
+    }
    },
-   "verified": {
-    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   "actions": {
+    "a_prepare": {
+     "type": "compute",
+     "compute_unit": "validator:check_inputs",
+     "description": "validator confirms required vars + writable record_store + reachable runtime"
+    },
+    "a_operate": {
+     "type": "compute",
+     "compute_unit": "perk:sequence",
+     "description": "run the chosen perk's tool sequence (perk OPTIONAL)"
+    },
+    "a_verify": {
+     "type": "compute",
+     "compute_unit": "validator:check_contract",
+     "description": "the perk's src/contracts.json checks"
+    },
+    "a_record": {
+     "type": "compute",
+     "compute_unit": "executor:record",
+     "description": "persist run metadata + outputs"
+    }
    },
-   "recorded": {
-    "description": "run metadata + outputs recorded to the run-ledger"
-   }
+   "transitions": [
+    {
+     "from": "ready",
+     "to": "prepared",
+     "trigger": "PREPARE",
+     "action": "a_prepare",
+     "gate": "g_prepared"
+    },
+    {
+     "from": "prepared",
+     "to": "operated",
+     "trigger": "OPERATE",
+     "action": "a_operate",
+     "gate": "g_operated"
+    },
+    {
+     "from": "operated",
+     "to": "verified",
+     "trigger": "VERIFY",
+     "action": "a_verify",
+     "gate": "g_verified"
+    },
+    {
+     "from": "verified",
+     "to": "recorded",
+     "trigger": "RECORD",
+     "action": "a_record"
+    }
+   ],
+   "safety_invariants": [
+    {
+     "name": "operate_only_when_prepared",
+     "expression": "state /= 'operated' \\/ inputs_present",
+     "description": "GUARDRAIL: no operation before inputs are validated."
+    },
+    {
+     "name": "governed_execution_only",
+     "expression": "state /= 'operated' \\/ governed_run",
+     "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+    },
+    {
+     "name": "verify_before_record",
+     "expression": "state /= 'recorded' \\/ contract_checks_pass",
+     "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+    },
+    {
+     "name": "oversight_clears_script",
+     "expression": "TRUE",
+     "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+    }
+   ]
   },
-  "transitions": [
-   {
-    "from": "ready",
-    "to": "prepared",
-    "trigger": "PREPARE",
-    "action": "a_prepare",
-    "gate": "g_prepared"
-   },
-   {
-    "from": "prepared",
-    "to": "operated",
-    "trigger": "OPERATE",
-    "action": "a_operate",
-    "gate": "g_operated"
-   },
-   {
-    "from": "operated",
-    "to": "verified",
-    "trigger": "VERIFY",
-    "action": "a_verify",
-    "gate": "g_verified"
-   },
-   {
-    "from": "verified",
-    "to": "recorded",
-    "trigger": "RECORD",
-    "action": "a_record"
-   }
-  ],
-  "terminal": [
-   "recorded"
-  ],
-  "entry": "ready",
-  "safety_invariants": [
-   {
-    "name": "operate_only_when_prepared",
-    "expression": "state /= 'operated' \\/ inputs_present",
-    "description": "GUARDRAIL: no operation before inputs are validated."
-   },
-   {
-    "name": "governed_execution_only",
-    "expression": "state /= 'operated' \\/ governed_run",
-    "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
-   },
-   {
-    "name": "verify_before_record",
-    "expression": "state /= 'recorded' \\/ contract_checks_pass",
-    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
-   },
-   {
-    "name": "oversight_clears_script",
-    "expression": "TRUE",
-    "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
-   }
-  ],
   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">http</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
   "skill_md": "",
   "perks": [
@@ -1572,78 +1887,123 @@ window.SKILLS = [
   "id": "net",
   "name": "Network diagnostics",
   "description": "Networking diagnostics through proven pathways \u2014 HTTP health probes and DNS resolution. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
-  "states": {
-   "ready": {
-    "description": "task-ledger submitted, nothing run"
+  "blueprint": {
+   "$schema": "lpp/v0.2.0",
+   "id": "net",
+   "name": "Network diagnostics",
+   "description": "Networking diagnostics through proven pathways \u2014 HTTP health probes and DNS resolution. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+   "entry_state": "ready",
+   "states": {
+    "ready": {
+     "description": "task-ledger submitted, nothing run"
+    },
+    "prepared": {
+     "description": "inputs validated \u2014 required vars present, runtime + store ready"
+    },
+    "operated": {
+     "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+    },
+    "verified": {
+     "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+    },
+    "recorded": {
+     "description": "run metadata + outputs recorded to the run-ledger"
+    }
    },
-   "prepared": {
-    "description": "inputs validated \u2014 required vars present, runtime + store ready"
+   "terminal_states": {
+    "recorded": {}
    },
-   "operated": {
-    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   "gates": {
+    "g_prepared": {
+     "type": "expression",
+     "expression": "inputs_present /\\ store_writable",
+     "description": "inputs + store validated"
+    },
+    "g_operated": {
+     "type": "expression",
+     "expression": "governed_run",
+     "description": "ran ONLY through executor.py"
+    },
+    "g_verified": {
+     "type": "expression",
+     "expression": "contract_checks_pass",
+     "description": "the perk's contract is satisfied"
+    }
    },
-   "verified": {
-    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   "actions": {
+    "a_prepare": {
+     "type": "compute",
+     "compute_unit": "validator:check_inputs",
+     "description": "validator confirms required vars + writable record_store + reachable runtime"
+    },
+    "a_operate": {
+     "type": "compute",
+     "compute_unit": "perk:sequence",
+     "description": "run the chosen perk's tool sequence (perk OPTIONAL)"
+    },
+    "a_verify": {
+     "type": "compute",
+     "compute_unit": "validator:check_contract",
+     "description": "the perk's src/contracts.json checks"
+    },
+    "a_record": {
+     "type": "compute",
+     "compute_unit": "executor:record",
+     "description": "persist run metadata + outputs"
+    }
    },
-   "recorded": {
-    "description": "run metadata + outputs recorded to the run-ledger"
-   }
+   "transitions": [
+    {
+     "from": "ready",
+     "to": "prepared",
+     "trigger": "PREPARE",
+     "action": "a_prepare",
+     "gate": "g_prepared"
+    },
+    {
+     "from": "prepared",
+     "to": "operated",
+     "trigger": "OPERATE",
+     "action": "a_operate",
+     "gate": "g_operated"
+    },
+    {
+     "from": "operated",
+     "to": "verified",
+     "trigger": "VERIFY",
+     "action": "a_verify",
+     "gate": "g_verified"
+    },
+    {
+     "from": "verified",
+     "to": "recorded",
+     "trigger": "RECORD",
+     "action": "a_record"
+    }
+   ],
+   "safety_invariants": [
+    {
+     "name": "operate_only_when_prepared",
+     "expression": "state /= 'operated' \\/ inputs_present",
+     "description": "GUARDRAIL: no operation before inputs are validated."
+    },
+    {
+     "name": "governed_execution_only",
+     "expression": "state /= 'operated' \\/ governed_run",
+     "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+    },
+    {
+     "name": "verify_before_record",
+     "expression": "state /= 'recorded' \\/ contract_checks_pass",
+     "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+    },
+    {
+     "name": "oversight_clears_script",
+     "expression": "TRUE",
+     "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+    }
+   ]
   },
-  "transitions": [
-   {
-    "from": "ready",
-    "to": "prepared",
-    "trigger": "PREPARE",
-    "action": "a_prepare",
-    "gate": "g_prepared"
-   },
-   {
-    "from": "prepared",
-    "to": "operated",
-    "trigger": "OPERATE",
-    "action": "a_operate",
-    "gate": "g_operated"
-   },
-   {
-    "from": "operated",
-    "to": "verified",
-    "trigger": "VERIFY",
-    "action": "a_verify",
-    "gate": "g_verified"
-   },
-   {
-    "from": "verified",
-    "to": "recorded",
-    "trigger": "RECORD",
-    "action": "a_record"
-   }
-  ],
-  "terminal": [
-   "recorded"
-  ],
-  "entry": "ready",
-  "safety_invariants": [
-   {
-    "name": "operate_only_when_prepared",
-    "expression": "state /= 'operated' \\/ inputs_present",
-    "description": "GUARDRAIL: no operation before inputs are validated."
-   },
-   {
-    "name": "governed_execution_only",
-    "expression": "state /= 'operated' \\/ governed_run",
-    "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
-   },
-   {
-    "name": "verify_before_record",
-    "expression": "state /= 'recorded' \\/ contract_checks_pass",
-    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
-   },
-   {
-    "name": "oversight_clears_script",
-    "expression": "TRUE",
-    "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
-   }
-  ],
   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">net</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
   "skill_md": "---\nskill: net\nname: Network diagnostics\nperks: [healthcheck, dns]\n---\n\n# net \u2014 Network diagnostics\n\nNetworking diagnostics through proven pathways \u2014 HTTP health probes and DNS resolution.\n\n## What to look out for\nEach tool emits one line of structured JSON (the audit + debug log) and writes its\nartifacts under `record_store`. LOGS TO CHECK: that line + the named report + the executor run-ledger.\n\n## Perks\n| perk | tool | nature |\n|---|---|---|\n| `healthcheck` | `net_healthcheck` | read-only / safe |\n| `dns` | `net_dns` | read-only / safe |\n\n## How to use it\nPick a perk, copy `ledger.json` \u2192 `task-ledger.json`, fill its vars + `record_store`, then\nvalidate \u2192 compose \u2192 compile \u2192 oversight \u2192 executor.\n",
   "perks": [
@@ -1809,78 +2169,123 @@ window.SKILLS = [
   "id": "pg_ops",
   "name": "Governed PostgreSQL operations",
   "description": "The general, perk-agnostic lifecycle of a governed DB operation. Tells the intelligence what to look out for (the guardrails) and which logs to check (the per-tool structured output + the executor's run-ledger). Perks are optional: any proven pathway plugs into a_operate.",
-  "states": {
-   "ready": {
-    "description": "task-ledger submitted, nothing run"
+  "blueprint": {
+   "$schema": "lpp/v0.2.0",
+   "id": "pg_ops",
+   "name": "Governed PostgreSQL operations",
+   "description": "The general, perk-agnostic lifecycle of a governed DB operation. Tells the intelligence what to look out for (the guardrails) and which logs to check (the per-tool structured output + the executor's run-ledger). Perks are optional: any proven pathway plugs into a_operate.",
+   "entry_state": "ready",
+   "states": {
+    "ready": {
+     "description": "task-ledger submitted, nothing run"
+    },
+    "connected": {
+     "description": "connection validated \u2014 host reachable, creds present, record_store writable"
+    },
+    "operated": {
+     "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+    },
+    "verified": {
+     "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+    },
+    "recorded": {
+     "description": "run metadata + outputs recorded to the run-ledger"
+    }
    },
-   "connected": {
-    "description": "connection validated \u2014 host reachable, creds present, record_store writable"
+   "terminal_states": {
+    "recorded": {}
    },
-   "operated": {
-    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   "gates": {
+    "g_connected": {
+     "type": "expression",
+     "expression": "host_reachable /\\ store_writable",
+     "description": "connection + store validated"
+    },
+    "g_operated": {
+     "type": "expression",
+     "expression": "governed_run",
+     "description": "ran ONLY through executor.py"
+    },
+    "g_verified": {
+     "type": "expression",
+     "expression": "contract_checks_pass",
+     "description": "the perk's contract is satisfied"
+    }
    },
-   "verified": {
-    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   "actions": {
+    "a_connect": {
+     "type": "compute",
+     "compute_unit": "validator:check_connection",
+     "description": "validator confirms host + creds + writable record_store"
+    },
+    "a_operate": {
+     "type": "compute",
+     "compute_unit": "perk:sequence",
+     "description": "run the chosen perk's tool sequence (perk OPTIONAL). LOOK OUT FOR: each tool's structured JSON on stdout."
+    },
+    "a_verify": {
+     "type": "compute",
+     "compute_unit": "validator:check_contract",
+     "description": "the perk's src/contracts.json checks. LOGS TO CHECK: per-tool JSON + ${record_store}/run-ledger.json"
+    },
+    "a_record": {
+     "type": "compute",
+     "compute_unit": "executor:record",
+     "description": "persist run metadata + outputs to the run-ledger"
+    }
    },
-   "recorded": {
-    "description": "run metadata + outputs recorded to the run-ledger"
-   }
+   "transitions": [
+    {
+     "from": "ready",
+     "to": "connected",
+     "trigger": "CONNECT",
+     "action": "a_connect",
+     "gate": "g_connected"
+    },
+    {
+     "from": "connected",
+     "to": "operated",
+     "trigger": "OPERATE",
+     "action": "a_operate",
+     "gate": "g_operated"
+    },
+    {
+     "from": "operated",
+     "to": "verified",
+     "trigger": "VERIFY",
+     "action": "a_verify",
+     "gate": "g_verified"
+    },
+    {
+     "from": "verified",
+     "to": "recorded",
+     "trigger": "RECORD",
+     "action": "a_record"
+    }
+   ],
+   "safety_invariants": [
+    {
+     "name": "operate_only_when_connected",
+     "expression": "state /= 'operated' \\/ host_reachable",
+     "description": "GUARDRAIL: no operation before the connection is validated."
+    },
+    {
+     "name": "governed_execution_only",
+     "expression": "state /= 'operated' \\/ governed_run",
+     "description": "GUARDRAIL: the perk's tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+    },
+    {
+     "name": "verify_before_record",
+     "expression": "state /= 'recorded' \\/ contract_checks_pass",
+     "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+    },
+    {
+     "name": "no_destructive_without_approval",
+     "expression": "TRUE",
+     "description": "GUARDRAIL: destructive SQL (DROP/TRUNCATE) is refused by OVERSIGHT_RULE unless explicitly approved (oversight.py --approve)."
+    }
+   ]
   },
-  "transitions": [
-   {
-    "from": "ready",
-    "to": "connected",
-    "trigger": "CONNECT",
-    "action": "a_connect",
-    "gate": "g_connected"
-   },
-   {
-    "from": "connected",
-    "to": "operated",
-    "trigger": "OPERATE",
-    "action": "a_operate",
-    "gate": "g_operated"
-   },
-   {
-    "from": "operated",
-    "to": "verified",
-    "trigger": "VERIFY",
-    "action": "a_verify",
-    "gate": "g_verified"
-   },
-   {
-    "from": "verified",
-    "to": "recorded",
-    "trigger": "RECORD",
-    "action": "a_record"
-   }
-  ],
-  "terminal": [
-   "recorded"
-  ],
-  "entry": "ready",
-  "safety_invariants": [
-   {
-    "name": "operate_only_when_connected",
-    "expression": "state /= 'operated' \\/ host_reachable",
-    "description": "GUARDRAIL: no operation before the connection is validated."
-   },
-   {
-    "name": "governed_execution_only",
-    "expression": "state /= 'operated' \\/ governed_run",
-    "description": "GUARDRAIL: the perk's tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
-   },
-   {
-    "name": "verify_before_record",
-    "expression": "state /= 'recorded' \\/ contract_checks_pass",
-    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
-   },
-   {
-    "name": "no_destructive_without_approval",
-    "expression": "TRUE",
-    "description": "GUARDRAIL: destructive SQL (DROP/TRUNCATE) is refused by OVERSIGHT_RULE unless explicitly approved (oversight.py --approve)."
-   }
-  ],
   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">pg_ops</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">CONNECT</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_connect</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">connected</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">connection validated \u2014 host</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">reachable, creds present,</text>\n<text x=\"41\" y=\"241\" font-size=\"9.5\" fill=\"#555\">record_store writable</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
   "skill_md": "---\nskill: pg_ops\nname: Governed PostgreSQL operations\nperks: [select, migrate]\n---\n\n# pg_ops \u2014 governed PostgreSQL operations\n\nRun PostgreSQL work through **proven, contract-bound pathways** under oversight. You never run SQL\ndirectly; you submit a **task-ledger** and the framework validates \u2192 composes \u2192 compiles \u2192 oversees \u2192\nexecutes it. Destructive SQL is refused unless explicitly approved.\n\n## What to look out for (for the intelligence)\n- The **blueprint** (`blueprint.json`) is the general lifecycle: `ready \u2192 connected \u2192 operated \u2192\n  verified \u2192 recorded`. Its `safety_invariants` are the things you must respect \u2014 chiefly\n  **governed_execution_only** (tools run *only* through `executor.py`) and **no_destructive_without_approval**.\n- Each tool emits **deterministic structured JSON** on stdout \u2014 that line *is* the audit + debug log.\n  After a run, check `${record_store}/run-ledger.json` (the executor's record) and each step's JSON.\n\n## How to use it \u2014 fill the form, submit it\n1. Pick a **perk** (a proven pathway): `select` (read-only query) or `migrate` (apply a SQL file).\n2. Copy `ledger.json` \u2192 your `task-ledger.json` and fill the `${...}` fields, bounded by the perk's\n   `manifesto.json` (the variables it accepts) and `src/contracts.json` (the I/O + checks).\n3. Hand it to the infrastructure:\n   ```sh\n   python3 infra/validator.py --ledger task-ledger.json     # are the claims real?\n   python3 infra/composer.py  --ledger task-ledger.json     # L++ \u2192 TLC, no deadlock\n   python3 infra/compiler.py  --ledger task-ledger.json -o run.sh\n   python3 infra/oversight.py --script run.sh               # OVERSIGHT_RULE (drops refused)\n   python3 infra/executor.py  --script run.sh --step 1      # the ONLY way to run\n   ```\n\n## Perks\n| perk | pathway | destructive? |\n|---|---|---|\n| `select` | read-only `SELECT \u2026 LIMIT` \u2192 CSV | no |\n| `migrate` | apply a `.sql` migration file in a transaction | yes (DROP/TRUNCATE refused by oversight unless `--approve`) |\n\nThe blueprint is **perk-agnostic** \u2014 it describes the lifecycle and the guardrails; a perk supplies the\nconcrete, contract-bound *how*.\n",
   "perks": [
@@ -2088,78 +2493,123 @@ window.SKILLS = [
   "id": "py_qc",
   "name": "Python quality checks",
   "description": "Run Python tests + lint through proven pathways; reports captured to record_store. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
-  "states": {
-   "ready": {
-    "description": "task-ledger submitted, nothing run"
+  "blueprint": {
+   "$schema": "lpp/v0.2.0",
+   "id": "py_qc",
+   "name": "Python quality checks",
+   "description": "Run Python tests + lint through proven pathways; reports captured to record_store. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+   "entry_state": "ready",
+   "states": {
+    "ready": {
+     "description": "task-ledger submitted, nothing run"
+    },
+    "prepared": {
+     "description": "inputs validated \u2014 required vars present, runtime + store ready"
+    },
+    "operated": {
+     "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+    },
+    "verified": {
+     "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+    },
+    "recorded": {
+     "description": "run metadata + outputs recorded to the run-ledger"
+    }
    },
-   "prepared": {
-    "description": "inputs validated \u2014 required vars present, runtime + store ready"
+   "terminal_states": {
+    "recorded": {}
    },
-   "operated": {
-    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   "gates": {
+    "g_prepared": {
+     "type": "expression",
+     "expression": "inputs_present /\\ store_writable",
+     "description": "inputs + store validated"
+    },
+    "g_operated": {
+     "type": "expression",
+     "expression": "governed_run",
+     "description": "ran ONLY through executor.py"
+    },
+    "g_verified": {
+     "type": "expression",
+     "expression": "contract_checks_pass",
+     "description": "the perk's contract is satisfied"
+    }
    },
-   "verified": {
-    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   "actions": {
+    "a_prepare": {
+     "type": "compute",
+     "compute_unit": "validator:check_inputs",
+     "description": "validator confirms required vars + writable record_store + reachable runtime"
+    },
+    "a_operate": {
+     "type": "compute",
+     "compute_unit": "perk:sequence",
+     "description": "run the chosen perk's tool sequence (perk OPTIONAL)"
+    },
+    "a_verify": {
+     "type": "compute",
+     "compute_unit": "validator:check_contract",
+     "description": "the perk's src/contracts.json checks"
+    },
+    "a_record": {
+     "type": "compute",
+     "compute_unit": "executor:record",
+     "description": "persist run metadata + outputs"
+    }
    },
-   "recorded": {
-    "description": "run metadata + outputs recorded to the run-ledger"
-   }
+   "transitions": [
+    {
+     "from": "ready",
+     "to": "prepared",
+     "trigger": "PREPARE",
+     "action": "a_prepare",
+     "gate": "g_prepared"
+    },
+    {
+     "from": "prepared",
+     "to": "operated",
+     "trigger": "OPERATE",
+     "action": "a_operate",
+     "gate": "g_operated"
+    },
+    {
+     "from": "operated",
+     "to": "verified",
+     "trigger": "VERIFY",
+     "action": "a_verify",
+     "gate": "g_verified"
+    },
+    {
+     "from": "verified",
+     "to": "recorded",
+     "trigger": "RECORD",
+     "action": "a_record"
+    }
+   ],
+   "safety_invariants": [
+    {
+     "name": "operate_only_when_prepared",
+     "expression": "state /= 'operated' \\/ inputs_present",
+     "description": "GUARDRAIL: no operation before inputs are validated."
+    },
+    {
+     "name": "governed_execution_only",
+     "expression": "state /= 'operated' \\/ governed_run",
+     "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+    },
+    {
+     "name": "verify_before_record",
+     "expression": "state /= 'recorded' \\/ contract_checks_pass",
+     "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+    },
+    {
+     "name": "oversight_clears_script",
+     "expression": "TRUE",
+     "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+    }
+   ]
   },
-  "transitions": [
-   {
-    "from": "ready",
-    "to": "prepared",
-    "trigger": "PREPARE",
-    "action": "a_prepare",
-    "gate": "g_prepared"
-   },
-   {
-    "from": "prepared",
-    "to": "operated",
-    "trigger": "OPERATE",
-    "action": "a_operate",
-    "gate": "g_operated"
-   },
-   {
-    "from": "operated",
-    "to": "verified",
-    "trigger": "VERIFY",
-    "action": "a_verify",
-    "gate": "g_verified"
-   },
-   {
-    "from": "verified",
-    "to": "recorded",
-    "trigger": "RECORD",
-    "action": "a_record"
-   }
-  ],
-  "terminal": [
-   "recorded"
-  ],
-  "entry": "ready",
-  "safety_invariants": [
-   {
-    "name": "operate_only_when_prepared",
-    "expression": "state /= 'operated' \\/ inputs_present",
-    "description": "GUARDRAIL: no operation before inputs are validated."
-   },
-   {
-    "name": "governed_execution_only",
-    "expression": "state /= 'operated' \\/ governed_run",
-    "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
-   },
-   {
-    "name": "verify_before_record",
-    "expression": "state /= 'recorded' \\/ contract_checks_pass",
-    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
-   },
-   {
-    "name": "oversight_clears_script",
-    "expression": "TRUE",
-    "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
-   }
-  ],
   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">py_qc</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
   "skill_md": "",
   "perks": [
@@ -2337,78 +2787,123 @@ window.SKILLS = [
   "id": "release",
   "name": "Release tagging",
   "description": "Release operations through proven pathways \u2014 annotated git tags (no push; push stays gated). Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
-  "states": {
-   "ready": {
-    "description": "task-ledger submitted, nothing run"
+  "blueprint": {
+   "$schema": "lpp/v0.2.0",
+   "id": "release",
+   "name": "Release tagging",
+   "description": "Release operations through proven pathways \u2014 annotated git tags (no push; push stays gated). Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+   "entry_state": "ready",
+   "states": {
+    "ready": {
+     "description": "task-ledger submitted, nothing run"
+    },
+    "prepared": {
+     "description": "inputs validated \u2014 required vars present, runtime + store ready"
+    },
+    "operated": {
+     "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+    },
+    "verified": {
+     "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+    },
+    "recorded": {
+     "description": "run metadata + outputs recorded to the run-ledger"
+    }
    },
-   "prepared": {
-    "description": "inputs validated \u2014 required vars present, runtime + store ready"
+   "terminal_states": {
+    "recorded": {}
    },
-   "operated": {
-    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   "gates": {
+    "g_prepared": {
+     "type": "expression",
+     "expression": "inputs_present /\\ store_writable",
+     "description": "inputs + store validated"
+    },
+    "g_operated": {
+     "type": "expression",
+     "expression": "governed_run",
+     "description": "ran ONLY through executor.py"
+    },
+    "g_verified": {
+     "type": "expression",
+     "expression": "contract_checks_pass",
+     "description": "the perk's contract is satisfied"
+    }
    },
-   "verified": {
-    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   "actions": {
+    "a_prepare": {
+     "type": "compute",
+     "compute_unit": "validator:check_inputs",
+     "description": "validator confirms required vars + writable record_store + reachable runtime"
+    },
+    "a_operate": {
+     "type": "compute",
+     "compute_unit": "perk:sequence",
+     "description": "run the chosen perk's tool sequence (perk OPTIONAL)"
+    },
+    "a_verify": {
+     "type": "compute",
+     "compute_unit": "validator:check_contract",
+     "description": "the perk's src/contracts.json checks"
+    },
+    "a_record": {
+     "type": "compute",
+     "compute_unit": "executor:record",
+     "description": "persist run metadata + outputs"
+    }
    },
-   "recorded": {
-    "description": "run metadata + outputs recorded to the run-ledger"
-   }
+   "transitions": [
+    {
+     "from": "ready",
+     "to": "prepared",
+     "trigger": "PREPARE",
+     "action": "a_prepare",
+     "gate": "g_prepared"
+    },
+    {
+     "from": "prepared",
+     "to": "operated",
+     "trigger": "OPERATE",
+     "action": "a_operate",
+     "gate": "g_operated"
+    },
+    {
+     "from": "operated",
+     "to": "verified",
+     "trigger": "VERIFY",
+     "action": "a_verify",
+     "gate": "g_verified"
+    },
+    {
+     "from": "verified",
+     "to": "recorded",
+     "trigger": "RECORD",
+     "action": "a_record"
+    }
+   ],
+   "safety_invariants": [
+    {
+     "name": "operate_only_when_prepared",
+     "expression": "state /= 'operated' \\/ inputs_present",
+     "description": "GUARDRAIL: no operation before inputs are validated."
+    },
+    {
+     "name": "governed_execution_only",
+     "expression": "state /= 'operated' \\/ governed_run",
+     "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+    },
+    {
+     "name": "verify_before_record",
+     "expression": "state /= 'recorded' \\/ contract_checks_pass",
+     "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+    },
+    {
+     "name": "oversight_clears_script",
+     "expression": "TRUE",
+     "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+    }
+   ]
   },
-  "transitions": [
-   {
-    "from": "ready",
-    "to": "prepared",
-    "trigger": "PREPARE",
-    "action": "a_prepare",
-    "gate": "g_prepared"
-   },
-   {
-    "from": "prepared",
-    "to": "operated",
-    "trigger": "OPERATE",
-    "action": "a_operate",
-    "gate": "g_operated"
-   },
-   {
-    "from": "operated",
-    "to": "verified",
-    "trigger": "VERIFY",
-    "action": "a_verify",
-    "gate": "g_verified"
-   },
-   {
-    "from": "verified",
-    "to": "recorded",
-    "trigger": "RECORD",
-    "action": "a_record"
-   }
-  ],
-  "terminal": [
-   "recorded"
-  ],
-  "entry": "ready",
-  "safety_invariants": [
-   {
-    "name": "operate_only_when_prepared",
-    "expression": "state /= 'operated' \\/ inputs_present",
-    "description": "GUARDRAIL: no operation before inputs are validated."
-   },
-   {
-    "name": "governed_execution_only",
-    "expression": "state /= 'operated' \\/ governed_run",
-    "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
-   },
-   {
-    "name": "verify_before_record",
-    "expression": "state /= 'recorded' \\/ contract_checks_pass",
-    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
-   },
-   {
-    "name": "oversight_clears_script",
-    "expression": "TRUE",
-    "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
-   }
-  ],
   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">release</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
   "skill_md": "---\nskill: release\nname: Release tagging\nperks: [tag]\n---\n\n# release \u2014 Release tagging\n\nRelease operations through proven pathways \u2014 annotated git tags (no push; push stays gated).\n\n## What to look out for\nEach tool emits one line of structured JSON (the audit + debug log) and writes its\nartifacts under `record_store`. LOGS TO CHECK: that line + the named report + the executor run-ledger.\n\n## Perks\n| perk | tool | nature |\n|---|---|---|\n| `tag` | `release_tag` | read-only / safe |\n\n## How to use it\nPick a perk, copy `ledger.json` \u2192 `task-ledger.json`, fill its vars + `record_store`, then\nvalidate \u2192 compose \u2192 compile \u2192 oversight \u2192 executor.\n",
   "perks": [
@@ -2508,78 +3003,123 @@ window.SKILLS = [
   "id": "search",
   "name": "Code search",
   "description": "Search and measure a codebase through proven pathways \u2014 pattern search and line counts. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
-  "states": {
-   "ready": {
-    "description": "task-ledger submitted, nothing run"
+  "blueprint": {
+   "$schema": "lpp/v0.2.0",
+   "id": "search",
+   "name": "Code search",
+   "description": "Search and measure a codebase through proven pathways \u2014 pattern search and line counts. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+   "entry_state": "ready",
+   "states": {
+    "ready": {
+     "description": "task-ledger submitted, nothing run"
+    },
+    "prepared": {
+     "description": "inputs validated \u2014 required vars present, runtime + store ready"
+    },
+    "operated": {
+     "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+    },
+    "verified": {
+     "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+    },
+    "recorded": {
+     "description": "run metadata + outputs recorded to the run-ledger"
+    }
    },
-   "prepared": {
-    "description": "inputs validated \u2014 required vars present, runtime + store ready"
+   "terminal_states": {
+    "recorded": {}
    },
-   "operated": {
-    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   "gates": {
+    "g_prepared": {
+     "type": "expression",
+     "expression": "inputs_present /\\ store_writable",
+     "description": "inputs + store validated"
+    },
+    "g_operated": {
+     "type": "expression",
+     "expression": "governed_run",
+     "description": "ran ONLY through executor.py"
+    },
+    "g_verified": {
+     "type": "expression",
+     "expression": "contract_checks_pass",
+     "description": "the perk's contract is satisfied"
+    }
    },
-   "verified": {
-    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   "actions": {
+    "a_prepare": {
+     "type": "compute",
+     "compute_unit": "validator:check_inputs",
+     "description": "validator confirms required vars + writable record_store + reachable runtime"
+    },
+    "a_operate": {
+     "type": "compute",
+     "compute_unit": "perk:sequence",
+     "description": "run the chosen perk's tool sequence (perk OPTIONAL)"
+    },
+    "a_verify": {
+     "type": "compute",
+     "compute_unit": "validator:check_contract",
+     "description": "the perk's src/contracts.json checks"
+    },
+    "a_record": {
+     "type": "compute",
+     "compute_unit": "executor:record",
+     "description": "persist run metadata + outputs"
+    }
    },
-   "recorded": {
-    "description": "run metadata + outputs recorded to the run-ledger"
-   }
+   "transitions": [
+    {
+     "from": "ready",
+     "to": "prepared",
+     "trigger": "PREPARE",
+     "action": "a_prepare",
+     "gate": "g_prepared"
+    },
+    {
+     "from": "prepared",
+     "to": "operated",
+     "trigger": "OPERATE",
+     "action": "a_operate",
+     "gate": "g_operated"
+    },
+    {
+     "from": "operated",
+     "to": "verified",
+     "trigger": "VERIFY",
+     "action": "a_verify",
+     "gate": "g_verified"
+    },
+    {
+     "from": "verified",
+     "to": "recorded",
+     "trigger": "RECORD",
+     "action": "a_record"
+    }
+   ],
+   "safety_invariants": [
+    {
+     "name": "operate_only_when_prepared",
+     "expression": "state /= 'operated' \\/ inputs_present",
+     "description": "GUARDRAIL: no operation before inputs are validated."
+    },
+    {
+     "name": "governed_execution_only",
+     "expression": "state /= 'operated' \\/ governed_run",
+     "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+    },
+    {
+     "name": "verify_before_record",
+     "expression": "state /= 'recorded' \\/ contract_checks_pass",
+     "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+    },
+    {
+     "name": "oversight_clears_script",
+     "expression": "TRUE",
+     "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+    }
+   ]
   },
-  "transitions": [
-   {
-    "from": "ready",
-    "to": "prepared",
-    "trigger": "PREPARE",
-    "action": "a_prepare",
-    "gate": "g_prepared"
-   },
-   {
-    "from": "prepared",
-    "to": "operated",
-    "trigger": "OPERATE",
-    "action": "a_operate",
-    "gate": "g_operated"
-   },
-   {
-    "from": "operated",
-    "to": "verified",
-    "trigger": "VERIFY",
-    "action": "a_verify",
-    "gate": "g_verified"
-   },
-   {
-    "from": "verified",
-    "to": "recorded",
-    "trigger": "RECORD",
-    "action": "a_record"
-   }
-  ],
-  "terminal": [
-   "recorded"
-  ],
-  "entry": "ready",
-  "safety_invariants": [
-   {
-    "name": "operate_only_when_prepared",
-    "expression": "state /= 'operated' \\/ inputs_present",
-    "description": "GUARDRAIL: no operation before inputs are validated."
-   },
-   {
-    "name": "governed_execution_only",
-    "expression": "state /= 'operated' \\/ governed_run",
-    "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
-   },
-   {
-    "name": "verify_before_record",
-    "expression": "state /= 'recorded' \\/ contract_checks_pass",
-    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
-   },
-   {
-    "name": "oversight_clears_script",
-    "expression": "TRUE",
-    "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
-   }
-  ],
   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">search</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
   "skill_md": "---\nskill: search\nname: Code search\nperks: [grep, loc]\n---\n\n# search \u2014 Code search\n\nSearch and measure a codebase through proven pathways \u2014 pattern search and line counts.\n\n## What to look out for\nEach tool emits one line of structured JSON (the audit + debug log) and writes its\nartifacts under `record_store`. LOGS TO CHECK: that line + the named report + the executor run-ledger.\n\n## Perks\n| perk | tool | nature |\n|---|---|---|\n| `grep` | `search_grep` | read-only / safe |\n| `loc` | `search_loc` | read-only / safe |\n\n## How to use it\nPick a perk, copy `ledger.json` \u2192 `task-ledger.json`, fill its vars + `record_store`, then\nvalidate \u2192 compose \u2192 compile \u2192 oversight \u2192 executor.\n",
   "perks": [

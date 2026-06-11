@@ -58,6 +58,7 @@
   details.code { margin:8px 0; }
   details.code > summary { cursor:pointer; color:var(--blue); font-size:12px; font-family:var(--mono); }
   pre { background:#0b0d13; border:1px solid var(--line); border-radius:8px; padding:12px; overflow:auto; font:12px/1.5 var(--mono); color:#cdd3e1; margin:6px 0; }
+  pre.tall { max-height:360px; }
   .md h1,.md h2,.md h3,.md h4 { color:var(--ink); }
   .md h4 { margin:12px 0 4px; font-size:14px; }
   .md p, .md li { color:var(--dim); }
@@ -200,9 +201,9 @@ function render() {
 
 function overviewHtml(s) {
   return `
-    <p class="muted" style="font-size:12.5px">The <b>Blueprint &amp; demo</b> tab shows the lifecycle and a worked task flow; each <b>perk</b> tab shows its flow, contract, and code.</p>
+    <p class="muted" style="font-size:12.5px">The <b>Blueprints</b> tab shows the lifecycle and a worked task flow per perk; each <b>perk</b> tab shows its flow, contract, and code.</p>
     <h3>Guardrails — safety_invariants</h3>
-    <div class="card">${(s.safety_invariants||[]).map(inv =>
+    <div class="card">${((s.blueprint||{}).safety_invariants||[]).map(inv =>
       `<div class="inv"><b>${esc(inv.name)}</b><span>${esc((inv.description||"").replace(/^GUARDRAIL:\s*/,""))}</span></div>`).join("") || '<span class="muted">none</span>'}</div>
     <h3>Context — SKILL.md</h3>
     <div class="card md">${md(s.skill_md || "")}</div>`;
@@ -220,7 +221,9 @@ function blueprintHtml(s) {
       <h3>Shared lifecycle</h3>
       <div class="card" id="bp">${s.svg || '<span class="muted">no diagram</span>'}</div>
       <p class="muted" style="font-size:12.5px;margin-top:8px">Every skill runs this lifecycle. A task flows through the governed pipeline — pick a <b>demo</b> above to see a concrete one, config to compiled script:</p>
-      <div class="stages">${stages}</div>`;
+      <div class="stages">${stages}</div>
+      <div class="lbl">blueprint — L++ source <span class="muted">— blueprint.json</span></div>
+      <pre class="tall">${esc(JSON.stringify(s.blueprint || {}, null, 2))}</pre>`;
   } else {
     const p = s.perks.find(x => x.id === sub), d = p.demo || {};
     body = `
@@ -237,6 +240,8 @@ function blueprintHtml(s) {
           <div class="card" id="bp">${p.svg || ""}</div>
         </div>
       </div>
+      <div class="lbl">task blueprint — L++ source <span class="muted">— blueprint.json; the perk's tool sequence fills the a_operate step</span></div>
+      <pre class="tall">${esc(JSON.stringify(s.blueprint || {}, null, 2))}</pre>
       <div class="lbl">compiled script <span class="muted">— what the executor runs, step by step</span></div>
       <pre>${esc(d.compiled || "")}</pre>`;
   }

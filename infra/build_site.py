@@ -68,9 +68,7 @@ def skill_data(sdir: str) -> dict | None:
              for pm in load(os.path.join(sdir, "perks.json")).get("perks", [])]
     return {
         "id": bp["id"], "name": bp.get("name", bp["id"]), "description": bp.get("description", ""),
-        "states": bp.get("states", {}), "transitions": bp.get("transitions", []),
-        "terminal": list(bp.get("terminal_states", {})), "entry": bp.get("entry_state", ""),
-        "safety_invariants": bp.get("safety_invariants", []),
+        "blueprint": bp,   # the full L++ blueprint.json — printed alongside its SVG in the dashboard
         "svg": read(os.path.join(sdir, "blueprint.svg")), "skill_md": read(os.path.join(sdir, "SKILL.md")),
         "perks": perks,
     }
