@@ -1,0 +1,35 @@
+{
+  "_perk": "apply",
+  "sequence": [
+    "addperk_branch",
+    "addperk_formulate",
+    "addperk_pr"
+  ],
+  "tools": {
+    "addperk_branch": {
+      "binary": "bash",
+      "params": {}
+    },
+    "addperk_formulate": {
+      "binary": "python3",
+      "params": {}
+    },
+    "addperk_pr": {
+      "binary": "bash",
+      "params": {}
+    }
+  },
+  "env": {
+    "SKILL": "${SKILL}",
+    "PERK": "${PERK}",
+    "PERK_DESC": "${PERK_DESC}",
+    "TOOL": "${TOOL}",
+    "BINARY": "${BINARY}",
+    "BASE": "${BASE}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "git",
+    "python3"
+  ]
+}

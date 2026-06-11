@@ -1,0 +1,27 @@
+{
+  "tool": "addperk_eval",
+  "inputs": {
+    "SKILL": {
+      "type": "string",
+      "required": true
+    },
+    "PERK": {
+      "type": "string",
+      "required": true
+    },
+    "PERK_DESC": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "evaluation": {
+      "path": "${RECORD_STORE}/perk_eval.json",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/perk_eval.json"
+  }
+}

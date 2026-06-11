@@ -1,0 +1,39 @@
+{
+  "tool": "addperk_pr",
+  "inputs": {
+    "SKILL": {
+      "type": "string",
+      "required": true
+    },
+    "PERK": {
+      "type": "string",
+      "required": true
+    },
+    "PERK_DESC": {
+      "type": "string",
+      "required": true
+    },
+    "TOOL": {
+      "type": "string",
+      "required": true
+    },
+    "BINARY": {
+      "type": "string",
+      "required": false
+    },
+    "BASE": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "outputs": {
+    "pr": {
+      "path": "${RECORD_STORE}/pr.json",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/pr.json"
+  }
+}
