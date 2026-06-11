@@ -1,0 +1,20 @@
+{
+  "perk": "audit",
+  "skill": "codebaseqc",
+  "description": "Full usage + contract + coverage QC, pure-Python ast.",
+  "rules": [
+    "read-only \u2014 analyzes, never edits",
+    "three reports to record_store",
+    "name-based heuristics"
+  ],
+  "usage": "Set PROJECT_DIR (+ SRC_DIR, TEST_DIR). Outputs: usage_gaps.json, contract_gaps.json, coverage_gaps.json.",
+  "limitation": "Name-based (no sound call resolution); Python only.",
+  "minimal_example": {
+    "perk": "audit",
+    "vars": {
+      "PROJECT_DIR": "/path/to/repo",
+      "SRC_DIR": "src",
+      "TEST_DIR": "tests"
+    }
+  }
+}
