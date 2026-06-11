@@ -1,0 +1,11 @@
+{
+  "_schema": "task-ledger TEMPLATE for codebaseqc \u2014 fill PROJECT_DIR (+ optional SRC_DIR, TEST_DIR).",
+  "skill": "codebaseqc",
+  "perk": "audit",
+  "record_store": "<absolute dir for the *_gaps.json reports>",
+  "vars": {
+    "PROJECT_DIR": "<repo path>",
+    "SRC_DIR": ".",
+    "TEST_DIR": "tests"
+  }
+}

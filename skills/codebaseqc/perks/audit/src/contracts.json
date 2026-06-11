@@ -1,0 +1,32 @@
+{
+  "tool": "audit",
+  "inputs": {
+    "PROJECT_DIR": {
+      "type": "dir",
+      "required": true
+    },
+    "SRC_DIR": {
+      "type": "string",
+      "required": false
+    },
+    "TEST_DIR": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "outputs": {
+    "usage": {
+      "path": "${RECORD_STORE}/usage_gaps.json"
+    },
+    "contract": {
+      "path": "${RECORD_STORE}/contract_gaps.json"
+    },
+    "coverage": {
+      "path": "${RECORD_STORE}/coverage_gaps.json"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/coverage_gaps.json"
+  }
+}

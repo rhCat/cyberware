@@ -1,0 +1,15 @@
+{
+  "skill": "codebaseqc",
+  "perks": [
+    {
+      "id": "audit",
+      "summary": "full usage + contract + coverage QC (3 governed steps)",
+      "destructive": false,
+      "tools": [
+        "cbqc_usage",
+        "cbqc_contract",
+        "cbqc_coverage"
+      ]
+    }
+  ]
+}
