@@ -82,8 +82,9 @@ def main() -> int:
     """Emit docs/site/data.js — the skills plus the markdown review docs."""
     skills = [d for sdir in sorted(glob.glob(os.path.join(ROOT, "skills", "*")))
               if os.path.isdir(sdir) and (d := skill_data(sdir))]
-    docs = [{"id": name, "label": label, "body": read(os.path.join(ROOT, "docs", name + ".md"))}
-            for name, label in DOC_TABS]
+    docs = [{"id": "operate", "label": "Operate", "body": read(os.path.join(ROOT, "cyberware.md"))}]
+    docs += [{"id": name, "label": label, "body": read(os.path.join(ROOT, "docs", name + ".md"))}
+             for name, label in DOC_TABS]
     # the infra's OWN blueprint (the governance pipeline) — placed under Architecture (the ouroboros)
     pipeline_bp = load(os.path.join(ROOT, "infra", "pipeline.blueprint.json"))
     for d in docs:
