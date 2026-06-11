@@ -45,15 +45,21 @@
     },
     {
       "id": "rm_rf",
-      "pattern": "\\brm\\s+-[a-z]*[rf]",
+      "pattern": "\\brm\\s+(-[a-z]*[rf]|--recursive\\b|--force\\b)",
       "reason": "recursive/forced delete",
       "approvable": true
     },
     {
       "id": "rm_root",
-      "pattern": "\\brm\\s+-[a-z]*[rf][a-z]*\\s+/(\\s|$)",
+      "pattern": "\\brm\\b[^\\n;|&]*\\s+/(\\s|$)",
       "reason": "rm at filesystem root",
       "approvable": false
+    },
+    {
+      "id": "find_delete",
+      "pattern": "\\bfind\\b[^\\n;|&]*\\s-delete\\b",
+      "reason": "find -delete is a recursive delete",
+      "approvable": true
     },
     {
       "id": "chmod_777",
@@ -75,8 +81,8 @@
     },
     {
       "id": "pipe_to_shell",
-      "pattern": "\\b(curl|wget)\\b[^\\n|]*\\|\\s*(ba)?sh",
-      "reason": "pipe-to-shell (RCE)",
+      "pattern": "\\b(curl|wget)\\b[^\\n|]*\\|\\s*(env\\s+)?((ba|z|da|k)?sh|python3?|perl|ruby|node)\\b",
+      "reason": "pipe-to-interpreter (RCE)",
       "approvable": false
     },
     {

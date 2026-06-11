@@ -41,10 +41,12 @@ SKILL.md ─► LLM fills ledger.json (the form, bounded by blueprint + perk man
             ▼
         compiler.py    ── blueprint + contracts + snippets → ONE bash script (step-wise --run flags)
             ▼
-        oversight.py   ── OVERSIGHT_RULE over the script (ast/regex/optional sub-agent) → pass | push back
+        oversight.py   ── OVERSIGHT_RULE over the script (regex/optional sub-agent) → pass | push back
             ▼
-        executor.py    ── the governed run: registers metadata, .bk tamper-check, upstream-step check,
-                          enforces EXECUTOR_RULE. The agent NEVER runs the script directly — only here.
+        executor.py    ── the governed run: .bk tamper-check, IN-CHANNEL oversight scan (refuses on
+                          violations; --approve waivers are ledger-recorded), upstream-step check,
+                          run-ledger provenance, EXECUTOR_RULE. The agent NEVER runs the script
+                          directly — only here.
 ```
 
 ## Why a skill = blueprint + perks
@@ -61,6 +63,9 @@ The agent channels **all** work through `executor.py`. It is the chokepoint:
 - every run's metadata is registered to a persistent ledger (who ran what, when, with which inputs);
 - a `.<script>.bk` is taken on first run and re-checked every run — **if the script changed, it's flagged**
   (an agent editing a compiled step to bypass a contract is caught);
+- **the OVERSIGHT_RULE scan runs in-channel** before any step — running `oversight.py` first is
+  pre-flight visibility, but the executor refuses unwaived violations regardless; `--approve` waivers
+  are explicit and ledger-recorded;
 - **upstream steps are checked** — a step can't run if its predecessors didn't;
 - `EXECUTOR_RULE.json` (usage monitors, limits) is enforced at the call boundary.
 

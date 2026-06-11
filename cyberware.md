@@ -51,9 +51,13 @@ RUN=$(python3 infra/runlog.py --ledger "$L")             # the grouped run dir
 python3 infra/validator.py --ledger "$L"                 # claims real?
 python3 infra/composer.py  --ledger "$L"                 # L++ -> TLC: no deadlock
 python3 infra/compiler.py  --ledger "$L"                 # writes $RUN/run.sh (+ run.{drawio,svg})
-python3 infra/oversight.py --script "$RUN/run.sh"        # OVERSIGHT_RULE (push back on danger)
+python3 infra/oversight.py --script "$RUN/run.sh"        # OVERSIGHT_RULE pre-flight (see what would block)
 python3 infra/executor.py  --script "$RUN/run.sh" --all  # THE governed run (the ONLY channel)
 ```
+
+The executor **re-runs the oversight scan in-channel** before any step — skipping the pre-flight
+doesn't skip the gate. An approvable violation runs only with `--approve <rule_id>` *on the executor*,
+and every waiver is recorded in the run-ledger.
 
 **4. Read the result.** Everything for the run lands in `$RUN/`: `run.sh` · `run.{drawio,svg}` ·
 `.run.sh.bk` (tamper snapshot) · `run-ledger.json` (the provenance log, appended as each step runs) · the
@@ -69,8 +73,8 @@ under the run-logs root.
 | `validator` | record_store writable · runtimes + required binaries reachable · required vars present |
 | `composer` | the L++ blueprint cannot deadlock (TLC, with a structural fallback) |
 | `compiler` | the perk's tool sequence + contracts → one step-wise bash; each tool a gated step + its contract check |
-| `oversight` | the script clears `OVERSIGHT_RULE`; destructive/dangerous patterns push back unless `--approve`d |
-| `executor` | `.bk` tamper-check · upstream-step gate · run-ledger provenance. **THE channel.** |
+| `oversight` | the script clears `OVERSIGHT_RULE`; destructive/dangerous patterns push back unless `--approve`d (pre-flight visibility — the executor enforces the same scan) |
+| `executor` | `.bk` tamper-check · **in-channel `OVERSIGHT_RULE` scan (refuses; waivers ledger-recorded)** · upstream-step gate · run-ledger provenance. **THE channel.** |
 
 ## Growing the registry — use the internals, don't hand-roll
 

@@ -59,7 +59,7 @@ def blueprint(sid, name, desc):
             {"name": "governed_execution_only", "expression": "state /= 'executed' \\/ governed_run", "description": "GUARDRAIL: a task reaches 'executed' ONLY through executor.py — the single governed channel; the runtime is the enforcement."},
             {"name": "record_during_execution", "expression": "state /= 'executed' \\/ recorded_each_step", "description": "GUARDRAIL: recording is PART of executing — each step is written to the run-ledger as it runs, not in a separate phase after."},
             {"name": "verify_before_execute", "expression": "state /= 'executed' \\/ contract_bound", "description": "GUARDRAIL: nothing executes until its tool sequence + contract are bound."},
-            {"name": "oversight_clears_script", "expression": "TRUE", "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."},
+            {"name": "oversight_clears_script", "expression": "state /= 'executed' \\/ oversight_cleared", "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE — enforced INSIDE the executor (scanned before any step runs; approvable rules waived only by an explicit --approve, recorded in the run-ledger)."},
         ],
     }
 

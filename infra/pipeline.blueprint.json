@@ -2,42 +2,142 @@
   "$schema": "lpp/v0.2.0",
   "id": "pipeline",
   "name": "cyberware governance pipeline",
-  "description": "The infra's OWN blueprint — the path every task-ledger takes through the governed runtime: validate -> compose -> compile -> oversee -> execute. The same L++ formalism the skills use, turned on the framework itself (the ouroboros). Each gate's failure route is the stage refusing and logging.",
+  "description": "The infra's OWN blueprint \u2014 the path every task-ledger takes through the governed runtime: validate -> compose -> compile -> oversee -> execute. The same L++ formalism the skills use, turned on the framework itself (the ouroboros). Each gate's failure route is the stage refusing and logging.",
   "entry_state": "submitted",
   "states": {
-    "submitted": {"description": "a task-ledger (skill, perk, vars, record_store) is submitted; nothing has run"},
-    "validated": {"description": "validator.py confirmed the claims are real — store writable, runtime + binaries reachable, required inputs present"},
-    "composed": {"description": "composer.py model-checked the L++ blueprint (-> TLC) — no logical deadlock"},
-    "compiled": {"description": "compiler.py turned ledger + manifesto + contracts + snippets into ONE step-wise bash script"},
-    "cleared": {"description": "oversight.py scanned the script against OVERSIGHT_RULE — no unapproved destructive/dangerous patterns"},
-    "executed": {"description": "executor.py ran it through the governed channel — tamper-checked, upstream-gated, recorded to the run-ledger"}
+    "submitted": {
+      "description": "a task-ledger (skill, perk, vars, record_store) is submitted; nothing has run"
+    },
+    "validated": {
+      "description": "validator.py confirmed the claims are real \u2014 store writable, runtime + binaries reachable, required inputs present"
+    },
+    "composed": {
+      "description": "composer.py model-checked the L++ blueprint (-> TLC) \u2014 no logical deadlock"
+    },
+    "compiled": {
+      "description": "compiler.py turned ledger + manifesto + contracts + snippets into ONE step-wise bash script"
+    },
+    "cleared": {
+      "description": "oversight.py scanned the script against OVERSIGHT_RULE \u2014 no unapproved destructive/dangerous patterns"
+    },
+    "executed": {
+      "description": "executor.py ran it through the governed channel \u2014 tamper-checked, upstream-gated, recorded to the run-ledger"
+    }
   },
-  "terminal_states": {"executed": {}},
+  "terminal_states": {
+    "executed": {}
+  },
   "gates": {
-    "g_claims_real": {"type": "expression", "expression": "store_writable /\\ runtime_reachable /\\ inputs_present", "description": "the ledger's claims hold"},
-    "g_no_deadlock": {"type": "expression", "expression": "tlc_no_deadlock \\/ structurally_sound", "description": "the blueprint cannot deadlock"},
-    "g_contract_bound": {"type": "expression", "expression": "sequence_resolved /\\ contracts_present", "description": "every step is contract-bound"},
-    "g_oversight_clear": {"type": "expression", "expression": "no_dangerous_pattern \\/ approved", "description": "the script clears the oversight rules"},
-    "g_governed": {"type": "expression", "expression": "tamper_check_pass /\\ upstream_recorded", "description": "no drift; predecessors recorded"}
+    "g_claims_real": {
+      "type": "expression",
+      "expression": "store_writable /\\ runtime_reachable /\\ inputs_present",
+      "description": "the ledger's claims hold"
+    },
+    "g_no_deadlock": {
+      "type": "expression",
+      "expression": "tlc_no_deadlock \\/ structurally_sound",
+      "description": "the blueprint cannot deadlock"
+    },
+    "g_contract_bound": {
+      "type": "expression",
+      "expression": "sequence_resolved /\\ contracts_present",
+      "description": "every step is contract-bound"
+    },
+    "g_oversight_clear": {
+      "type": "expression",
+      "expression": "no_dangerous_pattern \\/ approved",
+      "description": "the script clears the oversight rules"
+    },
+    "g_governed": {
+      "type": "expression",
+      "expression": "tamper_check_pass /\\ oversight_cleared /\\ upstream_recorded",
+      "description": "no drift; oversight re-checked in-channel; predecessors recorded"
+    }
   },
   "actions": {
-    "a_validate": {"type": "compute", "compute_unit": "validator:check_claims", "description": "probe the runtime, dirs, and required inputs"},
-    "a_compose": {"type": "compute", "compute_unit": "composer:model_check", "description": "compile L++ -> TLA+ -> TLC (structural fallback if no JRE)"},
-    "a_compile": {"type": "compute", "compute_unit": "compiler:build_script", "description": "ledger + manifesto + contracts + snippets -> step-wise bash"},
-    "a_oversee": {"type": "compute", "compute_unit": "oversight:scan", "description": "regex/ast scan the compiled script against OVERSIGHT_RULE"},
-    "a_execute": {"type": "compute", "compute_unit": "executor:govern_run", "description": "THE channel — .bk tamper-check, upstream gate, run-ledger provenance"}
+    "a_validate": {
+      "type": "compute",
+      "compute_unit": "validator:check_claims",
+      "description": "probe the runtime, dirs, and required inputs"
+    },
+    "a_compose": {
+      "type": "compute",
+      "compute_unit": "composer:model_check",
+      "description": "compile L++ -> TLA+ -> TLC (structural fallback if no JRE)"
+    },
+    "a_compile": {
+      "type": "compute",
+      "compute_unit": "compiler:build_script",
+      "description": "ledger + manifesto + contracts + snippets -> step-wise bash"
+    },
+    "a_oversee": {
+      "type": "compute",
+      "compute_unit": "oversight:scan",
+      "description": "regex/ast scan the compiled script against OVERSIGHT_RULE"
+    },
+    "a_execute": {
+      "type": "compute",
+      "compute_unit": "executor:govern_run",
+      "description": "the ONLY channel: tamper-check, in-channel OVERSIGHT_RULE scan, upstream gate, provenance record per step"
+    }
   },
   "transitions": [
-    {"from": "submitted", "to": "validated", "trigger": "VALIDATE", "action": "a_validate", "gate": "g_claims_real"},
-    {"from": "validated", "to": "composed", "trigger": "COMPOSE", "action": "a_compose", "gate": "g_no_deadlock"},
-    {"from": "composed", "to": "compiled", "trigger": "COMPILE", "action": "a_compile", "gate": "g_contract_bound"},
-    {"from": "compiled", "to": "cleared", "trigger": "OVERSEE", "action": "a_oversee", "gate": "g_oversight_clear"},
-    {"from": "cleared", "to": "executed", "trigger": "EXECUTE", "action": "a_execute", "gate": "g_governed"}
+    {
+      "from": "submitted",
+      "to": "validated",
+      "trigger": "VALIDATE",
+      "action": "a_validate",
+      "gate": "g_claims_real"
+    },
+    {
+      "from": "validated",
+      "to": "composed",
+      "trigger": "COMPOSE",
+      "action": "a_compose",
+      "gate": "g_no_deadlock"
+    },
+    {
+      "from": "composed",
+      "to": "compiled",
+      "trigger": "COMPILE",
+      "action": "a_compile",
+      "gate": "g_contract_bound"
+    },
+    {
+      "from": "compiled",
+      "to": "cleared",
+      "trigger": "OVERSEE",
+      "action": "a_oversee",
+      "gate": "g_oversight_clear"
+    },
+    {
+      "from": "cleared",
+      "to": "executed",
+      "trigger": "EXECUTE",
+      "action": "a_execute",
+      "gate": "g_governed"
+    }
   ],
   "safety_invariants": [
-    {"name": "governed_execution_only", "expression": "state /= 'executed' \\/ governed_run", "description": "GUARDRAIL: a task reaches 'executed' ONLY through executor.py — the single governed channel."},
-    {"name": "no_stage_skipped", "expression": "ordered(submitted, validated, composed, compiled, cleared, executed)", "description": "GUARDRAIL: no stage is skipped — each gate must hold before the next fires."},
-    {"name": "refuse_on_drift", "expression": "state /= 'executed' \\/ tamper_check_pass", "description": "GUARDRAIL: if the compiled script drifted from its .bk snapshot, the executor refuses."},
-    {"name": "record_every_run", "expression": "state /= 'executed' \\/ recorded_to_ledger", "description": "GUARDRAIL: every governed run is appended to the run-ledger — no out-of-band execution."}
+    {
+      "name": "governed_execution_only",
+      "expression": "state /= 'executed' \\/ governed_run",
+      "description": "GUARDRAIL: a task reaches 'executed' ONLY through executor.py \u2014 the single governed channel."
+    },
+    {
+      "name": "no_stage_skipped",
+      "expression": "ordered(submitted, validated, composed, compiled, cleared, executed)",
+      "description": "GUARDRAIL: no stage is skipped \u2014 each gate must hold before the next fires."
+    },
+    {
+      "name": "refuse_on_drift",
+      "expression": "state /= 'executed' \\/ tamper_check_pass",
+      "description": "GUARDRAIL: if the compiled script drifted from its .bk snapshot, the executor refuses."
+    },
+    {
+      "name": "record_every_run",
+      "expression": "state /= 'executed' \\/ recorded_to_ledger",
+      "description": "GUARDRAIL: every governed run is appended to the run-ledger \u2014 no out-of-band execution."
+    }
   ]
 }

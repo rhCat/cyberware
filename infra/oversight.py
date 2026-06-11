@@ -12,6 +12,17 @@ from __future__ import annotations
 import argparse, json, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+RULES_PATH = os.path.join(ROOT, "infra", "OVERSIGHT_RULE.json")
+
+
+def scan(script_text, approve=(), rules_path=RULES_PATH):
+    """Scan compiled bash against OVERSIGHT_RULE. Returns (violations, waived) — rule dicts.
+    The single source of truth: the standalone CLI *and* the executor's in-channel gate both call this."""
+    violations, waived = [], []
+    for r in json.load(open(rules_path))["deny"]:
+        if re.search(r["pattern"], script_text):
+            (waived if (r["id"] in approve and r.get("approvable")) else violations).append(r)
+    return violations, waived
 
 
 def main():
@@ -21,19 +32,15 @@ def main():
     ap.add_argument("--approve", action="append", default=[], help="rule id to waive (approvable rules only)")
     ap.add_argument("--subagent", action="store_true", help="opt-in LLM review hook")
     a = ap.parse_args()
-    rules = json.load(open(a.rules))["deny"]
     script = open(a.script).read()
     print(f"oversight · {os.path.basename(a.script)}")
 
-    violations, waived = [], []
-    for r in rules:
-        if re.search(r["pattern"], script):
-            if r["id"] in a.approve and r.get("approvable"):
-                waived.append(r); print(f"  [WAIVED] {r['id']} — {r['reason']} (explicitly approved)")
-            else:
-                violations.append(r)
-                how = "" if not r.get("approvable") else f"  (approvable: --approve {r['id']})"
-                print(f"  [BLOCK] {r['id']} — {r['reason']}{how}")
+    violations, waived = scan(script, a.approve, a.rules)
+    for r in waived:
+        print(f"  [WAIVED] {r['id']} — {r['reason']} (explicitly approved)")
+    for r in violations:
+        how = "" if not r.get("approvable") else f"  (approvable: --approve {r['id']})"
+        print(f"  [BLOCK] {r['id']} — {r['reason']}{how}")
     if not violations and not waived:
         print("  [clean] no denied patterns")
     if a.subagent:
