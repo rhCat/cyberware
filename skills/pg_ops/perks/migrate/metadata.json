@@ -1,0 +1,21 @@
+{
+  "perk": "migrate",
+  "skill": "pg_ops",
+  "description": "Apply a .sql migration file inside a single transaction (rollback on any error).",
+  "rules": [
+    "wrapped in one transaction (ON_ERROR_STOP, --single-transaction)",
+    "DROP/TRUNCATE refused by oversight unless approved",
+    "migration file must exist"
+  ],
+  "usage": "Set MIGRATION to a .sql path. Applied atomically; structured output reports the applied log.",
+  "limitation": "Destructive DDL (DROP/TRUNCATE) blocked at oversight unless explicitly approved (--approve).",
+  "minimal_example": {
+    "perk": "migrate",
+    "vars": {
+      "PGHOST": "localhost",
+      "PGDATABASE": "demo",
+      "PGUSER": "admin",
+      "MIGRATION": "/path/0001_add_index.sql"
+    }
+  }
+}

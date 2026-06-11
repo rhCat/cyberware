@@ -1,0 +1,21 @@
+{
+  "skill": "pg_ops",
+  "perks": [
+    {
+      "id": "select",
+      "summary": "read-only SELECT \u2192 CSV",
+      "destructive": false,
+      "tools": [
+        "psql_select"
+      ]
+    },
+    {
+      "id": "migrate",
+      "summary": "apply a .sql migration in one transaction",
+      "destructive": true,
+      "tools": [
+        "psql_migrate"
+      ]
+    }
+  ]
+}

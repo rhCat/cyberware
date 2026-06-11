@@ -1,0 +1,14 @@
+{
+  "_schema": "task-ledger TEMPLATE \u2014 copy, set perk, fill record_store + the vars the chosen perk's manifesto declares, then submit to validator\u2192composer\u2192compiler. The LLM outputs ONLY these fields.",
+  "skill": "pg_ops",
+  "perk": "select",
+  "record_store": "<absolute dir for outputs + the run-ledger>",
+  "vars": {
+    "PGHOST": "<host>",
+    "PGPORT": "5432",
+    "PGDATABASE": "<db>",
+    "PGUSER": "<user>",
+    "QUERY": "<SELECT ...>",
+    "LIMIT": "100"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "_schema": "rules the executor enforces at the call boundary (the governance layer).",
+  "tamper_check": true,
+  "require_upstream": true,
+  "max_runtime_seconds": 600,
+  "record_ledger_name": "run-ledger.json",
+  "backup_suffix": ".bk"
+}

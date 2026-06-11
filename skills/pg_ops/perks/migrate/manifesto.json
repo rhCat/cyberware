@@ -1,0 +1,24 @@
+{
+  "_perk": "migrate",
+  "sequence": [
+    "psql_migrate"
+  ],
+  "tools": {
+    "psql_migrate": {
+      "binary": "psql",
+      "params": {
+        "migration": "${MIGRATION}"
+      }
+    }
+  },
+  "env": {
+    "PGHOST": "${PGHOST}",
+    "PGPORT": "${PGPORT}",
+    "PGDATABASE": "${PGDATABASE}",
+    "PGUSER": "${PGUSER}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "psql"
+  ]
+}

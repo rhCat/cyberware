@@ -1,0 +1,22 @@
+{
+  "perk": "select",
+  "skill": "pg_ops",
+  "description": "Read-only SELECT against a database, written to CSV. The safe, proven query pathway.",
+  "rules": [
+    "read-only \u2014 no DML/DDL",
+    "LIMIT enforced",
+    "CSV output to record_store"
+  ],
+  "usage": "Set QUERY to a SELECT; LIMIT caps rows. Output: ${record_store}/select_rows.csv.",
+  "limitation": "SELECT only; INSERT/UPDATE/DELETE/DDL are refused at oversight.",
+  "minimal_example": {
+    "perk": "select",
+    "vars": {
+      "PGHOST": "localhost",
+      "PGDATABASE": "demo",
+      "PGUSER": "reader",
+      "QUERY": "SELECT id,name FROM users",
+      "LIMIT": "50"
+    }
+  }
+}
