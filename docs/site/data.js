@@ -186,13 +186,17 @@ window.SKILLS = [
      },
      "outputs": {
       "workflow": {
+       "path": "${PROJECT_DIR}/.github/workflows/codeqc.yml",
+       "type": "file"
+      },
+      "record": {
        "path": "${RECORD_STORE}/codeqc.yml",
        "type": "file"
       }
      },
      "checks": {
       "exit_zero": true,
-      "output_exists": "${RECORD_STORE}/codeqc.yml"
+      "output_exists": "${PROJECT_DIR}/.github/workflows/codeqc.yml"
      }
     },
     "snippets": {
@@ -212,7 +216,7 @@ window.SKILLS = [
        "BRANCH": "main"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=ci-codeqc perk=github_actions\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PROJECT_DIR=/path/to/repo SRC_DIR=src TEST_DIR=tests PYTHON_VERSION=3.12 BRANCH=main RECORD_STORE=~/cyberware_run_logs/ci-codeqc__github_actions__3d975f19\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/ci-codeqc/perks/github_actions/src\n\nstep1() {   # ci_github_actions\n  echo \"[step 1] ci_github_actions\"\n  bash \"$SNIP/ci_github_actions.sh\"\n  test -f \"${RECORD_STORE}/codeqc.yml\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/codeqc.yml\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tci_github_actions\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=ci-codeqc perk=github_actions\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PROJECT_DIR=/path/to/repo SRC_DIR=src TEST_DIR=tests PYTHON_VERSION=3.12 BRANCH=main RECORD_STORE=~/cyberware_run_logs/ci-codeqc__github_actions__3d975f19\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/ci-codeqc/perks/github_actions/src\n\nstep1() {   # ci_github_actions\n  echo \"[step 1] ci_github_actions\"\n  bash \"$SNIP/ci_github_actions.sh\"\n  test -f \"${PROJECT_DIR}/.github/workflows/codeqc.yml\" || { echo \"CONTRACT FAIL step 1: missing ${PROJECT_DIR}/.github/workflows/codeqc.yml\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tci_github_actions\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]
@@ -1587,13 +1591,17 @@ window.SKILLS = [
      },
      "outputs": {
       "workflow": {
+       "path": "${PROJECT_DIR}/.github/workflows/datadog-ci.yml",
+       "type": "file"
+      },
+      "record": {
        "path": "${RECORD_STORE}/datadog-ci.yml",
        "type": "file"
       }
      },
      "checks": {
       "exit_zero": true,
-      "output_exists": "${RECORD_STORE}/datadog-ci.yml"
+      "output_exists": "${PROJECT_DIR}/.github/workflows/datadog-ci.yml"
      }
     },
     "snippets": {
@@ -1614,7 +1622,7 @@ window.SKILLS = [
        "BRANCH": "main"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=datadog perk=github_ci\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PROJECT_DIR=/path/to/repo SERVICE=my-app TEST_CMD='pytest --junitxml=junit.xml' JUNIT_PATH=junit.xml DD_SITE=datadoghq.com BRANCH=main RECORD_STORE=~/cyberware_run_logs/datadog__github_ci__cd4dcb1c\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/datadog/perks/github_ci/src\n\nstep1() {   # datadog_github_ci\n  echo \"[step 1] datadog_github_ci\"\n  bash \"$SNIP/datadog_github_ci.sh\"\n  test -f \"${RECORD_STORE}/datadog-ci.yml\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/datadog-ci.yml\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tdatadog_github_ci\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=datadog perk=github_ci\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PROJECT_DIR=/path/to/repo SERVICE=my-app TEST_CMD='pytest --junitxml=junit.xml' JUNIT_PATH=junit.xml DD_SITE=datadoghq.com BRANCH=main RECORD_STORE=~/cyberware_run_logs/datadog__github_ci__cd4dcb1c\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/datadog/perks/github_ci/src\n\nstep1() {   # datadog_github_ci\n  echo \"[step 1] datadog_github_ci\"\n  bash \"$SNIP/datadog_github_ci.sh\"\n  test -f \"${PROJECT_DIR}/.github/workflows/datadog-ci.yml\" || { echo \"CONTRACT FAIL step 1: missing ${PROJECT_DIR}/.github/workflows/datadog-ci.yml\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tdatadog_github_ci\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]

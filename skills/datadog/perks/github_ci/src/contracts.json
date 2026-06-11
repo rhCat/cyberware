@@ -28,12 +28,16 @@
   },
   "outputs": {
     "workflow": {
+      "path": "${PROJECT_DIR}/.github/workflows/datadog-ci.yml",
+      "type": "file"
+    },
+    "record": {
       "path": "${RECORD_STORE}/datadog-ci.yml",
       "type": "file"
     }
   },
   "checks": {
     "exit_zero": true,
-    "output_exists": "${RECORD_STORE}/datadog-ci.yml"
+    "output_exists": "${PROJECT_DIR}/.github/workflows/datadog-ci.yml"
   }
 }
