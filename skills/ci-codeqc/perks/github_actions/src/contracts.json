@@ -24,12 +24,16 @@
   },
   "outputs": {
     "workflow": {
+      "path": "${PROJECT_DIR}/.github/workflows/codeqc.yml",
+      "type": "file"
+    },
+    "record": {
       "path": "${RECORD_STORE}/codeqc.yml",
       "type": "file"
     }
   },
   "checks": {
     "exit_zero": true,
-    "output_exists": "${RECORD_STORE}/codeqc.yml"
+    "output_exists": "${PROJECT_DIR}/.github/workflows/codeqc.yml"
   }
 }
