@@ -19,6 +19,8 @@
   header .stats { color:var(--dim); font-size:12px; margin-left:auto; }
   .layout { display:grid; grid-template-columns:240px 1fr; min-height:calc(100vh - 56px); }
   aside { border-right:1px solid var(--line); padding:14px 10px; overflow:auto; }
+  aside .grp { font-size:10px; text-transform:uppercase; letter-spacing:1.5px; color:var(--acc); padding:16px 12px 5px; font-weight:600; }
+  aside .grp:first-child { padding-top:4px; }
   aside .item { padding:9px 12px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:8px; }
   aside .item:hover { background:var(--panel); }
   aside .item.active { background:var(--panel2); outline:1px solid var(--line); }
@@ -183,8 +185,13 @@ function setMode(id) {
 function renderList() {
   document.getElementById("stats").textContent =
     `${S.length} skills · ${S.reduce((a,s)=>a+s.perks.length,0)} perks · ${new Set(S.flatMap(s=>s.perks.flatMap(p=>p.sequence))).size} tools`;
-  document.getElementById("list").innerHTML = S.map((s,i) =>
-    `<div class="item" data-i="${i}"><span class="dot"></span><b>${esc(s.id)}</b><span class="n">${s.perks.length}</span></div>`).join("");
+  const groups = {};
+  S.forEach((s, i) => { const g = s.group || "skills"; (groups[g] = groups[g] || []).push(i); });
+  const order = ["skills", "cws internals"];
+  const keys = order.filter(g => groups[g]).concat(Object.keys(groups).filter(g => !order.includes(g)));
+  document.getElementById("list").innerHTML = keys.map(g =>
+    `<div class="grp">${esc(g)}</div>` + groups[g].map(i =>
+      `<div class="item" data-i="${i}"><span class="dot"></span><b>${esc(S[i].id)}</b><span class="n">${S[i].perks.length}</span></div>`).join("")).join("");
   document.querySelectorAll("#list .item").forEach(el => el.onclick = () => openSkill(+el.dataset.i));
 }
 

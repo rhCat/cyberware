@@ -3,6 +3,7 @@ window.SKILLS = [
   "id": "ci-codeqc",
   "name": "CI code-QC generator",
   "description": "Generate or update a GitHub Actions code-QC workflow (ruff + mypy + pytest) for a repo. Idempotent \u2014 creates, or backs up and updates an existing workflow. Perk-agnostic lifecycle (ready \u2192 prepared \u2192 verified \u2192 executed); the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "group": "skills",
   "blueprint": {
    "$schema": "lpp/v0.2.0",
    "id": "ci-codeqc",
@@ -220,6 +221,7 @@ window.SKILLS = [
   "id": "codebaseqc",
   "name": "Codebase QC (usage / contract / coverage)",
   "description": "Pure-Python ast quality checks for a Python repo over three dimensions \u2014 USAGE (dead code), CONTRACT (missing docstring/return type), COVERAGE (not referenced in tests). No alembic; name-based heuristics (sound resolution is the open frontier). Perk-agnostic lifecycle (ready \u2192 prepared \u2192 verified \u2192 executed); the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "group": "skills",
   "blueprint": {
    "$schema": "lpp/v0.2.0",
    "id": "codebaseqc",
@@ -439,6 +441,7 @@ window.SKILLS = [
   "id": "cws-create",
   "name": "Cyberware skill create",
   "description": "Evaluate a candidate skill \u2014 execution (tool) vs design (taste) vs transformable \u2014 and, when it fits, scaffold it into cyberware format. The framework's on-ramp for new skills. Perk-agnostic lifecycle (ready \u2192 prepared \u2192 verified \u2192 executed); the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "group": "cws internals",
   "blueprint": {
    "$schema": "lpp/v0.2.0",
    "id": "cws-create",
@@ -724,6 +727,7 @@ window.SKILLS = [
   "id": "data",
   "name": "Data wrangling",
   "description": "Data transforms through proven pathways \u2014 CSV\u2192JSON and jq queries. Perk-agnostic lifecycle (ready \u2192 prepared \u2192 verified \u2192 executed); the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "group": "skills",
   "blueprint": {
    "$schema": "lpp/v0.2.0",
    "id": "data",
@@ -992,6 +996,7 @@ window.SKILLS = [
   "id": "docker",
   "name": "Docker operations",
   "description": "Container operations through proven pathways \u2014 build images, inspect running containers. Requires a reachable Docker daemon. Perk-agnostic lifecycle (ready \u2192 prepared \u2192 verified \u2192 executed); the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "group": "skills",
   "blueprint": {
    "$schema": "lpp/v0.2.0",
    "id": "docker",
@@ -1265,6 +1270,7 @@ window.SKILLS = [
   "id": "fs",
   "name": "Filesystem operations",
   "description": "Filesystem work through proven pathways; outputs + manifests captured to record_store. Perk-agnostic lifecycle (ready \u2192 prepared \u2192 verified \u2192 executed); the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "group": "skills",
   "blueprint": {
    "$schema": "lpp/v0.2.0",
    "id": "fs",
@@ -1532,6 +1538,7 @@ window.SKILLS = [
   "id": "git_ops",
   "name": "Git operations",
   "description": "Git work through proven pathways; the oversight ruleset refuses force-push and hard reset unless approved. Perk-agnostic lifecycle (ready \u2192 prepared \u2192 verified \u2192 executed); the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "group": "skills",
   "blueprint": {
    "$schema": "lpp/v0.2.0",
    "id": "git_ops",
@@ -1799,6 +1806,7 @@ window.SKILLS = [
   "id": "http",
   "name": "HTTP requests",
   "description": "Make HTTP requests through proven, contract-bound pathways; responses captured to record_store with status + size in structured output. Perk-agnostic lifecycle (ready \u2192 prepared \u2192 verified \u2192 executed); the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "group": "skills",
   "blueprint": {
    "$schema": "lpp/v0.2.0",
    "id": "http",
@@ -2074,6 +2082,7 @@ window.SKILLS = [
   "id": "net",
   "name": "Network diagnostics",
   "description": "Networking diagnostics through proven pathways \u2014 HTTP health probes and DNS resolution. Perk-agnostic lifecycle (ready \u2192 prepared \u2192 verified \u2192 executed); the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "group": "skills",
   "blueprint": {
    "$schema": "lpp/v0.2.0",
    "id": "net",
@@ -2342,6 +2351,7 @@ window.SKILLS = [
   "id": "pg_ops",
   "name": "Governed PostgreSQL operations",
   "description": "The general, perk-agnostic lifecycle of a governed DB operation. Tells the intelligence what to look out for (the guardrails) and which logs to check (the per-tool structured output + the executor's run-ledger). Perks are optional: any proven pathway plugs into a_operate. Perk-agnostic lifecycle (ready \u2192 prepared \u2192 verified \u2192 executed); the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "group": "skills",
   "blueprint": {
    "$schema": "lpp/v0.2.0",
    "id": "pg_ops",
@@ -2652,6 +2662,7 @@ window.SKILLS = [
   "id": "py_qc",
   "name": "Python quality checks",
   "description": "Run Python tests + lint through proven pathways; reports captured to record_store. Perk-agnostic lifecycle (ready \u2192 prepared \u2192 verified \u2192 executed); the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "group": "skills",
   "blueprint": {
    "$schema": "lpp/v0.2.0",
    "id": "py_qc",
@@ -2932,6 +2943,7 @@ window.SKILLS = [
   "id": "release",
   "name": "Release tagging",
   "description": "Release operations through proven pathways \u2014 annotated git tags (no push; push stays gated). Perk-agnostic lifecycle (ready \u2192 prepared \u2192 verified \u2192 executed); the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "group": "skills",
   "blueprint": {
    "$schema": "lpp/v0.2.0",
    "id": "release",
@@ -3134,6 +3146,7 @@ window.SKILLS = [
   "id": "search",
   "name": "Code search",
   "description": "Search and measure a codebase through proven pathways \u2014 pattern search and line counts. Perk-agnostic lifecycle (ready \u2192 prepared \u2192 verified \u2192 executed); the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "group": "skills",
   "blueprint": {
    "$schema": "lpp/v0.2.0",
    "id": "search",
