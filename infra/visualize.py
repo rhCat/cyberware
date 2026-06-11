@@ -83,9 +83,22 @@ def drawio(bp, perk_steps=None):
     pos, d, W, H, _, _ = _layout(bp)
     cells = []
     task = bp.get("task") or {}
-    note_lines = ([f"TASK · {task.get('skill', '')} / {task.get('perk', '')}"]
-                  + [f"{k} = {v}" for k, v in (task.get("vars") or {}).items()]
-                  + ([f"run → {task['run_dir']}"] if task.get("run_dir") else [])) if task else []
+    c = task.get("contract") or {}
+    note_lines = []
+    if task:
+        note_lines = [f"TASK · {task.get('skill', '')} / {task.get('perk', '')}"]
+        for k, s in (c.get("inputs") or {}).items():
+            note_lines.append(f"{k} = {s.get('value', '∅')}  ({s.get('type', '?')}{', required' if s.get('required') else ''})")
+        if not c.get("inputs"):
+            note_lines += [f"{k} = {v}" for k, v in (task.get("vars") or {}).items()]
+        checks = c.get("checks") or {}
+        chk = (["exit_zero"] if checks.get("exit_zero") else []) + ([f"test -f {checks['output_exists']}"] if checks.get("output_exists") else [])
+        if chk:
+            note_lines.append("checks: " + " ∧ ".join(chk))
+        if c.get("requires"):
+            note_lines.append("requires: " + ", ".join(c["requires"]))
+        if task.get("run_dir"):
+            note_lines.append(f"$RUN → {task['run_dir']}")
     yoff = (44 + len(note_lines) * 16) if note_lines else 0   # push states below the task note
     if note_lines:
         note = E("\n".join(note_lines)).replace("\n", "&#10;")
@@ -96,9 +109,11 @@ def drawio(bp, perk_steps=None):
         fill, stroke = ("#d5e8d4", "#82b366") if s in terms else (("#dae8fc", "#6c8ebf") if s == entry else ("#f5f5f5", "#666666"))
         val = E(f"{s}\n{states[s].get('description','')}").replace("\n", "&#10;")
         cells.append(f'<mxCell id="s_{s}" value="{val}" style="rounded=1;whiteSpace=wrap;html=1;fillColor={fill};strokeColor={stroke};align=left;verticalAlign=top;spacing=6;spacingTop=4;fontSize=11;" vertex="1" parent="1"><mxGeometry x="{x}" y="{y}" width="{W}" height="{H}" as="geometry"/></mxCell>')
+    gmap = bp.get("gates", {})
     for i, t in enumerate(bp["transitions"]):
+        bnd = gmap.get(t.get("gate", ""), {}).get("binding", "")
         sub = " / ".join(x for x in [t.get("action"), ("⊨ " + t["gate"]) if t.get("gate") else None] if x)
-        label = E(t.get("trigger", "") + ("\n" + sub if sub else "")).replace("\n", "&#10;")
+        label = E(t.get("trigger", "") + ("\n" + sub if sub else "") + ("\n↳ " + bnd if bnd else "")).replace("\n", "&#10;")
         cells.append(f'<mxCell id="t_{i}" value="{label}" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;endArrow=block;strokeColor=#444444;" edge="1" parent="1" source="s_{t["from"]}" target="s_{t["to"]}"><mxGeometry relative="1" as="geometry"/></mxCell>')
     body = "\n        ".join(cells)
     return (f'<mxfile host="cyberware">\n  <diagram name="{E(bp.get("id","skill"))}">\n'
@@ -154,16 +169,30 @@ def svg(bp, perk_steps=None):
         cu = actions.get(ident, {}).get("compute_unit", ident)
         return "▶ " + " → ".join(perk_steps) if (perk_steps and "perk:sequence" in cu) else ""
 
+    def bind_of(ident):   # the gate's abstract predicate resolved to the concrete check for this task
+        b = gates.get(ident, {}).get("binding", "")
+        return (b[:112] + "…") if len(b) > 113 else b
+
     task = bp.get("task") or {}
-    task_lines = [f"{k} = {str(v)[:56]}" for k, v in (task.get("vars") or {}).items()]
+    contract = task.get("contract") or {}
+    cin = contract.get("inputs") or {}
+    if cin:   # show each input with its contract type + whether it is required
+        task_lines = [f"{k} = {str(s.get('value', '∅'))[:44]}  ({s.get('type', '?')}{', required' if s.get('required') else ''})"
+                      for k, s in cin.items()]
+    else:
+        task_lines = [f"{k} = {str(v)[:56]}" for k, v in (task.get("vars") or {}).items()]
     if task.get("run_dir"):
-        task_lines.append(f"run → {str(task['run_dir'])[:56]}")
+        rl = f"$RUN → {str(task['run_dir'])[:56]}"
+        if contract.get("requires"):
+            rl += f"   ·   requires {', '.join(contract['requires'])}"
+        task_lines.append(rl)
     th = (26 + len(task_lines) * 15 + 8) if task_lines else 0   # task-settings header height
     y, nodes, maxside = 48 + th, [], 12
     for kind, ident, trig in seq:
         w, h = _SIZE[kind]
         nodes.append((kind, ident, CX - w / 2, y, w, h, trig))
-        maxside = max(maxside, len(expr_of(ident)) if kind == "gate" else (len(steps_of(ident)) if kind == "action" else 0))
+        side = max(len(expr_of(ident)), len(bind_of(ident))) if kind == "gate" else (len(steps_of(ident)) if kind == "action" else 0)
+        maxside = max(maxside, side)
         y += h + GAP
     height = y + 8
     width = max(600, CX + 95 + maxside * 7 + 28, max((len(s) for s in task_lines), default=0) * 7 + 44)
@@ -215,7 +244,10 @@ def svg(bp, perk_steps=None):
         elif kind == "gate":
             o.append(f'<polygon points="{cx},{y} {x+w},{y+h/2} {cx},{y+h} {x},{y+h/2}" fill="#0c1a0c" stroke="{_NEON}" stroke-width="1.8" filter="url(#glow)"/>')
             o.append(f'<text x="{cx:.0f}" y="{y+h/2+4:.0f}" font-size="11" font-weight="600" text-anchor="middle" fill="{_NEON}">{E(ident)}</text>')
-            o.append(f'<text x="{x+w+16:.0f}" y="{y+h/2+4:.0f}" font-size="11" fill="{_ON}">{E(expr_of(ident))}</text>')
+            bnd = bind_of(ident)   # the abstract predicate (top) resolved to this task's concrete check (below)
+            o.append(f'<text x="{x+w+16:.0f}" y="{y+h/2+(-5 if bnd else 4):.0f}" font-size="11" fill="{_ON}">{E(expr_of(ident))}</text>')
+            if bnd:
+                o.append(f'<text x="{x+w+16:.0f}" y="{y+h/2+13:.0f}" font-size="10.5" fill="{_DIM}">↳ {E(bnd)}</text>')
             fx = x - 138   # failure route → exit / log (to the left)
             o.append(f'<line x1="{x}" y1="{y+h/2}" x2="{fx+120:.0f}" y2="{y+h/2}" stroke="{_FAIL}" stroke-width="2"/>')
             o.append(f'<text x="{(x+fx+120)/2:.0f}" y="{y+h/2-6:.0f}" font-size="11" font-weight="700" text-anchor="middle" fill="{_FAIL}">✗ fail</text>')

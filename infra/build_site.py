@@ -44,7 +44,7 @@ def perk_data(pdir: str, pm: dict, bp: dict, sid: str, tpl_vars: dict) -> dict:
     dvars = {v: ex.get(v, tpl_vars.get(v, "")) for v in man.get("env", {}) if v != "RECORD_STORE"}
     ledger = {"skill": sid, "perk": pm["id"], "record_store": "<default: ~/cyberware_run_logs>", "vars": dvars}
     run = compiler.run_dir(ledger).replace(os.path.expanduser("~"), "~")
-    task_bp = {**bp, "task": {"skill": sid, "perk": pm["id"], "vars": dvars, "tools": seq, "run_dir": run}}
+    task_bp = compiler.task_blueprint(ledger, run, seq)
     try:
         text, _ = compiler.build_script(ledger)
         compiled = text.replace(ROOT + "/", "").replace(os.path.expanduser("~"), "~")   # readable paths
