@@ -1,0 +1,29 @@
+{
+  "_perk": "github_actions",
+  "sequence": [
+    "ci_github_actions"
+  ],
+  "tools": {
+    "ci_github_actions": {
+      "binary": "bash",
+      "params": {
+        "PROJECT_DIR": "${PROJECT_DIR}",
+        "SRC_DIR": "${SRC_DIR}",
+        "TEST_DIR": "${TEST_DIR}",
+        "PYTHON_VERSION": "${PYTHON_VERSION}",
+        "BRANCH": "${BRANCH}"
+      }
+    }
+  },
+  "env": {
+    "PROJECT_DIR": "${PROJECT_DIR}",
+    "SRC_DIR": "${SRC_DIR}",
+    "TEST_DIR": "${TEST_DIR}",
+    "PYTHON_VERSION": "${PYTHON_VERSION}",
+    "BRANCH": "${BRANCH}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "bash"
+  ]
+}

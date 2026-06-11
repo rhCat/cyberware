@@ -1,0 +1,20 @@
+{
+  "perk": "github_actions",
+  "skill": "ci-codeqc",
+  "description": "Generate/update a GitHub Actions code-QC workflow (ruff + mypy + pytest).",
+  "rules": [
+    "idempotent \u2014 existing workflow backed up to .bk before overwrite",
+    "writes only .github/workflows/codeqc.yml",
+    "non-destructive"
+  ],
+  "usage": "Set PROJECT_DIR (+ SRC_DIR, TEST_DIR, PYTHON_VERSION, BRANCH). Output: .github/workflows/codeqc.yml.",
+  "limitation": "GitHub Actions + Python repos; the workflow is a sensible default, edit as needed.",
+  "minimal_example": {
+    "perk": "github_actions",
+    "vars": {
+      "PROJECT_DIR": "/path/to/repo",
+      "SRC_DIR": "src",
+      "TEST_DIR": "tests"
+    }
+  }
+}

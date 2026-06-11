@@ -1,0 +1,13 @@
+{
+  "_schema": "task-ledger TEMPLATE for ci-codeqc \u2014 fill PROJECT_DIR (+ optional SRC_DIR, TEST_DIR, PYTHON_VERSION, BRANCH).",
+  "skill": "ci-codeqc",
+  "perk": "github_actions",
+  "record_store": "<absolute dir for the codeqc.yml copy + run-ledger>",
+  "vars": {
+    "PROJECT_DIR": "<repo path>",
+    "SRC_DIR": ".",
+    "TEST_DIR": "tests",
+    "PYTHON_VERSION": "3.12",
+    "BRANCH": "main"
+  }
+}

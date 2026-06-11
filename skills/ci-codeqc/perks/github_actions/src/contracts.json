@@ -1,0 +1,35 @@
+{
+  "tool": "ci_github_actions",
+  "inputs": {
+    "PROJECT_DIR": {
+      "type": "dir",
+      "required": true
+    },
+    "SRC_DIR": {
+      "type": "string",
+      "required": false
+    },
+    "TEST_DIR": {
+      "type": "string",
+      "required": false
+    },
+    "PYTHON_VERSION": {
+      "type": "string",
+      "required": false
+    },
+    "BRANCH": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "outputs": {
+    "workflow": {
+      "path": "${RECORD_STORE}/codeqc.yml",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/codeqc.yml"
+  }
+}
