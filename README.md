@@ -74,4 +74,14 @@ python3 infra/oversight.py  --script /tmp/run.sh                 # OVERSIGHT_RUL
 python3 infra/executor.py   --script /tmp/run.sh --step 1        # governed run (the ONLY channel)
 ```
 
+## Authoring + visualizing
+
+```sh
+# scaffold a new skill skeleton — composes out of the box; fill the snippets + vars
+python3 infra/scaffold.py --skill myskill --name "My Skill" --perk fetch:my_fetch:curl --perk store:my_store:python3
+
+# render a blueprint as draw.io XML (entry blue, terminal green; open in app.diagrams.net)
+python3 infra/visualize.py --skill pg_ops -o skills/pg_ops/blueprint.drawio
+```
+
 See [`SPEC.md`](SPEC.md) for the original specification.
