@@ -1,0 +1,23 @@
+{
+  "tool": "net_healthcheck",
+  "inputs": {
+    "URL": {
+      "type": "string",
+      "required": true
+    },
+    "TIMEOUT": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "outputs": {
+    "net_healthcheck_out": {
+      "path": "${RECORD_STORE}/healthcheck.json",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/healthcheck.json"
+  }
+}

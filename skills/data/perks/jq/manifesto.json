@@ -1,0 +1,23 @@
+{
+  "_perk": "jq",
+  "sequence": [
+    "data_jq"
+  ],
+  "tools": {
+    "data_jq": {
+      "binary": "jq",
+      "params": {
+        "JSON_FILE": "${JSON_FILE}",
+        "QUERY": "${QUERY}"
+      }
+    }
+  },
+  "env": {
+    "JSON_FILE": "${JSON_FILE}",
+    "QUERY": "${QUERY}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "jq"
+  ]
+}

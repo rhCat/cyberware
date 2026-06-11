@@ -1,0 +1,21 @@
+{
+  "_perk": "ps",
+  "sequence": [
+    "docker_ps"
+  ],
+  "tools": {
+    "docker_ps": {
+      "binary": "docker",
+      "params": {
+        "ALL": "${ALL}"
+      }
+    }
+  },
+  "env": {
+    "ALL": "${ALL}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "docker"
+  ]
+}

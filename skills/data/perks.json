@@ -1,0 +1,21 @@
+{
+  "skill": "data",
+  "perks": [
+    {
+      "id": "csv2json",
+      "summary": "convert a CSV file to a JSON array",
+      "destructive": false,
+      "tools": [
+        "data_csv2json"
+      ]
+    },
+    {
+      "id": "jq",
+      "summary": "run a jq query over a JSON file",
+      "destructive": false,
+      "tools": [
+        "data_jq"
+      ]
+    }
+  ]
+}

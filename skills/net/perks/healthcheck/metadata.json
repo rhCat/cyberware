@@ -1,0 +1,17 @@
+{
+  "perk": "healthcheck",
+  "skill": "net",
+  "description": "HTTP probe \u2014 status code + latency",
+  "rules": [
+    "read-only",
+    "health = 2xx/3xx"
+  ],
+  "usage": "Set URL (+ optional TIMEOUT, default 10s). Output: healthcheck.json.",
+  "limitation": "HTTP(S) only.",
+  "minimal_example": {
+    "perk": "healthcheck",
+    "vars": {
+      "URL": "https://example.com/health"
+    }
+  }
+}

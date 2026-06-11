@@ -1,0 +1,15 @@
+{
+  "perk": "ps",
+  "skill": "docker",
+  "description": "list containers (read-only)",
+  "rules": [
+    "read-only",
+    "listing to record_store"
+  ],
+  "usage": "Optional ALL=1 to include stopped. Output: containers.txt.",
+  "limitation": "Reporting only.",
+  "minimal_example": {
+    "perk": "ps",
+    "vars": {}
+  }
+}

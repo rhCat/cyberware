@@ -1,0 +1,18 @@
+{
+  "perk": "grep",
+  "skill": "search",
+  "description": "search files for a pattern (ripgrep, fallback grep)",
+  "rules": [
+    "read-only",
+    "matches to record_store"
+  ],
+  "usage": "Set PATTERN + SEARCH_DIR. Output: matches.txt.",
+  "limitation": "Line-oriented text search.",
+  "minimal_example": {
+    "perk": "grep",
+    "vars": {
+      "PATTERN": "TODO",
+      "SEARCH_DIR": "."
+    }
+  }
+}

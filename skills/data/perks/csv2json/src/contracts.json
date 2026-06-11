@@ -1,0 +1,19 @@
+{
+  "tool": "data_csv2json",
+  "inputs": {
+    "CSV_FILE": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "data_csv2json_out": {
+      "path": "${RECORD_STORE}/data.json",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/data.json"
+  }
+}

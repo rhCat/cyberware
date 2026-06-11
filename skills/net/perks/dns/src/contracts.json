@@ -1,0 +1,19 @@
+{
+  "tool": "net_dns",
+  "inputs": {
+    "HOST": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "net_dns_out": {
+      "path": "${RECORD_STORE}/dns.json",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/dns.json"
+  }
+}

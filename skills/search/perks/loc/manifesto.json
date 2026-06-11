@@ -1,0 +1,23 @@
+{
+  "_perk": "loc",
+  "sequence": [
+    "search_loc"
+  ],
+  "tools": {
+    "search_loc": {
+      "binary": "find",
+      "params": {
+        "SEARCH_DIR": "${SEARCH_DIR}",
+        "EXT": "${EXT}"
+      }
+    }
+  },
+  "env": {
+    "SEARCH_DIR": "${SEARCH_DIR}",
+    "EXT": "${EXT}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "find"
+  ]
+}

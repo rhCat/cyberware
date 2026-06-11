@@ -1,0 +1,10 @@
+{
+  "_schema": "task-ledger TEMPLATE for search \u2014 set perk, fill record_store + the vars the perk declares.",
+  "skill": "search",
+  "perk": "grep",
+  "record_store": "<absolute dir for outputs + run-ledger>",
+  "vars": {
+    "PATTERN": "<pattern>",
+    "SEARCH_DIR": "<search_dir>"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "perk": "dns",
+  "skill": "net",
+  "description": "resolve a hostname to addresses",
+  "rules": [
+    "read-only",
+    "result to record_store"
+  ],
+  "usage": "Set HOST. Output: dns.json.",
+  "limitation": "A/AAAA via the system resolver.",
+  "minimal_example": {
+    "perk": "dns",
+    "vars": {
+      "HOST": "example.com"
+    }
+  }
+}

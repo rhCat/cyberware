@@ -1,0 +1,27 @@
+{
+  "tool": "docker_build",
+  "inputs": {
+    "CONTEXT_DIR": {
+      "type": "string",
+      "required": true
+    },
+    "IMAGE_TAG": {
+      "type": "string",
+      "required": true
+    },
+    "DOCKERFILE": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "outputs": {
+    "docker_build_out": {
+      "path": "${RECORD_STORE}/docker_build.log",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/docker_build.log"
+  }
+}

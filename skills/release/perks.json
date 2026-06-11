@@ -1,0 +1,13 @@
+{
+  "skill": "release",
+  "perks": [
+    {
+      "id": "tag",
+      "summary": "create an annotated git tag at HEAD",
+      "destructive": false,
+      "tools": [
+        "release_tag"
+      ]
+    }
+  ]
+}

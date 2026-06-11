@@ -1,0 +1,17 @@
+{
+  "perk": "csv2json",
+  "skill": "data",
+  "description": "convert a CSV file to a JSON array",
+  "rules": [
+    "row objects keyed by header",
+    "result to record_store"
+  ],
+  "usage": "Set CSV_FILE. Output: data.json.",
+  "limitation": "Header row required.",
+  "minimal_example": {
+    "perk": "csv2json",
+    "vars": {
+      "CSV_FILE": "/path/to/data.csv"
+    }
+  }
+}

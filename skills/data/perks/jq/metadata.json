@@ -1,0 +1,17 @@
+{
+  "perk": "jq",
+  "skill": "data",
+  "description": "run a jq query over a JSON file",
+  "rules": [
+    "result to record_store"
+  ],
+  "usage": "Set JSON_FILE + QUERY. Output: jq_result.json.",
+  "limitation": "Needs jq installed.",
+  "minimal_example": {
+    "perk": "jq",
+    "vars": {
+      "JSON_FILE": "/path/to/in.json",
+      "QUERY": ".items | length"
+    }
+  }
+}

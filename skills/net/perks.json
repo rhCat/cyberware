@@ -1,0 +1,21 @@
+{
+  "skill": "net",
+  "perks": [
+    {
+      "id": "healthcheck",
+      "summary": "HTTP probe \u2014 status code + latency",
+      "destructive": false,
+      "tools": [
+        "net_healthcheck"
+      ]
+    },
+    {
+      "id": "dns",
+      "summary": "resolve a hostname to addresses",
+      "destructive": false,
+      "tools": [
+        "net_dns"
+      ]
+    }
+  ]
+}

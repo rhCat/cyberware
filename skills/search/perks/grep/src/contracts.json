@@ -1,0 +1,23 @@
+{
+  "tool": "search_grep",
+  "inputs": {
+    "PATTERN": {
+      "type": "string",
+      "required": true
+    },
+    "SEARCH_DIR": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "search_grep_out": {
+      "path": "${RECORD_STORE}/matches.txt",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/matches.txt"
+  }
+}

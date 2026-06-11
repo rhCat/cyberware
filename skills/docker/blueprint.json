@@ -1,0 +1,117 @@
+{
+  "$schema": "lpp/v0.2.0",
+  "id": "docker",
+  "name": "Docker operations",
+  "description": "Container operations through proven pathways \u2014 build images, inspect running containers. Requires a reachable Docker daemon. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "entry_state": "ready",
+  "states": {
+    "ready": {
+      "description": "task-ledger submitted, nothing run"
+    },
+    "prepared": {
+      "description": "inputs validated \u2014 required vars present, runtime + store ready"
+    },
+    "operated": {
+      "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+    },
+    "verified": {
+      "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+    },
+    "recorded": {
+      "description": "run metadata + outputs recorded to the run-ledger"
+    }
+  },
+  "terminal_states": {
+    "recorded": {}
+  },
+  "gates": {
+    "g_prepared": {
+      "type": "expression",
+      "expression": "inputs_present /\\ store_writable",
+      "description": "inputs + store validated"
+    },
+    "g_operated": {
+      "type": "expression",
+      "expression": "governed_run",
+      "description": "ran ONLY through executor.py"
+    },
+    "g_verified": {
+      "type": "expression",
+      "expression": "contract_checks_pass",
+      "description": "the perk's contract is satisfied"
+    }
+  },
+  "actions": {
+    "a_prepare": {
+      "type": "compute",
+      "compute_unit": "validator:check_inputs",
+      "description": "validator confirms required vars + writable record_store + reachable runtime"
+    },
+    "a_operate": {
+      "type": "compute",
+      "compute_unit": "perk:sequence",
+      "description": "run the chosen perk's tool sequence (perk OPTIONAL)"
+    },
+    "a_verify": {
+      "type": "compute",
+      "compute_unit": "validator:check_contract",
+      "description": "the perk's src/contracts.json checks"
+    },
+    "a_record": {
+      "type": "compute",
+      "compute_unit": "executor:record",
+      "description": "persist run metadata + outputs"
+    }
+  },
+  "transitions": [
+    {
+      "from": "ready",
+      "to": "prepared",
+      "trigger": "PREPARE",
+      "action": "a_prepare",
+      "gate": "g_prepared"
+    },
+    {
+      "from": "prepared",
+      "to": "operated",
+      "trigger": "OPERATE",
+      "action": "a_operate",
+      "gate": "g_operated"
+    },
+    {
+      "from": "operated",
+      "to": "verified",
+      "trigger": "VERIFY",
+      "action": "a_verify",
+      "gate": "g_verified"
+    },
+    {
+      "from": "verified",
+      "to": "recorded",
+      "trigger": "RECORD",
+      "action": "a_record"
+    }
+  ],
+  "safety_invariants": [
+    {
+      "name": "operate_only_when_prepared",
+      "expression": "state /= 'operated' \\/ inputs_present",
+      "description": "GUARDRAIL: no operation before inputs are validated."
+    },
+    {
+      "name": "governed_execution_only",
+      "expression": "state /= 'operated' \\/ governed_run",
+      "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+    },
+    {
+      "name": "verify_before_record",
+      "expression": "state /= 'recorded' \\/ contract_checks_pass",
+      "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+    },
+    {
+      "name": "oversight_clears_script",
+      "expression": "TRUE",
+      "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+    }
+  ]
+}
