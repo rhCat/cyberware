@@ -72,6 +72,10 @@
   .stage .sn { background:var(--panel2); color:var(--acc); border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:11px; flex:none; font-family:var(--mono); margin-top:1px; }
   .stage b { font-family:var(--mono); font-size:12.5px; color:var(--ink); }
   .stage em { display:block; color:var(--dim); font-size:12px; font-style:normal; }
+  .subnav { display:flex; gap:6px; flex-wrap:wrap; margin:14px 0 18px; }
+  .subtab { padding:5px 12px; border-radius:7px; cursor:pointer; font-size:12px; color:var(--dim); background:var(--panel); border:1px solid var(--line); font-family:var(--mono); }
+  .subtab:hover { color:var(--ink); }
+  .subtab.active { color:#0e1016; background:var(--acc); border-color:var(--acc); font-weight:600; }
   /* document view */
   .docview { padding:30px 28px; overflow:auto; }
   .doc { max-width:860px; margin:0 auto; }
@@ -174,14 +178,14 @@ function renderList() {
   document.querySelectorAll("#list .item").forEach(el => el.onclick = () => openSkill(+el.dataset.i));
 }
 
-function openSkill(i) { cur = { i, tab: "overview" }; setMode("dashboard"); }
+function openSkill(i) { cur = { i, tab: "overview", bp: "shared" }; setMode("dashboard"); }
 function setTab(t) { cur.tab = t; render(); }
 
 function render() {
   const s = S[cur.i];
   document.querySelectorAll("#list .item").forEach((el,j)=>el.classList.toggle("active", j===cur.i));
   const tabs = `<span class="tab ov ${cur.tab==='overview'?'active':''}" data-tab="overview">Overview</span>` +
-    `<span class="tab ov ${cur.tab==='blueprint'?'active':''}" data-tab="blueprint">Blueprint &amp; demo</span>` +
+    `<span class="tab ov ${cur.tab==='blueprint'?'active':''}" data-tab="blueprint">Blueprints</span>` +
     s.perks.map(p=>`<span class="tab ${p.id===cur.tab?'active':''}" data-tab="${esc(p.id)}">${esc(p.id)}</span>`).join("");
   const body = cur.tab==="overview" ? overviewHtml(s)
     : cur.tab==="blueprint" ? blueprintHtml(s)
@@ -192,6 +196,7 @@ function render() {
     <div class="tabs">${tabs}</div>
     <div class="tabc">${body}</div>`;
   document.querySelectorAll(".tab").forEach(el => el.onclick = () => setTab(el.dataset.tab));
+  document.querySelectorAll(".subtab").forEach(el => el.onclick = () => { cur.bp = el.dataset.bp; render(); });
 }
 
 function overviewHtml(s) {
@@ -205,28 +210,38 @@ function overviewHtml(s) {
 }
 
 function blueprintHtml(s) {
-  const d = s.demo;
-  const stages = STAGES.map(([n, desc], i) =>
-    `<div class="stage"><span class="sn">${i+1}</span><div><b>${n}</b><em>${esc(desc)}</em></div></div>`).join("");
-  const demo = d ? `
-    <h3>Demo task flow — perk <code>${esc(d.perk)}</code></h3>
-    <p class="muted" style="font-size:12.5px">A ready-to-run example. The intelligence fills the <b>task config</b>; it flows through the governed pipeline to the <b>compiled script</b> the executor runs — nothing runs outside that channel.</p>
-    <div class="demo-grid">
-      <div>
-        <div class="lbl">1 · task config <span class="muted">— task-ledger.json, the form the LLM fills</span></div>
-        <pre>${esc(JSON.stringify(d.ledger, null, 2))}</pre>
+  const sub = (cur.bp === "shared" || s.perks.some(p => p.id === cur.bp)) ? cur.bp : "shared";
+  const subnav = `<span class="subtab ${sub==='shared'?'active':''}" data-bp="shared">shared blueprint</span>` +
+    s.perks.map(p => `<span class="subtab ${sub===p.id?'active':''}" data-bp="${esc(p.id)}">demo: ${esc(p.id)}</span>`).join("");
+  let body;
+  if (sub === "shared") {
+    const stages = STAGES.map(([n, desc], i) =>
+      `<div class="stage"><span class="sn">${i+1}</span><div><b>${n}</b><em>${esc(desc)}</em></div></div>`).join("");
+    body = `
+      <h3>Shared lifecycle</h3>
+      <div class="card" id="bp">${s.svg || '<span class="muted">no diagram</span>'}</div>
+      <p class="muted" style="font-size:12.5px;margin-top:8px">Every skill runs this lifecycle. A task flows through the governed pipeline — pick a <b>demo</b> above to see a concrete one, config to compiled script:</p>
+      <div class="stages">${stages}</div>`;
+  } else {
+    const p = s.perks.find(x => x.id === sub), d = p.demo || {};
+    body = `
+      <div class="perkhead"><b>demo · ${esc(p.id)}</b><span class="sum">${esc(p.summary)}</span>
+        <span class="badge ${p.destructive?'dx':'ro'}">${p.destructive?'destructive':'read-only'}</span></div>
+      <p class="muted" style="font-size:12.5px">The intelligence fills the <b>task config</b>; it compiles to the <b>script</b> the executor runs — its shape visualized in <b>this task's blueprint</b> (the lifecycle annotated with the perk's tool sequence).</p>
+      <div class="demo-grid">
+        <div>
+          <div class="lbl">task config <span class="muted">— task-ledger.json</span></div>
+          <pre>${esc(JSON.stringify(d.ledger || {}, null, 2))}</pre>
+        </div>
+        <div>
+          <div class="lbl">task blueprint <span class="muted">— lifecycle annotated with this perk's tools</span></div>
+          <div class="card" id="bp">${p.svg || ""}</div>
+        </div>
       </div>
-      <div>
-        <div class="lbl">2 · the governed pipeline</div>
-        <div class="stages">${stages}</div>
-      </div>
-    </div>
-    <div class="lbl">3 · compiled script <span class="muted">— what the executor runs, step by step</span></div>
-    <pre>${esc(d.compiled)}</pre>` : '<p class="muted">no demo</p>';
-  return `
-    <h3>Lifecycle</h3>
-    <div class="card" id="bp">${s.svg || '<span class="muted">no diagram</span>'}</div>
-    ${demo}`;
+      <div class="lbl">compiled script <span class="muted">— what the executor runs, step by step</span></div>
+      <pre>${esc(d.compiled || "")}</pre>`;
+  }
+  return `<div class="subnav">${subnav}</div>${body}`;
 }
 
 function perkPanel(p) {

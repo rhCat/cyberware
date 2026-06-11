@@ -28,8 +28,8 @@ def read(p: str) -> str:
     return open(p, encoding="utf-8").read() if os.path.isfile(p) else ""
 
 
-def perk_data(pdir: str, pm: dict, bp: dict) -> dict:
-    """Assemble one perk: metadata + manifesto + contracts + snippet code + the perk-annotated SVG."""
+def perk_data(pdir: str, pm: dict, bp: dict, sid: str, tpl_vars: dict) -> dict:
+    """Assemble one perk: metadata + manifesto + contracts + snippet code + annotated SVG + a worked demo."""
     man = load(os.path.join(pdir, "manifesto.json"))
     seq = man.get("sequence", [])
     snippets = {}
@@ -38,40 +38,34 @@ def perk_data(pdir: str, pm: dict, bp: dict) -> dict:
             fp = os.path.join(pdir, "src", tool + ext)
             if os.path.isfile(fp):
                 snippets[tool + ext] = read(fp)
-    return {
-        "id": pm["id"], "summary": pm.get("summary", ""), "destructive": pm.get("destructive", False),
-        "metadata": load(os.path.join(pdir, "metadata.json")),
-        "sequence": seq, "tools": man.get("tools", {}),
-        "env": man.get("env", {}), "requires": man.get("requires", []),
-        "contracts": load(os.path.join(pdir, "src", "contracts.json")), "snippets": snippets,
-        "svg": visualize.svg(bp, seq),
-    }
-
-
-def demo_data(sid: str, perk: dict, tpl_vars: dict) -> dict:
-    """A worked example: a pre-filled task-ledger for the perk + its real compiled script."""
-    ex = perk.get("metadata", {}).get("minimal_example", {}).get("vars", {})
-    dvars = {}
-    for v in perk.get("env", {}):
-        if v != "RECORD_STORE":
-            dvars[v] = ex.get(v, tpl_vars.get(v, ""))
-    ledger = {"skill": sid, "perk": perk["id"], "record_store": f"/tmp/{sid}-demo", "vars": dvars}
+    meta = load(os.path.join(pdir, "metadata.json"))
+    # a worked demo: a pre-filled task-ledger for THIS perk + its real compiled script
+    ex = meta.get("minimal_example", {}).get("vars", {})
+    dvars = {v: ex.get(v, tpl_vars.get(v, "")) for v in man.get("env", {}) if v != "RECORD_STORE"}
+    ledger = {"skill": sid, "perk": pm["id"], "record_store": f"/tmp/{sid}-demo", "vars": dvars}
     try:
         text, _ = compiler.build_script(ledger)
         compiled = text.replace(ROOT + "/", "")   # relativize the SNIP path for display
     except Exception as exc:
         compiled = f"# (compile preview unavailable: {exc})"
-    return {"perk": perk["id"], "ledger": ledger, "compiled": compiled}
+    return {
+        "id": pm["id"], "summary": pm.get("summary", ""), "destructive": pm.get("destructive", False),
+        "metadata": meta, "sequence": seq, "tools": man.get("tools", {}),
+        "env": man.get("env", {}), "requires": man.get("requires", []),
+        "contracts": load(os.path.join(pdir, "src", "contracts.json")), "snippets": snippets,
+        "svg": visualize.svg(bp, seq),
+        "demo": {"ledger": ledger, "compiled": compiled},
+    }
 
 
 def skill_data(sdir: str) -> dict | None:
-    """Assemble one skill: blueprint + svg + SKILL.md + perks + a worked demo."""
+    """Assemble one skill: blueprint + svg + SKILL.md + perks (each carrying its own demo)."""
     bp = load(os.path.join(sdir, "blueprint.json"))
     if not bp:
         return None
-    perks = [perk_data(os.path.join(sdir, "perks", pm["id"]), pm, bp)
-             for pm in load(os.path.join(sdir, "perks.json")).get("perks", [])]
     tpl_vars = load(os.path.join(sdir, "ledger.json")).get("vars", {})
+    perks = [perk_data(os.path.join(sdir, "perks", pm["id"]), pm, bp, bp["id"], tpl_vars)
+             for pm in load(os.path.join(sdir, "perks.json")).get("perks", [])]
     return {
         "id": bp["id"], "name": bp.get("name", bp["id"]), "description": bp.get("description", ""),
         "states": bp.get("states", {}), "transitions": bp.get("transitions", []),
@@ -79,7 +73,6 @@ def skill_data(sdir: str) -> dict | None:
         "safety_invariants": bp.get("safety_invariants", []),
         "svg": read(os.path.join(sdir, "blueprint.svg")), "skill_md": read(os.path.join(sdir, "SKILL.md")),
         "perks": perks,
-        "demo": demo_data(bp["id"], perks[0], tpl_vars) if perks else None,
     }
 
 
