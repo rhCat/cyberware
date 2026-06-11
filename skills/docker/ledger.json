@@ -1,0 +1,11 @@
+{
+  "_schema": "task-ledger TEMPLATE for docker \u2014 set perk, fill record_store + the vars the perk declares.",
+  "skill": "docker",
+  "perk": "build",
+  "record_store": "<absolute dir for outputs + run-ledger>",
+  "vars": {
+    "CONTEXT_DIR": "<context_dir>",
+    "IMAGE_TAG": "<image_tag>",
+    "DOCKERFILE": ""
+  }
+}

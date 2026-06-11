@@ -1,0 +1,23 @@
+{
+  "tool": "search_loc",
+  "inputs": {
+    "SEARCH_DIR": {
+      "type": "string",
+      "required": true
+    },
+    "EXT": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "outputs": {
+    "search_loc_out": {
+      "path": "${RECORD_STORE}/loc.txt",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/loc.txt"
+  }
+}

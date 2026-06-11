@@ -1,0 +1,9 @@
+{
+  "_schema": "task-ledger TEMPLATE for data \u2014 set perk, fill record_store + the vars the perk declares.",
+  "skill": "data",
+  "perk": "csv2json",
+  "record_store": "<absolute dir for outputs + run-ledger>",
+  "vars": {
+    "CSV_FILE": "<csv_file>"
+  }
+}

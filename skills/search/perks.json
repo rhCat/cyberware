@@ -1,0 +1,21 @@
+{
+  "skill": "search",
+  "perks": [
+    {
+      "id": "grep",
+      "summary": "search files for a pattern (ripgrep, fallback grep)",
+      "destructive": false,
+      "tools": [
+        "search_grep"
+      ]
+    },
+    {
+      "id": "loc",
+      "summary": "count files + lines for an extension (read-only)",
+      "destructive": false,
+      "tools": [
+        "search_loc"
+      ]
+    }
+  ]
+}

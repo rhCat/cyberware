@@ -1,0 +1,25 @@
+{
+  "_perk": "build",
+  "sequence": [
+    "docker_build"
+  ],
+  "tools": {
+    "docker_build": {
+      "binary": "docker",
+      "params": {
+        "CONTEXT_DIR": "${CONTEXT_DIR}",
+        "IMAGE_TAG": "${IMAGE_TAG}",
+        "DOCKERFILE": "${DOCKERFILE}"
+      }
+    }
+  },
+  "env": {
+    "CONTEXT_DIR": "${CONTEXT_DIR}",
+    "IMAGE_TAG": "${IMAGE_TAG}",
+    "DOCKERFILE": "${DOCKERFILE}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "docker"
+  ]
+}

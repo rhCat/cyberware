@@ -1,0 +1,18 @@
+{
+  "perk": "build",
+  "skill": "docker",
+  "description": "build an image from a context dir",
+  "rules": [
+    "build log to record_store",
+    "tags the image"
+  ],
+  "usage": "Set CONTEXT_DIR + IMAGE_TAG (+ optional DOCKERFILE). Output: docker_build.log.",
+  "limitation": "Needs a running Docker daemon.",
+  "minimal_example": {
+    "perk": "build",
+    "vars": {
+      "CONTEXT_DIR": ".",
+      "IMAGE_TAG": "myapp:dev"
+    }
+  }
+}

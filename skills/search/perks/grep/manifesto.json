@@ -1,0 +1,23 @@
+{
+  "_perk": "grep",
+  "sequence": [
+    "search_grep"
+  ],
+  "tools": {
+    "search_grep": {
+      "binary": "grep",
+      "params": {
+        "PATTERN": "${PATTERN}",
+        "SEARCH_DIR": "${SEARCH_DIR}"
+      }
+    }
+  },
+  "env": {
+    "PATTERN": "${PATTERN}",
+    "SEARCH_DIR": "${SEARCH_DIR}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "grep"
+  ]
+}

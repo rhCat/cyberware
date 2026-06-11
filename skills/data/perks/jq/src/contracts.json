@@ -1,0 +1,23 @@
+{
+  "tool": "data_jq",
+  "inputs": {
+    "JSON_FILE": {
+      "type": "string",
+      "required": true
+    },
+    "QUERY": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "data_jq_out": {
+      "path": "${RECORD_STORE}/jq_result.json",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/jq_result.json"
+  }
+}

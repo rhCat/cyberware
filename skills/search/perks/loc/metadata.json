@@ -1,0 +1,17 @@
+{
+  "perk": "loc",
+  "skill": "search",
+  "description": "count files + lines for an extension (read-only)",
+  "rules": [
+    "read-only",
+    "skips dotdirs"
+  ],
+  "usage": "Set SEARCH_DIR (+ EXT, default py). Output: loc.txt.",
+  "limitation": "One extension per run.",
+  "minimal_example": {
+    "perk": "loc",
+    "vars": {
+      "SEARCH_DIR": "."
+    }
+  }
+}

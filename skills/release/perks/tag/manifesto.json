@@ -1,0 +1,25 @@
+{
+  "_perk": "tag",
+  "sequence": [
+    "release_tag"
+  ],
+  "tools": {
+    "release_tag": {
+      "binary": "git",
+      "params": {
+        "REPO_DIR": "${REPO_DIR}",
+        "VERSION": "${VERSION}",
+        "MESSAGE": "${MESSAGE}"
+      }
+    }
+  },
+  "env": {
+    "REPO_DIR": "${REPO_DIR}",
+    "VERSION": "${VERSION}",
+    "MESSAGE": "${MESSAGE}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "git"
+  ]
+}

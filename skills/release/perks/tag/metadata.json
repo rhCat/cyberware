@@ -1,0 +1,19 @@
+{
+  "perk": "tag",
+  "skill": "release",
+  "description": "create an annotated git tag at HEAD",
+  "rules": [
+    "annotated tag",
+    "no force, no push",
+    "no-op if the tag exists"
+  ],
+  "usage": "Set REPO_DIR + VERSION (+ optional MESSAGE). Output: release_tag.json.",
+  "limitation": "Local tag only \u2014 push is a separate, gated step.",
+  "minimal_example": {
+    "perk": "tag",
+    "vars": {
+      "REPO_DIR": "/path/to/repo",
+      "VERSION": "v1.2.0"
+    }
+  }
+}

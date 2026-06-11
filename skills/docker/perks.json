@@ -1,0 +1,21 @@
+{
+  "skill": "docker",
+  "perks": [
+    {
+      "id": "build",
+      "summary": "build an image from a context dir",
+      "destructive": false,
+      "tools": [
+        "docker_build"
+      ]
+    },
+    {
+      "id": "ps",
+      "summary": "list containers (read-only)",
+      "destructive": false,
+      "tools": [
+        "docker_ps"
+      ]
+    }
+  ]
+}

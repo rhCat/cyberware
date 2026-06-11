@@ -1,0 +1,23 @@
+{
+  "_perk": "healthcheck",
+  "sequence": [
+    "net_healthcheck"
+  ],
+  "tools": {
+    "net_healthcheck": {
+      "binary": "curl",
+      "params": {
+        "URL": "${URL}",
+        "TIMEOUT": "${TIMEOUT}"
+      }
+    }
+  },
+  "env": {
+    "URL": "${URL}",
+    "TIMEOUT": "${TIMEOUT}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "curl"
+  ]
+}

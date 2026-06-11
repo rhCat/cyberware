@@ -1,0 +1,21 @@
+{
+  "_perk": "csv2json",
+  "sequence": [
+    "data_csv2json"
+  ],
+  "tools": {
+    "data_csv2json": {
+      "binary": "python3",
+      "params": {
+        "CSV_FILE": "${CSV_FILE}"
+      }
+    }
+  },
+  "env": {
+    "CSV_FILE": "${CSV_FILE}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "python3"
+  ]
+}

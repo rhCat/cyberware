@@ -1,0 +1,11 @@
+{
+  "_schema": "task-ledger TEMPLATE for release \u2014 set perk, fill record_store + the vars the perk declares.",
+  "skill": "release",
+  "perk": "tag",
+  "record_store": "<absolute dir for outputs + run-ledger>",
+  "vars": {
+    "REPO_DIR": "<repo_dir>",
+    "VERSION": "<version>",
+    "MESSAGE": ""
+  }
+}

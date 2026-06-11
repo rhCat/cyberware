@@ -1,0 +1,27 @@
+{
+  "tool": "release_tag",
+  "inputs": {
+    "REPO_DIR": {
+      "type": "string",
+      "required": true
+    },
+    "VERSION": {
+      "type": "string",
+      "required": true
+    },
+    "MESSAGE": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "outputs": {
+    "release_tag_out": {
+      "path": "${RECORD_STORE}/release_tag.json",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/release_tag.json"
+  }
+}

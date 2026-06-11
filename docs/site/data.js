@@ -346,6 +346,438 @@ window.SKILLS = [
   ]
  },
  {
+  "id": "data",
+  "name": "Data wrangling",
+  "description": "Data transforms through proven pathways \u2014 CSV\u2192JSON and jq queries. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "states": {
+   "ready": {
+    "description": "task-ledger submitted, nothing run"
+   },
+   "prepared": {
+    "description": "inputs validated \u2014 required vars present, runtime + store ready"
+   },
+   "operated": {
+    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   },
+   "verified": {
+    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   },
+   "recorded": {
+    "description": "run metadata + outputs recorded to the run-ledger"
+   }
+  },
+  "transitions": [
+   {
+    "from": "ready",
+    "to": "prepared",
+    "trigger": "PREPARE",
+    "action": "a_prepare",
+    "gate": "g_prepared"
+   },
+   {
+    "from": "prepared",
+    "to": "operated",
+    "trigger": "OPERATE",
+    "action": "a_operate",
+    "gate": "g_operated"
+   },
+   {
+    "from": "operated",
+    "to": "verified",
+    "trigger": "VERIFY",
+    "action": "a_verify",
+    "gate": "g_verified"
+   },
+   {
+    "from": "verified",
+    "to": "recorded",
+    "trigger": "RECORD",
+    "action": "a_record"
+   }
+  ],
+  "terminal": [
+   "recorded"
+  ],
+  "entry": "ready",
+  "safety_invariants": [
+   {
+    "name": "operate_only_when_prepared",
+    "expression": "state /= 'operated' \\/ inputs_present",
+    "description": "GUARDRAIL: no operation before inputs are validated."
+   },
+   {
+    "name": "governed_execution_only",
+    "expression": "state /= 'operated' \\/ governed_run",
+    "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+   },
+   {
+    "name": "verify_before_record",
+    "expression": "state /= 'recorded' \\/ contract_checks_pass",
+    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+   },
+   {
+    "name": "oversight_clears_script",
+    "expression": "TRUE",
+    "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+   }
+  ],
+  "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">data</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
+  "skill_md": "---\nskill: data\nname: Data wrangling\nperks: [csv2json, jq]\n---\n\n# data \u2014 Data wrangling\n\nData transforms through proven pathways \u2014 CSV\u2192JSON and jq queries.\n\n## What to look out for\nEach tool emits one line of structured JSON (the audit + debug log) and writes its\nartifacts under `record_store`. LOGS TO CHECK: that line + the named report + the executor run-ledger.\n\n## Perks\n| perk | tool | nature |\n|---|---|---|\n| `csv2json` | `data_csv2json` | read-only / safe |\n| `jq` | `data_jq` | read-only / safe |\n\n## How to use it\nPick a perk, copy `ledger.json` \u2192 `task-ledger.json`, fill its vars + `record_store`, then\nvalidate \u2192 compose \u2192 compile \u2192 oversight \u2192 executor.\n",
+  "perks": [
+   {
+    "id": "csv2json",
+    "summary": "convert a CSV file to a JSON array",
+    "destructive": false,
+    "metadata": {
+     "perk": "csv2json",
+     "skill": "data",
+     "description": "convert a CSV file to a JSON array",
+     "rules": [
+      "row objects keyed by header",
+      "result to record_store"
+     ],
+     "usage": "Set CSV_FILE. Output: data.json.",
+     "limitation": "Header row required.",
+     "minimal_example": {
+      "perk": "csv2json",
+      "vars": {
+       "CSV_FILE": "/path/to/data.csv"
+      }
+     }
+    },
+    "sequence": [
+     "data_csv2json"
+    ],
+    "tools": {
+     "data_csv2json": {
+      "binary": "python3",
+      "params": {
+       "CSV_FILE": "${CSV_FILE}"
+      }
+     }
+    },
+    "env": {
+     "CSV_FILE": "${CSV_FILE}",
+     "RECORD_STORE": "${record_store}"
+    },
+    "requires": [
+     "python3"
+    ],
+    "contracts": {
+     "tool": "data_csv2json",
+     "inputs": {
+      "CSV_FILE": {
+       "type": "string",
+       "required": true
+      }
+     },
+     "outputs": {
+      "data_csv2json_out": {
+       "path": "${RECORD_STORE}/data.json",
+       "type": "file"
+      }
+     },
+     "checks": {
+      "exit_zero": true,
+      "output_exists": "${RECORD_STORE}/data.json"
+     }
+    },
+    "snippets": {
+     "data_csv2json.py": "#!/usr/bin/env python3\n\"\"\"data_csv2json \u2014 convert a CSV file to a JSON array of row objects. Reads CSV_FILE, RECORD_STORE from env.\"\"\"\nfrom __future__ import annotations\nimport csv\nimport json\nimport os\nimport sys\n\n\ndef main() -> int:\n    \"\"\"Read CSV_FILE and write data.json.\"\"\"\n    src = os.environ[\"CSV_FILE\"]\n    store = os.environ[\"RECORD_STORE\"].rstrip(\"/\")\n    out = os.path.join(store, \"data.json\")\n    with open(src, newline=\"\", encoding=\"utf-8\") as f:\n        rows = list(csv.DictReader(f))\n    json.dump(rows, open(out, \"w\"), indent=2)\n    cols = list(rows[0].keys()) if rows else []\n    print(json.dumps({\"tool\": \"data_csv2json\", \"status\": \"ok\", \"rows\": len(rows), \"columns\": cols, \"out\": out}))\n    return 0\n\n\nif __name__ == \"__main__\":\n    sys.exit(main())\n",
+     "data_csv2json.sh": "#!/usr/bin/env bash\n# data_csv2json \u2014 porter: runs the Python core (data_csv2json.py), which reads CSV_FILE/RECORD_STORE from the environment.\nset -euo pipefail\nHERE=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\nexec python3 \"$HERE/data_csv2json.py\"\n"
+    },
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">data</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py \u25b6</text>\n<text x=\"41\" y=\"391\" font-size=\"9.5\" fill=\"#555\">data_csv2json</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n"
+   },
+   {
+    "id": "jq",
+    "summary": "run a jq query over a JSON file",
+    "destructive": false,
+    "metadata": {
+     "perk": "jq",
+     "skill": "data",
+     "description": "run a jq query over a JSON file",
+     "rules": [
+      "result to record_store"
+     ],
+     "usage": "Set JSON_FILE + QUERY. Output: jq_result.json.",
+     "limitation": "Needs jq installed.",
+     "minimal_example": {
+      "perk": "jq",
+      "vars": {
+       "JSON_FILE": "/path/to/in.json",
+       "QUERY": ".items | length"
+      }
+     }
+    },
+    "sequence": [
+     "data_jq"
+    ],
+    "tools": {
+     "data_jq": {
+      "binary": "jq",
+      "params": {
+       "JSON_FILE": "${JSON_FILE}",
+       "QUERY": "${QUERY}"
+      }
+     }
+    },
+    "env": {
+     "JSON_FILE": "${JSON_FILE}",
+     "QUERY": "${QUERY}",
+     "RECORD_STORE": "${record_store}"
+    },
+    "requires": [
+     "jq"
+    ],
+    "contracts": {
+     "tool": "data_jq",
+     "inputs": {
+      "JSON_FILE": {
+       "type": "string",
+       "required": true
+      },
+      "QUERY": {
+       "type": "string",
+       "required": true
+      }
+     },
+     "outputs": {
+      "data_jq_out": {
+       "path": "${RECORD_STORE}/jq_result.json",
+       "type": "file"
+      }
+     },
+     "checks": {
+      "exit_zero": true,
+      "output_exists": "${RECORD_STORE}/jq_result.json"
+     }
+    },
+    "snippets": {
+     "data_jq.sh": "#!/usr/bin/env bash\n# data_jq \u2014 run a jq query over a JSON file (proven pathway). Structured JSON output.\nset -uo pipefail\n: \"${JSON_FILE:?}\" \"${QUERY:?}\" \"${RECORD_STORE:?}\"\nOUT=\"${RECORD_STORE%/}/jq_result.json\"\njq \"$QUERY\" \"$JSON_FILE\" > \"$OUT\" 2>/dev/null\nRC=$?\nprintf '{\"tool\":\"data_jq\",\"status\":\"%s\",\"exit\":%d,\"out\":\"%s\"}\\n' \"$([ $RC -eq 0 ] && echo ok || echo fail)\" \"$RC\" \"$OUT\"\nexit $RC\n"
+    },
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">data</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py \u25b6</text>\n<text x=\"41\" y=\"391\" font-size=\"9.5\" fill=\"#555\">data_jq</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n"
+   }
+  ]
+ },
+ {
+  "id": "docker",
+  "name": "Docker operations",
+  "description": "Container operations through proven pathways \u2014 build images, inspect running containers. Requires a reachable Docker daemon. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "states": {
+   "ready": {
+    "description": "task-ledger submitted, nothing run"
+   },
+   "prepared": {
+    "description": "inputs validated \u2014 required vars present, runtime + store ready"
+   },
+   "operated": {
+    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   },
+   "verified": {
+    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   },
+   "recorded": {
+    "description": "run metadata + outputs recorded to the run-ledger"
+   }
+  },
+  "transitions": [
+   {
+    "from": "ready",
+    "to": "prepared",
+    "trigger": "PREPARE",
+    "action": "a_prepare",
+    "gate": "g_prepared"
+   },
+   {
+    "from": "prepared",
+    "to": "operated",
+    "trigger": "OPERATE",
+    "action": "a_operate",
+    "gate": "g_operated"
+   },
+   {
+    "from": "operated",
+    "to": "verified",
+    "trigger": "VERIFY",
+    "action": "a_verify",
+    "gate": "g_verified"
+   },
+   {
+    "from": "verified",
+    "to": "recorded",
+    "trigger": "RECORD",
+    "action": "a_record"
+   }
+  ],
+  "terminal": [
+   "recorded"
+  ],
+  "entry": "ready",
+  "safety_invariants": [
+   {
+    "name": "operate_only_when_prepared",
+    "expression": "state /= 'operated' \\/ inputs_present",
+    "description": "GUARDRAIL: no operation before inputs are validated."
+   },
+   {
+    "name": "governed_execution_only",
+    "expression": "state /= 'operated' \\/ governed_run",
+    "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+   },
+   {
+    "name": "verify_before_record",
+    "expression": "state /= 'recorded' \\/ contract_checks_pass",
+    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+   },
+   {
+    "name": "oversight_clears_script",
+    "expression": "TRUE",
+    "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+   }
+  ],
+  "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">docker</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
+  "skill_md": "---\nskill: docker\nname: Docker operations\nperks: [build, ps]\n---\n\n# docker \u2014 Docker operations\n\nContainer operations through proven pathways \u2014 build images, inspect running containers. Requires a reachable Docker daemon.\n\n## What to look out for\nEach tool emits one line of structured JSON (the audit + debug log) and writes its\nartifacts under `record_store`. LOGS TO CHECK: that line + the named report + the executor run-ledger.\n\n## Perks\n| perk | tool | nature |\n|---|---|---|\n| `build` | `docker_build` | read-only / safe |\n| `ps` | `docker_ps` | read-only / safe |\n\n## How to use it\nPick a perk, copy `ledger.json` \u2192 `task-ledger.json`, fill its vars + `record_store`, then\nvalidate \u2192 compose \u2192 compile \u2192 oversight \u2192 executor.\n",
+  "perks": [
+   {
+    "id": "build",
+    "summary": "build an image from a context dir",
+    "destructive": false,
+    "metadata": {
+     "perk": "build",
+     "skill": "docker",
+     "description": "build an image from a context dir",
+     "rules": [
+      "build log to record_store",
+      "tags the image"
+     ],
+     "usage": "Set CONTEXT_DIR + IMAGE_TAG (+ optional DOCKERFILE). Output: docker_build.log.",
+     "limitation": "Needs a running Docker daemon.",
+     "minimal_example": {
+      "perk": "build",
+      "vars": {
+       "CONTEXT_DIR": ".",
+       "IMAGE_TAG": "myapp:dev"
+      }
+     }
+    },
+    "sequence": [
+     "docker_build"
+    ],
+    "tools": {
+     "docker_build": {
+      "binary": "docker",
+      "params": {
+       "CONTEXT_DIR": "${CONTEXT_DIR}",
+       "IMAGE_TAG": "${IMAGE_TAG}",
+       "DOCKERFILE": "${DOCKERFILE}"
+      }
+     }
+    },
+    "env": {
+     "CONTEXT_DIR": "${CONTEXT_DIR}",
+     "IMAGE_TAG": "${IMAGE_TAG}",
+     "DOCKERFILE": "${DOCKERFILE}",
+     "RECORD_STORE": "${record_store}"
+    },
+    "requires": [
+     "docker"
+    ],
+    "contracts": {
+     "tool": "docker_build",
+     "inputs": {
+      "CONTEXT_DIR": {
+       "type": "string",
+       "required": true
+      },
+      "IMAGE_TAG": {
+       "type": "string",
+       "required": true
+      },
+      "DOCKERFILE": {
+       "type": "string",
+       "required": false
+      }
+     },
+     "outputs": {
+      "docker_build_out": {
+       "path": "${RECORD_STORE}/docker_build.log",
+       "type": "file"
+      }
+     },
+     "checks": {
+      "exit_zero": true,
+      "output_exists": "${RECORD_STORE}/docker_build.log"
+     }
+    },
+    "snippets": {
+     "docker_build.sh": "#!/usr/bin/env bash\n# docker_build \u2014 build an image from a context dir (proven pathway). Structured JSON output.\nset -uo pipefail\n: \"${CONTEXT_DIR:?}\" \"${IMAGE_TAG:?}\" \"${RECORD_STORE:?}\"\nLOG=\"${RECORD_STORE%/}/docker_build.log\"\ndocker build -t \"$IMAGE_TAG\" ${DOCKERFILE:+-f \"$DOCKERFILE\"} \"$CONTEXT_DIR\" > \"$LOG\" 2>&1\nRC=$?\nprintf '{\"tool\":\"docker_build\",\"status\":\"%s\",\"image\":\"%s\",\"exit\":%d,\"log\":\"%s\"}\\n' \"$([ $RC -eq 0 ] && echo ok || echo fail)\" \"$IMAGE_TAG\" \"$RC\" \"$LOG\"\nexit $RC\n"
+    },
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">docker</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py \u25b6</text>\n<text x=\"41\" y=\"391\" font-size=\"9.5\" fill=\"#555\">docker_build</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n"
+   },
+   {
+    "id": "ps",
+    "summary": "list containers (read-only)",
+    "destructive": false,
+    "metadata": {
+     "perk": "ps",
+     "skill": "docker",
+     "description": "list containers (read-only)",
+     "rules": [
+      "read-only",
+      "listing to record_store"
+     ],
+     "usage": "Optional ALL=1 to include stopped. Output: containers.txt.",
+     "limitation": "Reporting only.",
+     "minimal_example": {
+      "perk": "ps",
+      "vars": {}
+     }
+    },
+    "sequence": [
+     "docker_ps"
+    ],
+    "tools": {
+     "docker_ps": {
+      "binary": "docker",
+      "params": {
+       "ALL": "${ALL}"
+      }
+     }
+    },
+    "env": {
+     "ALL": "${ALL}",
+     "RECORD_STORE": "${record_store}"
+    },
+    "requires": [
+     "docker"
+    ],
+    "contracts": {
+     "tool": "docker_ps",
+     "inputs": {
+      "ALL": {
+       "type": "string",
+       "required": false
+      }
+     },
+     "outputs": {
+      "docker_ps_out": {
+       "path": "${RECORD_STORE}/containers.txt",
+       "type": "file"
+      }
+     },
+     "checks": {
+      "exit_zero": true,
+      "output_exists": "${RECORD_STORE}/containers.txt"
+     }
+    },
+    "snippets": {
+     "docker_ps.sh": "#!/usr/bin/env bash\n# docker_ps \u2014 list containers (read-only). Structured JSON output.\nset -uo pipefail\n: \"${RECORD_STORE:?}\"\nOUT=\"${RECORD_STORE%/}/containers.txt\"\ndocker ps ${ALL:+-a} --format '{{.ID}} {{.Image}} {{.Status}} {{.Names}}' > \"$OUT\" 2>/dev/null\nRC=$?\nCOUNT=$([ -f \"$OUT\" ] && wc -l < \"$OUT\" | tr -d ' ' || echo 0)\nprintf '{\"tool\":\"docker_ps\",\"status\":\"%s\",\"count\":%s,\"report\":\"%s\"}\\n' \"$([ $RC -eq 0 ] && echo ok || echo fail)\" \"$COUNT\" \"$OUT\"\n"
+    },
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">docker</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py \u25b6</text>\n<text x=\"41\" y=\"391\" font-size=\"9.5\" fill=\"#555\">docker_ps</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n"
+   }
+  ]
+ },
+ {
   "id": "fs",
   "name": "Filesystem operations",
   "description": "Filesystem work through proven pathways; outputs + manifests captured to record_store. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
@@ -992,6 +1424,220 @@ window.SKILLS = [
   ]
  },
  {
+  "id": "net",
+  "name": "Network diagnostics",
+  "description": "Networking diagnostics through proven pathways \u2014 HTTP health probes and DNS resolution. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "states": {
+   "ready": {
+    "description": "task-ledger submitted, nothing run"
+   },
+   "prepared": {
+    "description": "inputs validated \u2014 required vars present, runtime + store ready"
+   },
+   "operated": {
+    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   },
+   "verified": {
+    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   },
+   "recorded": {
+    "description": "run metadata + outputs recorded to the run-ledger"
+   }
+  },
+  "transitions": [
+   {
+    "from": "ready",
+    "to": "prepared",
+    "trigger": "PREPARE",
+    "action": "a_prepare",
+    "gate": "g_prepared"
+   },
+   {
+    "from": "prepared",
+    "to": "operated",
+    "trigger": "OPERATE",
+    "action": "a_operate",
+    "gate": "g_operated"
+   },
+   {
+    "from": "operated",
+    "to": "verified",
+    "trigger": "VERIFY",
+    "action": "a_verify",
+    "gate": "g_verified"
+   },
+   {
+    "from": "verified",
+    "to": "recorded",
+    "trigger": "RECORD",
+    "action": "a_record"
+   }
+  ],
+  "terminal": [
+   "recorded"
+  ],
+  "entry": "ready",
+  "safety_invariants": [
+   {
+    "name": "operate_only_when_prepared",
+    "expression": "state /= 'operated' \\/ inputs_present",
+    "description": "GUARDRAIL: no operation before inputs are validated."
+   },
+   {
+    "name": "governed_execution_only",
+    "expression": "state /= 'operated' \\/ governed_run",
+    "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+   },
+   {
+    "name": "verify_before_record",
+    "expression": "state /= 'recorded' \\/ contract_checks_pass",
+    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+   },
+   {
+    "name": "oversight_clears_script",
+    "expression": "TRUE",
+    "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+   }
+  ],
+  "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">net</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
+  "skill_md": "---\nskill: net\nname: Network diagnostics\nperks: [healthcheck, dns]\n---\n\n# net \u2014 Network diagnostics\n\nNetworking diagnostics through proven pathways \u2014 HTTP health probes and DNS resolution.\n\n## What to look out for\nEach tool emits one line of structured JSON (the audit + debug log) and writes its\nartifacts under `record_store`. LOGS TO CHECK: that line + the named report + the executor run-ledger.\n\n## Perks\n| perk | tool | nature |\n|---|---|---|\n| `healthcheck` | `net_healthcheck` | read-only / safe |\n| `dns` | `net_dns` | read-only / safe |\n\n## How to use it\nPick a perk, copy `ledger.json` \u2192 `task-ledger.json`, fill its vars + `record_store`, then\nvalidate \u2192 compose \u2192 compile \u2192 oversight \u2192 executor.\n",
+  "perks": [
+   {
+    "id": "healthcheck",
+    "summary": "HTTP probe \u2014 status code + latency",
+    "destructive": false,
+    "metadata": {
+     "perk": "healthcheck",
+     "skill": "net",
+     "description": "HTTP probe \u2014 status code + latency",
+     "rules": [
+      "read-only",
+      "health = 2xx/3xx"
+     ],
+     "usage": "Set URL (+ optional TIMEOUT, default 10s). Output: healthcheck.json.",
+     "limitation": "HTTP(S) only.",
+     "minimal_example": {
+      "perk": "healthcheck",
+      "vars": {
+       "URL": "https://example.com/health"
+      }
+     }
+    },
+    "sequence": [
+     "net_healthcheck"
+    ],
+    "tools": {
+     "net_healthcheck": {
+      "binary": "curl",
+      "params": {
+       "URL": "${URL}",
+       "TIMEOUT": "${TIMEOUT}"
+      }
+     }
+    },
+    "env": {
+     "URL": "${URL}",
+     "TIMEOUT": "${TIMEOUT}",
+     "RECORD_STORE": "${record_store}"
+    },
+    "requires": [
+     "curl"
+    ],
+    "contracts": {
+     "tool": "net_healthcheck",
+     "inputs": {
+      "URL": {
+       "type": "string",
+       "required": true
+      },
+      "TIMEOUT": {
+       "type": "string",
+       "required": false
+      }
+     },
+     "outputs": {
+      "net_healthcheck_out": {
+       "path": "${RECORD_STORE}/healthcheck.json",
+       "type": "file"
+      }
+     },
+     "checks": {
+      "exit_zero": true,
+      "output_exists": "${RECORD_STORE}/healthcheck.json"
+     }
+    },
+    "snippets": {
+     "net_healthcheck.sh": "#!/usr/bin/env bash\n# net_healthcheck \u2014 HTTP probe: status code + total latency (proven pathway). Structured JSON output.\nset -uo pipefail\n: \"${URL:?}\" \"${RECORD_STORE:?}\"\nOUT=\"${RECORD_STORE%/}/healthcheck.json\"\nRES=$(curl -sS -o /dev/null -w '%{http_code} %{time_total}' --max-time \"${TIMEOUT:-10}\" \"$URL\" 2>/dev/null || echo \"000 0\")\nCODE=\"${RES%% *}\"; LAT=\"${RES##* }\"\nH=$([ \"${CODE:0:1}\" = \"2\" ] || [ \"${CODE:0:1}\" = \"3\" ] && echo healthy || echo unhealthy)\nprintf '{\"tool\":\"net_healthcheck\",\"status\":\"ok\",\"http_code\":%s,\"latency_s\":%s,\"health\":\"%s\",\"report\":\"%s\"}\\n' \"$CODE\" \"$LAT\" \"$H\" \"$OUT\" | tee \"$OUT\"\n"
+    },
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">net</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py \u25b6</text>\n<text x=\"41\" y=\"391\" font-size=\"9.5\" fill=\"#555\">net_healthcheck</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n"
+   },
+   {
+    "id": "dns",
+    "summary": "resolve a hostname to addresses",
+    "destructive": false,
+    "metadata": {
+     "perk": "dns",
+     "skill": "net",
+     "description": "resolve a hostname to addresses",
+     "rules": [
+      "read-only",
+      "result to record_store"
+     ],
+     "usage": "Set HOST. Output: dns.json.",
+     "limitation": "A/AAAA via the system resolver.",
+     "minimal_example": {
+      "perk": "dns",
+      "vars": {
+       "HOST": "example.com"
+      }
+     }
+    },
+    "sequence": [
+     "net_dns"
+    ],
+    "tools": {
+     "net_dns": {
+      "binary": "python3",
+      "params": {
+       "HOST": "${HOST}"
+      }
+     }
+    },
+    "env": {
+     "HOST": "${HOST}",
+     "RECORD_STORE": "${record_store}"
+    },
+    "requires": [
+     "python3"
+    ],
+    "contracts": {
+     "tool": "net_dns",
+     "inputs": {
+      "HOST": {
+       "type": "string",
+       "required": true
+      }
+     },
+     "outputs": {
+      "net_dns_out": {
+       "path": "${RECORD_STORE}/dns.json",
+       "type": "file"
+      }
+     },
+     "checks": {
+      "exit_zero": true,
+      "output_exists": "${RECORD_STORE}/dns.json"
+     }
+    },
+    "snippets": {
+     "net_dns.py": "#!/usr/bin/env python3\n\"\"\"net_dns \u2014 resolve a hostname to its addresses. Reads HOST, RECORD_STORE from env; emits JSON.\"\"\"\nfrom __future__ import annotations\nimport json\nimport os\nimport socket\nimport sys\n\n\ndef main() -> int:\n    \"\"\"Resolve HOST and write dns.json.\"\"\"\n    host = os.environ[\"HOST\"]\n    store = os.environ[\"RECORD_STORE\"].rstrip(\"/\")\n    out = os.path.join(store, \"dns.json\")\n    try:\n        canonical, _aliases, addrs = socket.gethostbyname_ex(host)\n        result = {\"tool\": \"net_dns\", \"status\": \"ok\", \"host\": host, \"canonical\": canonical, \"addresses\": addrs, \"report\": out}\n    except OSError as exc:\n        result = {\"tool\": \"net_dns\", \"status\": \"error\", \"host\": host, \"reason\": str(exc), \"report\": out}\n    json.dump(result, open(out, \"w\"), indent=2)\n    print(json.dumps(result))\n    return 0 if result[\"status\"] == \"ok\" else 1\n\n\nif __name__ == \"__main__\":\n    sys.exit(main())\n",
+     "net_dns.sh": "#!/usr/bin/env bash\n# net_dns \u2014 porter: runs the Python core (net_dns.py), which reads HOST/RECORD_STORE from the environment.\nset -euo pipefail\nHERE=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\nexec python3 \"$HERE/net_dns.py\"\n"
+    },
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">net</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py \u25b6</text>\n<text x=\"41\" y=\"391\" font-size=\"9.5\" fill=\"#555\">net_dns</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n"
+   }
+  ]
+ },
+ {
   "id": "pg_ops",
   "name": "Governed PostgreSQL operations",
   "description": "The general, perk-agnostic lifecycle of a governed DB operation. Tells the intelligence what to look out for (the guardrails) and which logs to check (the per-tool structured output + the executor's run-ledger). Perks are optional: any proven pathway plugs into a_operate.",
@@ -1465,6 +2111,384 @@ window.SKILLS = [
     "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">py_qc</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py \u25b6</text>\n<text x=\"41\" y=\"391\" font-size=\"9.5\" fill=\"#555\">py_lint</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n"
    }
   ]
+ },
+ {
+  "id": "release",
+  "name": "Release tagging",
+  "description": "Release operations through proven pathways \u2014 annotated git tags (no push; push stays gated). Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "states": {
+   "ready": {
+    "description": "task-ledger submitted, nothing run"
+   },
+   "prepared": {
+    "description": "inputs validated \u2014 required vars present, runtime + store ready"
+   },
+   "operated": {
+    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   },
+   "verified": {
+    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   },
+   "recorded": {
+    "description": "run metadata + outputs recorded to the run-ledger"
+   }
+  },
+  "transitions": [
+   {
+    "from": "ready",
+    "to": "prepared",
+    "trigger": "PREPARE",
+    "action": "a_prepare",
+    "gate": "g_prepared"
+   },
+   {
+    "from": "prepared",
+    "to": "operated",
+    "trigger": "OPERATE",
+    "action": "a_operate",
+    "gate": "g_operated"
+   },
+   {
+    "from": "operated",
+    "to": "verified",
+    "trigger": "VERIFY",
+    "action": "a_verify",
+    "gate": "g_verified"
+   },
+   {
+    "from": "verified",
+    "to": "recorded",
+    "trigger": "RECORD",
+    "action": "a_record"
+   }
+  ],
+  "terminal": [
+   "recorded"
+  ],
+  "entry": "ready",
+  "safety_invariants": [
+   {
+    "name": "operate_only_when_prepared",
+    "expression": "state /= 'operated' \\/ inputs_present",
+    "description": "GUARDRAIL: no operation before inputs are validated."
+   },
+   {
+    "name": "governed_execution_only",
+    "expression": "state /= 'operated' \\/ governed_run",
+    "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+   },
+   {
+    "name": "verify_before_record",
+    "expression": "state /= 'recorded' \\/ contract_checks_pass",
+    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+   },
+   {
+    "name": "oversight_clears_script",
+    "expression": "TRUE",
+    "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+   }
+  ],
+  "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">release</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
+  "skill_md": "---\nskill: release\nname: Release tagging\nperks: [tag]\n---\n\n# release \u2014 Release tagging\n\nRelease operations through proven pathways \u2014 annotated git tags (no push; push stays gated).\n\n## What to look out for\nEach tool emits one line of structured JSON (the audit + debug log) and writes its\nartifacts under `record_store`. LOGS TO CHECK: that line + the named report + the executor run-ledger.\n\n## Perks\n| perk | tool | nature |\n|---|---|---|\n| `tag` | `release_tag` | read-only / safe |\n\n## How to use it\nPick a perk, copy `ledger.json` \u2192 `task-ledger.json`, fill its vars + `record_store`, then\nvalidate \u2192 compose \u2192 compile \u2192 oversight \u2192 executor.\n",
+  "perks": [
+   {
+    "id": "tag",
+    "summary": "create an annotated git tag at HEAD",
+    "destructive": false,
+    "metadata": {
+     "perk": "tag",
+     "skill": "release",
+     "description": "create an annotated git tag at HEAD",
+     "rules": [
+      "annotated tag",
+      "no force, no push",
+      "no-op if the tag exists"
+     ],
+     "usage": "Set REPO_DIR + VERSION (+ optional MESSAGE). Output: release_tag.json.",
+     "limitation": "Local tag only \u2014 push is a separate, gated step.",
+     "minimal_example": {
+      "perk": "tag",
+      "vars": {
+       "REPO_DIR": "/path/to/repo",
+       "VERSION": "v1.2.0"
+      }
+     }
+    },
+    "sequence": [
+     "release_tag"
+    ],
+    "tools": {
+     "release_tag": {
+      "binary": "git",
+      "params": {
+       "REPO_DIR": "${REPO_DIR}",
+       "VERSION": "${VERSION}",
+       "MESSAGE": "${MESSAGE}"
+      }
+     }
+    },
+    "env": {
+     "REPO_DIR": "${REPO_DIR}",
+     "VERSION": "${VERSION}",
+     "MESSAGE": "${MESSAGE}",
+     "RECORD_STORE": "${record_store}"
+    },
+    "requires": [
+     "git"
+    ],
+    "contracts": {
+     "tool": "release_tag",
+     "inputs": {
+      "REPO_DIR": {
+       "type": "string",
+       "required": true
+      },
+      "VERSION": {
+       "type": "string",
+       "required": true
+      },
+      "MESSAGE": {
+       "type": "string",
+       "required": false
+      }
+     },
+     "outputs": {
+      "release_tag_out": {
+       "path": "${RECORD_STORE}/release_tag.json",
+       "type": "file"
+      }
+     },
+     "checks": {
+      "exit_zero": true,
+      "output_exists": "${RECORD_STORE}/release_tag.json"
+     }
+    },
+    "snippets": {
+     "release_tag.sh": "#!/usr/bin/env bash\n# release_tag \u2014 create an annotated git tag at HEAD (proven pathway). Structured JSON output.\nset -uo pipefail\n: \"${REPO_DIR:?}\" \"${VERSION:?}\" \"${RECORD_STORE:?}\"\nOUT=\"${RECORD_STORE%/}/release_tag.json\"\ncd \"$REPO_DIR\" || { printf '{\"tool\":\"release_tag\",\"status\":\"error\",\"reason\":\"bad repo dir\"}\\n' | tee \"$OUT\"; exit 1; }\nif git rev-parse \"$VERSION\" >/dev/null 2>&1; then printf '{\"tool\":\"release_tag\",\"status\":\"noop\",\"reason\":\"tag exists\",\"tag\":\"%s\"}\\n' \"$VERSION\" | tee \"$OUT\"; exit 0; fi\ngit tag -a \"$VERSION\" -m \"${MESSAGE:-release $VERSION}\"\nRC=$?\nSHA=$(git rev-parse --short HEAD 2>/dev/null)\nprintf '{\"tool\":\"release_tag\",\"status\":\"%s\",\"tag\":\"%s\",\"sha\":\"%s\",\"report\":\"%s\"}\\n' \"$([ $RC -eq 0 ] && echo ok || echo fail)\" \"$VERSION\" \"$SHA\" \"$OUT\" | tee \"$OUT\"\nexit $RC\n"
+    },
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">release</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py \u25b6</text>\n<text x=\"41\" y=\"391\" font-size=\"9.5\" fill=\"#555\">release_tag</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n"
+   }
+  ]
+ },
+ {
+  "id": "search",
+  "name": "Code search",
+  "description": "Search and measure a codebase through proven pathways \u2014 pattern search and line counts. Perk-agnostic lifecycle; the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "states": {
+   "ready": {
+    "description": "task-ledger submitted, nothing run"
+   },
+   "prepared": {
+    "description": "inputs validated \u2014 required vars present, runtime + store ready"
+   },
+   "operated": {
+    "description": "the chosen perk's tool sequence ran \u2014 ONLY via executor.py"
+   },
+   "verified": {
+    "description": "the perk's contract checks passed (exit 0, declared outputs exist)"
+   },
+   "recorded": {
+    "description": "run metadata + outputs recorded to the run-ledger"
+   }
+  },
+  "transitions": [
+   {
+    "from": "ready",
+    "to": "prepared",
+    "trigger": "PREPARE",
+    "action": "a_prepare",
+    "gate": "g_prepared"
+   },
+   {
+    "from": "prepared",
+    "to": "operated",
+    "trigger": "OPERATE",
+    "action": "a_operate",
+    "gate": "g_operated"
+   },
+   {
+    "from": "operated",
+    "to": "verified",
+    "trigger": "VERIFY",
+    "action": "a_verify",
+    "gate": "g_verified"
+   },
+   {
+    "from": "verified",
+    "to": "recorded",
+    "trigger": "RECORD",
+    "action": "a_record"
+   }
+  ],
+  "terminal": [
+   "recorded"
+  ],
+  "entry": "ready",
+  "safety_invariants": [
+   {
+    "name": "operate_only_when_prepared",
+    "expression": "state /= 'operated' \\/ inputs_present",
+    "description": "GUARDRAIL: no operation before inputs are validated."
+   },
+   {
+    "name": "governed_execution_only",
+    "expression": "state /= 'operated' \\/ governed_run",
+    "description": "GUARDRAIL: tools run ONLY through executor.py \u2014 never directly. The runtime is the enforcement."
+   },
+   {
+    "name": "verify_before_record",
+    "expression": "state /= 'recorded' \\/ contract_checks_pass",
+    "description": "GUARDRAIL: nothing is recorded as done until the perk's contract checks pass."
+   },
+   {
+    "name": "oversight_clears_script",
+    "expression": "TRUE",
+    "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+   }
+  ],
+  "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">search</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n",
+  "skill_md": "---\nskill: search\nname: Code search\nperks: [grep, loc]\n---\n\n# search \u2014 Code search\n\nSearch and measure a codebase through proven pathways \u2014 pattern search and line counts.\n\n## What to look out for\nEach tool emits one line of structured JSON (the audit + debug log) and writes its\nartifacts under `record_store`. LOGS TO CHECK: that line + the named report + the executor run-ledger.\n\n## Perks\n| perk | tool | nature |\n|---|---|---|\n| `grep` | `search_grep` | read-only / safe |\n| `loc` | `search_loc` | read-only / safe |\n\n## How to use it\nPick a perk, copy `ledger.json` \u2192 `task-ledger.json`, fill its vars + `record_store`, then\nvalidate \u2192 compose \u2192 compile \u2192 oversight \u2192 executor.\n",
+  "perks": [
+   {
+    "id": "grep",
+    "summary": "search files for a pattern (ripgrep, fallback grep)",
+    "destructive": false,
+    "metadata": {
+     "perk": "grep",
+     "skill": "search",
+     "description": "search files for a pattern (ripgrep, fallback grep)",
+     "rules": [
+      "read-only",
+      "matches to record_store"
+     ],
+     "usage": "Set PATTERN + SEARCH_DIR. Output: matches.txt.",
+     "limitation": "Line-oriented text search.",
+     "minimal_example": {
+      "perk": "grep",
+      "vars": {
+       "PATTERN": "TODO",
+       "SEARCH_DIR": "."
+      }
+     }
+    },
+    "sequence": [
+     "search_grep"
+    ],
+    "tools": {
+     "search_grep": {
+      "binary": "grep",
+      "params": {
+       "PATTERN": "${PATTERN}",
+       "SEARCH_DIR": "${SEARCH_DIR}"
+      }
+     }
+    },
+    "env": {
+     "PATTERN": "${PATTERN}",
+     "SEARCH_DIR": "${SEARCH_DIR}",
+     "RECORD_STORE": "${record_store}"
+    },
+    "requires": [
+     "grep"
+    ],
+    "contracts": {
+     "tool": "search_grep",
+     "inputs": {
+      "PATTERN": {
+       "type": "string",
+       "required": true
+      },
+      "SEARCH_DIR": {
+       "type": "string",
+       "required": true
+      }
+     },
+     "outputs": {
+      "search_grep_out": {
+       "path": "${RECORD_STORE}/matches.txt",
+       "type": "file"
+      }
+     },
+     "checks": {
+      "exit_zero": true,
+      "output_exists": "${RECORD_STORE}/matches.txt"
+     }
+    },
+    "snippets": {
+     "search_grep.sh": "#!/usr/bin/env bash\n# search_grep \u2014 search files for a pattern (ripgrep, fallback grep). Structured JSON output.\nset -uo pipefail\n: \"${PATTERN:?}\" \"${SEARCH_DIR:?}\" \"${RECORD_STORE:?}\"\nOUT=\"${RECORD_STORE%/}/matches.txt\"\nif command -v rg >/dev/null 2>&1; then rg -n -- \"$PATTERN\" \"$SEARCH_DIR\" > \"$OUT\" 2>/dev/null || true\nelse grep -rn -- \"$PATTERN\" \"$SEARCH_DIR\" > \"$OUT\" 2>/dev/null || true; fi\nCOUNT=$(wc -l < \"$OUT\" | tr -d ' ')\nprintf '{\"tool\":\"search_grep\",\"status\":\"ok\",\"matches\":%s,\"report\":\"%s\"}\\n' \"$COUNT\" \"$OUT\"\n"
+    },
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">search</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py \u25b6</text>\n<text x=\"41\" y=\"391\" font-size=\"9.5\" fill=\"#555\">search_grep</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n"
+   },
+   {
+    "id": "loc",
+    "summary": "count files + lines for an extension (read-only)",
+    "destructive": false,
+    "metadata": {
+     "perk": "loc",
+     "skill": "search",
+     "description": "count files + lines for an extension (read-only)",
+     "rules": [
+      "read-only",
+      "skips dotdirs"
+     ],
+     "usage": "Set SEARCH_DIR (+ EXT, default py). Output: loc.txt.",
+     "limitation": "One extension per run.",
+     "minimal_example": {
+      "perk": "loc",
+      "vars": {
+       "SEARCH_DIR": "."
+      }
+     }
+    },
+    "sequence": [
+     "search_loc"
+    ],
+    "tools": {
+     "search_loc": {
+      "binary": "find",
+      "params": {
+       "SEARCH_DIR": "${SEARCH_DIR}",
+       "EXT": "${EXT}"
+      }
+     }
+    },
+    "env": {
+     "SEARCH_DIR": "${SEARCH_DIR}",
+     "EXT": "${EXT}",
+     "RECORD_STORE": "${record_store}"
+    },
+    "requires": [
+     "find"
+    ],
+    "contracts": {
+     "tool": "search_loc",
+     "inputs": {
+      "SEARCH_DIR": {
+       "type": "string",
+       "required": true
+      },
+      "EXT": {
+       "type": "string",
+       "required": false
+      }
+     },
+     "outputs": {
+      "search_loc_out": {
+       "path": "${RECORD_STORE}/loc.txt",
+       "type": "file"
+      }
+     },
+     "checks": {
+      "exit_zero": true,
+      "output_exists": "${RECORD_STORE}/loc.txt"
+     }
+    },
+    "snippets": {
+     "search_loc.sh": "#!/usr/bin/env bash\n# search_loc \u2014 count files + lines for an extension (read-only). Structured JSON output.\nset -uo pipefail\n: \"${SEARCH_DIR:?}\" \"${RECORD_STORE:?}\"\nEXT=\"${EXT:-py}\"\nOUT=\"${RECORD_STORE%/}/loc.txt\"\nfind \"$SEARCH_DIR\" -type f -name \"*.${EXT}\" -not -path '*/.*' > \"${OUT}.files\" 2>/dev/null || true\nFILES=$(wc -l < \"${OUT}.files\" | tr -d ' ')\nif [ -s \"${OUT}.files\" ]; then LINES=$(xargs wc -l < \"${OUT}.files\" 2>/dev/null | tail -1 | awk '{print $1}'); else LINES=0; fi\n: \"${LINES:=0}\"\nprintf '%s files, %s lines (*.%s)\\n' \"$FILES\" \"$LINES\" \"$EXT\" > \"$OUT\"\nprintf '{\"tool\":\"search_loc\",\"status\":\"ok\",\"ext\":\"%s\",\"files\":%s,\"lines\":%s,\"report\":\"%s\"}\\n' \"$EXT\" \"$FILES\" \"$LINES\" \"$OUT\"\n"
+    },
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"310\" height=\"810\" viewBox=\"0 0 310 810\" font-family=\"-apple-system,Segoe UI,Roboto,sans-serif\">\n<defs><marker id=\"arr\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L7,3 L0,6 z\" fill=\"#444\"/></marker></defs>\n<rect width=\"310\" height=\"810\" fill=\"#ffffff\"/>\n<text x=\"14\" y=\"20\" font-size=\"13\" font-weight=\"700\" fill=\"#333\">search</text>\n<path d=\"M135.0,108 C135.0,153 135.0,135 135.0,180\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"142\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">PREPARE</text>\n<text x=\"140\" y=\"155\" font-size=\"9\" fill=\"#999\">a_prepare</text>\n<path d=\"M135.0,258 C135.0,303 135.0,285 135.0,330\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"292\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">OPERATE</text>\n<text x=\"140\" y=\"305\" font-size=\"9\" fill=\"#999\">a_operate</text>\n<path d=\"M135.0,408 C135.0,453 135.0,435 135.0,480\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"442\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">VERIFY</text>\n<text x=\"140\" y=\"455\" font-size=\"9\" fill=\"#999\">a_verify</text>\n<path d=\"M135.0,558 C135.0,603 135.0,585 135.0,630\" fill=\"none\" stroke=\"#444\" stroke-width=\"1.4\" marker-end=\"url(#arr)\"/>\n<text x=\"140\" y=\"592\" font-size=\"11\" font-weight=\"600\" fill=\"#333\">RECORD</text>\n<text x=\"140\" y=\"605\" font-size=\"9\" fill=\"#999\">a_record</text>\n<rect x=\"30\" y=\"30\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#dae8fc\" stroke=\"#6c8ebf\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"50\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">ready</text>\n<text x=\"41\" y=\"67\" font-size=\"9.5\" fill=\"#555\">task-ledger submitted, nothing</text>\n<text x=\"41\" y=\"79\" font-size=\"9.5\" fill=\"#555\">run</text>\n<rect x=\"30\" y=\"180\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"200\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">prepared</text>\n<text x=\"41\" y=\"217\" font-size=\"9.5\" fill=\"#555\">inputs validated \u2014 required vars</text>\n<text x=\"41\" y=\"229\" font-size=\"9.5\" fill=\"#555\">present, runtime + store ready</text>\n<rect x=\"30\" y=\"330\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"350\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">operated</text>\n<text x=\"41\" y=\"367\" font-size=\"9.5\" fill=\"#555\">the chosen perk&#x27;s tool sequence</text>\n<text x=\"41\" y=\"379\" font-size=\"9.5\" fill=\"#555\">ran \u2014 ONLY via executor.py \u25b6</text>\n<text x=\"41\" y=\"391\" font-size=\"9.5\" fill=\"#555\">search_loc</text>\n<rect x=\"30\" y=\"480\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#f5f5f5\" stroke=\"#aaaaaa\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"500\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">verified</text>\n<text x=\"41\" y=\"517\" font-size=\"9.5\" fill=\"#555\">the perk&#x27;s contract checks passed</text>\n<text x=\"41\" y=\"529\" font-size=\"9.5\" fill=\"#555\">(exit 0, declared outputs exist)</text>\n<rect x=\"30\" y=\"630\" width=\"210\" height=\"78\" rx=\"9\" fill=\"#d5e8d4\" stroke=\"#82b366\" stroke-width=\"1.5\"/>\n<text x=\"41\" y=\"650\" font-size=\"13\" font-weight=\"700\" fill=\"#222\">recorded</text>\n<text x=\"41\" y=\"667\" font-size=\"9.5\" fill=\"#555\">run metadata + outputs recorded</text>\n<text x=\"41\" y=\"679\" font-size=\"9.5\" fill=\"#555\">to the run-ledger</text>\n</svg>\n"
+   }
+  ]
  }
 ];
 window.DOCS = [
@@ -1481,6 +2505,6 @@ window.DOCS = [
  {
   "id": "skills",
   "label": "Catalog",
-  "body": "# Skill catalog\n\nTool skills (operational pathways) \u2014 not design/taste skills. Each runs through the governed pipeline\n(`validate \u2192 compose \u2192 compile \u2192 oversight \u2192 executor`) and ships a `blueprint.{drawio,svg}`.\n\n| skill | perks | tools | notes / guard |\n|---|---|---|---|\n| **pg_ops** | `select` \u00b7 `migrate` | psql | governed PostgreSQL; `select` read-only, `migrate` in one transaction. DROP/TRUNCATE push back unless `--approve`. |\n| **http** | `get` \u00b7 `post` | curl | responses captured to record_store with status + size. pipe-to-shell blocked. |\n| **fs** | `archive` \u00b7 `find_large` | tar \u00b7 find | `archive` \u2192 tar.gz; `find_large` read-only listing. rm-at-root / rm -rf gated. |\n| **git_ops** | `snapshot` \u00b7 `status` | git | `snapshot` = stage+commit (no push \u2014 push is intentionally not a skill); `status` read-only. force-push / reset --hard gated. |\n| **py_qc** | `test` \u00b7 `lint` | pytest \u00b7 ruff/flake8 | run a project's tests / linter, reports to record_store. |\n| **codebaseqc** | `audit` | python3 (ast) | pure-Python QC: usage (dead code) \u00b7 contract (docstring+return type) \u00b7 coverage (referenced in tests). Name-based heuristics; sound resolution is the Intent-Fidelity frontier. |\n| **ci-codeqc** | `github_actions` | bash | generate/update `.github/workflows/codeqc.yml` (ruff + mypy + pytest) for any repo. Idempotent: existing workflow backed up to `.bk` before overwrite. |\n\n## Choosing a perk\n\nA **perk** is a *predetermined, proven, viable pathway*. The blueprint says what to watch and which\nlogs to check; a perk says exactly how to act. Pick the perk whose `metadata.json` matches your task\n(its `rules`, `usage`, `limitation`, and `minimal_example`), copy `ledger.json` \u2192 your\n`task-ledger.json`, fill the vars its `manifesto.json` declares, and submit it to the pipeline.\n\n## Adding a skill\n\nSee [authoring.md](authoring.md) \u2014 `scaffold.py` writes a composing skeleton; fill the snippets and\nvars. The registry is meant to grow: tools are the unit, perks are the proven pathways within them.\n\n## Self-audit\n\n`examples/self-audit/` holds the framework's own `codebaseqc` report \u2014 cyberware QC'd by cyberware.\nIt honestly shows the open gaps (no return-type hints, no `tests/` dir yet).\n"
+  "body": "# Skill catalog\n\nTool skills (operational pathways) \u2014 not design/taste skills. Each runs through the governed pipeline\n(`validate \u2192 compose \u2192 compile \u2192 oversight \u2192 executor`) and ships a `blueprint.{drawio,svg}`.\n\n| skill | perks | tools | notes / guard |\n|---|---|---|---|\n| **pg_ops** | `select` \u00b7 `migrate` | psql | governed PostgreSQL; `select` read-only, `migrate` in one transaction. DROP/TRUNCATE push back unless `--approve`. |\n| **http** | `get` \u00b7 `post` | curl | responses captured to record_store with status + size. pipe-to-shell blocked. |\n| **fs** | `archive` \u00b7 `find_large` | tar \u00b7 find | `archive` \u2192 tar.gz; `find_large` read-only listing. rm-at-root / rm -rf gated. |\n| **git_ops** | `snapshot` \u00b7 `status` | git | `snapshot` = stage+commit (no push \u2014 push is intentionally not a skill); `status` read-only. force-push / reset --hard gated. |\n| **py_qc** | `test` \u00b7 `lint` | pytest \u00b7 ruff/flake8 | run a project's tests / linter, reports to record_store. |\n| **codebaseqc** | `audit` | python3 (ast) | pure-Python QC: usage (dead code) \u00b7 contract (docstring+return type) \u00b7 coverage (referenced in tests). Name-based heuristics; sound resolution is the Intent-Fidelity frontier. |\n| **ci-codeqc** | `github_actions` | bash | generate/update `.github/workflows/codeqc.yml` (ruff + mypy + pytest) for any repo. Idempotent: existing workflow backed up to `.bk` before overwrite. |\n| **docker** | `build` \u00b7 `ps` | docker | build an image from a context dir; `ps` lists containers (read-only). Needs a running daemon. |\n| **net** | `healthcheck` \u00b7 `dns` | curl \u00b7 python3 | HTTP probe (status + latency); DNS resolve (python core via porter). Read-only. |\n| **data** | `csv2json` \u00b7 `jq` | python3 \u00b7 jq | CSV \u2192 JSON array (python core); jq query over a JSON file. |\n| **search** | `grep` \u00b7 `loc` | ripgrep/grep \u00b7 find | pattern search (rg, fallback grep); line counts by extension. Read-only. |\n| **release** | `tag` | git | annotated git tag at HEAD; no-op if it exists. No force, no push (push stays gated). |\n\n## Choosing a perk\n\nA **perk** is a *predetermined, proven, viable pathway*. The blueprint says what to watch and which\nlogs to check; a perk says exactly how to act. Pick the perk whose `metadata.json` matches your task\n(its `rules`, `usage`, `limitation`, and `minimal_example`), copy `ledger.json` \u2192 your\n`task-ledger.json`, fill the vars its `manifesto.json` declares, and submit it to the pipeline.\n\n## Adding a skill\n\nSee [authoring.md](authoring.md) \u2014 `scaffold.py` writes a composing skeleton; fill the snippets and\nvars. The registry is meant to grow: tools are the unit, perks are the proven pathways within them.\n\n## Self-audit\n\n`examples/self-audit/` holds the framework's own `codebaseqc` report \u2014 cyberware QC'd by cyberware.\nIt honestly shows the open gaps (no return-type hints, no `tests/` dir yet).\n"
  }
 ];

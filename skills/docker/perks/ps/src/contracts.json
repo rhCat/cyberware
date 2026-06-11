@@ -1,0 +1,19 @@
+{
+  "tool": "docker_ps",
+  "inputs": {
+    "ALL": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "outputs": {
+    "docker_ps_out": {
+      "path": "${RECORD_STORE}/containers.txt",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/containers.txt"
+  }
+}

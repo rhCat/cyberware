@@ -1,0 +1,10 @@
+{
+  "_schema": "task-ledger TEMPLATE for net \u2014 set perk, fill record_store + the vars the perk declares.",
+  "skill": "net",
+  "perk": "healthcheck",
+  "record_store": "<absolute dir for outputs + run-ledger>",
+  "vars": {
+    "URL": "<url>",
+    "TIMEOUT": "10"
+  }
+}

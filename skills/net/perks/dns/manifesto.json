@@ -1,0 +1,21 @@
+{
+  "_perk": "dns",
+  "sequence": [
+    "net_dns"
+  ],
+  "tools": {
+    "net_dns": {
+      "binary": "python3",
+      "params": {
+        "HOST": "${HOST}"
+      }
+    }
+  },
+  "env": {
+    "HOST": "${HOST}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "python3"
+  ]
+}
