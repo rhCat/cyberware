@@ -102,54 +102,104 @@ def _pretty(expr):
     return expr.replace("/\\", "∧").replace("\\/", "∨").replace("/=", "≠").replace("~", "¬")
 
 
+# theme
+_NEON, _ON, _DIM, _BG, _EDGE = "#39ff14", "#aaff7a", "#5cc746", "#0a0f0a", "#7dff4d"
+_SIZE = {"state": (228, 70), "gate": (150, 56), "action": (212, 46)}
+
+
+def _sequence(bp, gates):
+    """Walk the chain from entry → a vertical list of (kind, id, trigger-into-this-node)."""
+    trans, seq, visited, cur = bp["transitions"], [], set(), bp["entry_state"]
+    while cur and cur not in visited:
+        visited.add(cur)
+        seq.append(("state", cur, None))
+        outs = [t for t in trans if t["from"] == cur]
+        if not outs:
+            break
+        t = outs[0]
+        if t.get("gate") and t["gate"] in gates:
+            seq.append(("gate", t["gate"], t.get("trigger", "")))
+            seq.append(("action", t.get("action", ""), None))
+        else:
+            seq.append(("action", t.get("action", ""), t.get("trigger", "")))
+        cur = t["to"]
+    for s in bp["states"]:
+        if s not in visited:
+            seq.append(("state", s, None))
+    return seq
+
+
 def svg(bp, perk_steps=None):
-    """Render the blueprint as a cyberpunk SVG — states, plus each transition's trigger / action / gate."""
-    states = annotated_states(bp, perk_steps)
-    terms, entry = set(bp.get("terminal_states", {})), bp["entry_state"]
+    """Flowchart SVG (cyberpunk): states=rectangles, transitions=lines, gates=diamonds, actions=predefined-process."""
+    states, terms, entry = bp["states"], set(bp.get("terminal_states", {})), bp["entry_state"]
     gates, actions = bp.get("gates", {}), bp.get("actions", {})
-    pos, d, W, H, lw, height = _layout(bp)
-    width = lw + 270
-    NEON, ON, DIM, BG = "#39ff14", "#aaff7a", "#4fc23a", "#0a0f0a"
+    seq = _sequence(bp, gates)
+    CX, GAP, SIDE = 162, 30, 296
+
+    def side_of(kind, ident):
+        if kind == "gate":
+            return "⊨ " + _pretty(gates.get(ident, {}).get("expression", ""))
+        if kind == "action":
+            cu = actions.get(ident, {}).get("compute_unit", ident)
+            return "▶ " + " → ".join(perk_steps) if (perk_steps and "perk:sequence" in cu) else ""
+        return ""
+
+    y, nodes, maxside = 46, [], 0
+    for kind, ident, trig in seq:
+        w, h = _SIZE[kind]
+        nodes.append((kind, ident, CX - w / 2, y, w, h, trig))
+        maxside = max(maxside, len(side_of(kind, ident)))
+        y += h + GAP
+    height, width = y + 8, max(540, SIDE + maxside * 6 + 24)
+
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
          'font-family="ui-monospace,Menlo,Consolas,monospace">',
          '<defs>'
-         '<filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2" result="b"/>'
+         '<filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="1.8" result="b"/>'
          '<feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
-         f'<pattern id="px" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="{BG}"/>'
-         f'<rect width="1" height="1" fill="{NEON}" fill-opacity="0.16"/></pattern>'
-         f'<marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 z" fill="{NEON}"/></marker>'
+         f'<pattern id="px" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="{_BG}"/>'
+         f'<rect width="1" height="1" fill="{_NEON}" fill-opacity="0.16"/></pattern>'
+         f'<marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="{_EDGE}"/></marker>'
          '</defs>',
-         f'<rect width="{width}" height="{height}" fill="{BG}"/>',
+         f'<rect width="{width}" height="{height}" fill="{_BG}"/>',
          f'<rect width="{width}" height="{height}" fill="url(#px)"/>',
-         f'<text x="14" y="24" font-size="14" font-weight="700" letter-spacing="3" fill="{NEON}" filter="url(#glow)">{E(bp.get("id","skill")).upper()}</text>']
-    for t in bp["transitions"]:
-        sx, sy = pos[t["from"]]
-        tx, ty = pos[t["to"]]
-        if d[t["to"]] > d[t["from"]]:
-            x1, y1, x2, y2 = sx + W / 2, sy + H, tx + W / 2, ty
-            path = f'M{x1},{y1} L{x2},{y2}'
-        else:
-            x1, y1, x2, y2 = sx + W, sy + H / 2, tx + W, ty + H / 2
-            path = f'M{x1},{y1} C{x1+60},{y1} {x2+60},{y2} {x2},{y2}'
-        o.append(f'<path d="{path}" fill="none" stroke="{NEON}" stroke-width="1.6" marker-end="url(#arr)" filter="url(#glow)" opacity="0.92"/>')
-        lx, ly = sx + W + 20, (y1 + y2) / 2 - 8
-        o.append(f'<text x="{lx:.0f}" y="{ly:.0f}" font-size="11" font-weight="700" fill="{ON}">{E(t.get("trigger",""))}</text>')
-        cu = actions.get(t.get("action", ""), {}).get("compute_unit", t.get("action", ""))
-        if cu:
-            o.append(f'<text x="{lx:.0f}" y="{ly+13:.0f}" font-size="9" fill="{DIM}">▸ {E(cu)}</text>')
-        gid = t.get("gate", "")
-        if gid and gid in gates:
-            o.append(f'<text x="{lx:.0f}" y="{ly+25:.0f}" font-size="9" fill="{DIM}">⊨ {E(_pretty(gates[gid].get("expression","")))}</text>')
-    for s in bp["states"]:
-        x, y = pos[s]
-        is_term, is_entry = s in terms, s == entry
-        border = ON if (is_entry or is_term) else NEON
-        fill = "#0f2410" if is_term else ("#0e1d0d" if is_entry else "#0b140a")
-        o.append(f'<rect x="{x}" y="{y}" width="{W}" height="{H}" fill="{fill}" stroke="{border}" stroke-width="{2 if (is_term or is_entry) else 1.3}" filter="url(#glow)"/>')
-        tag = "  ▶ entry" if is_entry else ("  ■ terminal" if is_term else "")
-        o.append(f'<text x="{x+11}" y="{y+21}" font-size="13" font-weight="700" letter-spacing="1" fill="{border}" filter="url(#glow)">{E(s).upper()}<tspan font-size="8" letter-spacing="0" fill="{DIM}">{tag}</tspan></text>')
-        for j, line in enumerate(wrap(states[s].get("description", ""), 31)[:4]):
-            o.append(f'<text x="{x+11}" y="{y+38+j*12}" font-size="9.5" fill="{DIM}">{E(line)}</text>')
+         f'<text x="14" y="26" font-size="14" font-weight="700" letter-spacing="3" fill="{_NEON}" filter="url(#glow)">{E(bp.get("id","skill")).upper()}</text>']
+
+    # transitions = lines (drawn first; bright + crisp so they read clearly)
+    for k in range(len(nodes) - 1):
+        a, b = nodes[k], nodes[k + 1]
+        ax, ay, bx, by = a[2] + a[4] / 2, a[3] + a[5], b[2] + b[4] / 2, b[3]
+        o.append(f'<line x1="{ax}" y1="{ay}" x2="{bx}" y2="{by}" stroke="{_NEON}" stroke-width="5" opacity="0.22" filter="url(#glow)"/>')
+        o.append(f'<line x1="{ax}" y1="{ay}" x2="{bx}" y2="{by}" stroke="{_EDGE}" stroke-width="1.8" marker-end="url(#arr)"/>')
+        if b[6]:
+            o.append(f'<text x="{ax+12:.0f}" y="{(ay+by)/2+4:.0f}" font-size="11" font-weight="700" fill="{_ON}">{E(b[6])}</text>')
+
+    for kind, ident, x, y, w, h, _trig in nodes:
+        cx = x + w / 2
+        if kind == "state":
+            is_term, is_entry = ident in terms, ident == entry
+            border = _ON if (is_entry or is_term) else _NEON
+            fill = "#0f2410" if is_term else ("#0e1d0d" if is_entry else "#0b140a")
+            o.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="{fill}" stroke="{border}" stroke-width="{2 if (is_term or is_entry) else 1.4}" filter="url(#glow)"/>')
+            tag = "  ▶ entry" if is_entry else ("  ■ terminal" if is_term else "")
+            o.append(f'<text x="{x+12}" y="{y+20}" font-size="13" font-weight="700" letter-spacing="1" fill="{border}" filter="url(#glow)">{E(ident).upper()}<tspan font-size="8" letter-spacing="0" fill="{_DIM}">{tag}</tspan></text>')
+            for j, line in enumerate(wrap(states[ident].get("description", ""), 33)[:3]):
+                o.append(f'<text x="{x+12}" y="{y+37+j*12}" font-size="9.5" fill="{_DIM}">{E(line)}</text>')
+        elif kind == "gate":
+            o.append(f'<polygon points="{cx},{y} {x+w},{y+h/2} {cx},{y+h} {x},{y+h/2}" fill="#0c1a0c" stroke="{_NEON}" stroke-width="1.7" filter="url(#glow)"/>')
+            o.append(f'<text x="{cx:.0f}" y="{y+h/2-1:.0f}" font-size="9" text-anchor="middle" fill="{_NEON}">{E(ident)}</text>')
+            o.append(f'<text x="{cx:.0f}" y="{y+h/2+9:.0f}" font-size="7" text-anchor="middle" fill="{_DIM}">GATE</text>')
+            o.append(f'<text x="{x+w+14:.0f}" y="{y+h/2+3:.0f}" font-size="10" fill="{_ON}">{E(side_of("gate", ident))}</text>')
+        else:  # action — predefined-process (rectangle with double vertical rules at each end)
+            o.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="#0a1609" stroke="{_NEON}" stroke-width="1.4" filter="url(#glow)"/>')
+            o.append(f'<line x1="{x+7}" y1="{y}" x2="{x+7}" y2="{y+h}" stroke="{_NEON}" stroke-width="1.2"/>')
+            o.append(f'<line x1="{x+w-7}" y1="{y}" x2="{x+w-7}" y2="{y+h}" stroke="{_NEON}" stroke-width="1.2"/>')
+            cu = actions.get(ident, {}).get("compute_unit", ident)
+            o.append(f'<text x="{cx:.0f}" y="{y+h/2-2:.0f}" font-size="10" font-weight="600" text-anchor="middle" fill="{_ON}">{E(cu)}</text>')
+            o.append(f'<text x="{cx:.0f}" y="{y+h/2+10:.0f}" font-size="7.5" text-anchor="middle" fill="{_DIM}">{E(ident)} · action</text>')
+            sd = side_of("action", ident)
+            if sd:
+                o.append(f'<text x="{x+w+14:.0f}" y="{y+h/2+3:.0f}" font-size="10" fill="{_NEON}">{E(sd)}</text>')
     o.append("</svg>")
     return "\n".join(o) + "\n"
 
