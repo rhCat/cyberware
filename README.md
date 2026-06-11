@@ -91,12 +91,16 @@ the only fast way to eyeball what a compiled task will do before the executor ru
 
 ## Docs
 
-- **[skill dashboard](docs/site/)** — a static site to review every skill: the blueprint diagram, perk
-  flow, contracts, and snippet code, all in one place. Regenerate the data and serve:
-  ```sh
-  python3 infra/build_site.py                          # → docs/site/data.js
-  python3 -m http.server -d docs/site 8765             # → http://localhost:8765
-  ```
+**[→ live dashboard at rhcat.github.io/cyberware](https://rhcat.github.io/cyberware/)** — a static site
+(auto-deployed by [`.github/workflows/pages.yml`](.github/workflows/pages.yml) on every push) to review
+every skill — blueprint, perk flow, contracts, and snippet code — with the review documents below as
+in-site tabs. Regenerate + serve locally:
+
+```sh
+python3 infra/build_site.py                  # → docs/site/data.js
+python3 -m http.server -d docs/site 8765     # → http://localhost:8765
+```
+
 - [architecture](docs/architecture.md) — the two sides, the pipeline, the governance model
 - [authoring](docs/authoring.md) — scaffold + the perk / manifesto / contract / snippet pattern
 - [skills](docs/skills.md) — the catalog
