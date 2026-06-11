@@ -1,0 +1,23 @@
+{
+  "tool": "cws_evaluate",
+  "inputs": {
+    "SKILL_NAME": {
+      "type": "string",
+      "required": true
+    },
+    "SKILL_DESC": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "evaluation": {
+      "path": "${RECORD_STORE}/evaluation.json",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/evaluation.json"
+  }
+}

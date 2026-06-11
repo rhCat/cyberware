@@ -1,0 +1,18 @@
+{
+  "perk": "evaluate",
+  "skill": "cws-create",
+  "description": "Classify a candidate skill: execution | design | transformable | unclear.",
+  "rules": [
+    "read-only \u2014 analyzes a description, writes no skill",
+    "keyword heuristic \u2014 a recommendation, not a proof"
+  ],
+  "usage": "Set SKILL_NAME + SKILL_DESC. Output: evaluation.json (verdict + signals + recommendation).",
+  "limitation": "Heuristic on the description text; the intelligence makes the final call.",
+  "minimal_example": {
+    "perk": "evaluate",
+    "vars": {
+      "SKILL_NAME": "pg-backup",
+      "SKILL_DESC": "runs pg_dump to back up a Postgres database to a file"
+    }
+  }
+}

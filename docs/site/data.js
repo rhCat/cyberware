@@ -436,6 +436,291 @@ window.SKILLS = [
   ]
  },
  {
+  "id": "cws-create",
+  "name": "Cyberware skill create",
+  "description": "Evaluate a candidate skill \u2014 execution (tool) vs design (taste) vs transformable \u2014 and, when it fits, scaffold it into cyberware format. The framework's on-ramp for new skills. Perk-agnostic lifecycle (ready \u2192 prepared \u2192 verified \u2192 executed); the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+  "blueprint": {
+   "$schema": "lpp/v0.2.0",
+   "id": "cws-create",
+   "name": "Cyberware skill create",
+   "description": "Evaluate a candidate skill \u2014 execution (tool) vs design (taste) vs transformable \u2014 and, when it fits, scaffold it into cyberware format. The framework's on-ramp for new skills. Perk-agnostic lifecycle (ready \u2192 prepared \u2192 verified \u2192 executed); the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
+   "entry_state": "ready",
+   "states": {
+    "ready": {
+     "description": "task-ledger submitted, nothing run"
+    },
+    "prepared": {
+     "description": "inputs validated \u2014 required vars present, runtime + store reachable"
+    },
+    "verified": {
+     "description": "the plan is contract-bound \u2014 the perk's tool sequence resolves and its contract (I/O + checks) is in place"
+    },
+    "executed": {
+     "description": "the perk's tool sequence ran ONLY via executor.py \u2014 each step is recorded to the run-ledger AS it runs (recording is part of execution, not a step after)"
+    }
+   },
+   "terminal_states": {
+    "executed": {}
+   },
+   "gates": {
+    "g_prepared": {
+     "type": "expression",
+     "expression": "inputs_present /\\ store_writable",
+     "description": "inputs + store validated"
+    },
+    "g_verified": {
+     "type": "expression",
+     "expression": "sequence_resolved /\\ contracts_present",
+     "description": "the task is contract-bound"
+    },
+    "g_governed": {
+     "type": "expression",
+     "expression": "governed_run /\\ contract_checks_pass",
+     "description": "ran ONLY through executor.py; contract enforced"
+    }
+   },
+   "actions": {
+    "a_prepare": {
+     "type": "compute",
+     "compute_unit": "validator:check_inputs",
+     "description": "validator confirms required vars + writable record_store + reachable runtime"
+    },
+    "a_verify": {
+     "type": "compute",
+     "compute_unit": "validator:check_contract",
+     "description": "confirm the perk's sequence + contracts are bound"
+    },
+    "a_execute": {
+     "type": "compute",
+     "compute_unit": "perk:sequence",
+     "description": "run the perk's tool sequence via executor.py \u2014 recording each step to the run-ledger as it runs"
+    }
+   },
+   "transitions": [
+    {
+     "from": "ready",
+     "to": "prepared",
+     "trigger": "PREPARE",
+     "action": "a_prepare",
+     "gate": "g_prepared"
+    },
+    {
+     "from": "prepared",
+     "to": "verified",
+     "trigger": "VERIFY",
+     "action": "a_verify",
+     "gate": "g_verified"
+    },
+    {
+     "from": "verified",
+     "to": "executed",
+     "trigger": "EXECUTE",
+     "action": "a_execute",
+     "gate": "g_governed"
+    }
+   ],
+   "safety_invariants": [
+    {
+     "name": "governed_execution_only",
+     "expression": "state /= 'executed' \\/ governed_run",
+     "description": "GUARDRAIL: a task reaches 'executed' ONLY through executor.py \u2014 the single governed channel; the runtime is the enforcement."
+    },
+    {
+     "name": "record_during_execution",
+     "expression": "state /= 'executed' \\/ recorded_each_step",
+     "description": "GUARDRAIL: recording is PART of executing \u2014 each step is written to the run-ledger as it runs, not in a separate phase after."
+    },
+    {
+     "name": "verify_before_execute",
+     "expression": "state /= 'executed' \\/ contract_bound",
+     "description": "GUARDRAIL: nothing executes until its tool sequence + contract are bound."
+    },
+    {
+     "name": "oversight_clears_script",
+     "expression": "TRUE",
+     "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+    }
+   ]
+  },
+  "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"668\" height=\"1028\" viewBox=\"0 0 668 1028\" font-family=\"ui-monospace,Menlo,Consolas,monospace\">\n<defs><filter id=\"glow\" x=\"-60%\" y=\"-60%\" width=\"220%\" height=\"220%\"><feGaussianBlur stdDeviation=\"1.3\" result=\"b\"/><feMerge><feMergeNode in=\"b\"/><feMergeNode in=\"SourceGraphic\"/></feMerge></filter><pattern id=\"px\" width=\"7\" height=\"7\" patternUnits=\"userSpaceOnUse\"><rect width=\"7\" height=\"7\" fill=\"#0a0f0a\"/><rect width=\"1\" height=\"1\" fill=\"#54c24c\" fill-opacity=\"0.13\"/></pattern><marker id=\"arr\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L9,4 L0,8 z\" fill=\"#5cc450\"/></marker></defs>\n<rect width=\"668\" height=\"1028\" fill=\"#0a0f0a\"/>\n<rect width=\"668\" height=\"1028\" fill=\"url(#px)\"/>\n<text x=\"16\" y=\"28\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"3\" fill=\"#54c24c\" filter=\"url(#glow)\">CWS-CREATE</text>\n<line x1=\"272.0\" y1=\"130\" x2=\"272.0\" y2=\"162\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"130\" x2=\"272.0\" y2=\"162\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"150\" font-size=\"12\" font-weight=\"700\" fill=\"#93d98a\">PREPARE</text>\n<line x1=\"272.0\" y1=\"222\" x2=\"272.0\" y2=\"254\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"222\" x2=\"272.0\" y2=\"254\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"242\" font-size=\"11\" font-weight=\"700\" fill=\"#93d98a\">\u2713 pass</text>\n<line x1=\"272.0\" y1=\"302\" x2=\"272.0\" y2=\"334\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"302\" x2=\"272.0\" y2=\"334\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<line x1=\"272.0\" y1=\"416\" x2=\"272.0\" y2=\"448\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"416\" x2=\"272.0\" y2=\"448\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"436\" font-size=\"12\" font-weight=\"700\" fill=\"#93d98a\">VERIFY</text>\n<line x1=\"272.0\" y1=\"508\" x2=\"272.0\" y2=\"540\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"508\" x2=\"272.0\" y2=\"540\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"528\" font-size=\"11\" font-weight=\"700\" fill=\"#93d98a\">\u2713 pass</text>\n<line x1=\"272.0\" y1=\"588\" x2=\"272.0\" y2=\"620\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"588\" x2=\"272.0\" y2=\"620\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<line x1=\"272.0\" y1=\"702\" x2=\"272.0\" y2=\"734\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"702\" x2=\"272.0\" y2=\"734\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"722\" font-size=\"12\" font-weight=\"700\" fill=\"#93d98a\">EXECUTE</text>\n<line x1=\"272.0\" y1=\"794\" x2=\"272.0\" y2=\"826\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"794\" x2=\"272.0\" y2=\"826\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"814\" font-size=\"11\" font-weight=\"700\" fill=\"#93d98a\">\u2713 pass</text>\n<line x1=\"272.0\" y1=\"874\" x2=\"272.0\" y2=\"906\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"874\" x2=\"272.0\" y2=\"906\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<rect x=\"151.0\" y=\"48\" width=\"242\" height=\"82\" fill=\"#0e1d0d\" stroke=\"#93d98a\" stroke-width=\"2.2\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"71\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#93d98a\" filter=\"url(#glow)\">READY<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\">  \u00b7 entry</tspan></text>\n<text x=\"164.0\" y=\"89\" font-size=\"11\" fill=\"#74ad68\">task-ledger submitted, nothing</text>\n<text x=\"164.0\" y=\"103\" font-size=\"11\" fill=\"#74ad68\">run</text>\n<polygon points=\"272.0,162 351.0,192.0 272.0,222 193.0,192.0\" fill=\"#0c1a0c\" stroke=\"#54c24c\" stroke-width=\"1.8\" filter=\"url(#glow)\"/>\n<text x=\"272\" y=\"196\" font-size=\"11\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#54c24c\">g_prepared</text>\n<text x=\"367\" y=\"196\" font-size=\"11\" fill=\"#93d98a\">\u22a8 inputs_present \u2227 store_writable</text>\n<line x1=\"193.0\" y1=\"192.0\" x2=\"175\" y2=\"192.0\" stroke=\"#d4794e\" stroke-width=\"2\"/>\n<text x=\"184\" y=\"186\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#d4794e\">\u2717 fail</text>\n<rect x=\"55.0\" y=\"175\" width=\"120\" height=\"34\" fill=\"#170d09\" stroke=\"#d4794e\" stroke-width=\"1.6\"/>\n<text x=\"115.0\" y=\"196\" font-size=\"11\" text-anchor=\"middle\" fill=\"#e7a684\">exit / log</text>\n<rect x=\"160.0\" y=\"254\" width=\"224\" height=\"48\" fill=\"#0a1609\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<line x1=\"168.0\" y1=\"254\" x2=\"168.0\" y2=\"302\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<line x1=\"376.0\" y1=\"254\" x2=\"376.0\" y2=\"302\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<text x=\"272\" y=\"282\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#93d98a\">validator:check_inputs</text>\n<rect x=\"151.0\" y=\"334\" width=\"242\" height=\"82\" fill=\"#0b140a\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"357\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#54c24c\" filter=\"url(#glow)\">PREPARED<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\"></tspan></text>\n<text x=\"164.0\" y=\"375\" font-size=\"11\" fill=\"#74ad68\">inputs validated \u2014 required vars</text>\n<text x=\"164.0\" y=\"389\" font-size=\"11\" fill=\"#74ad68\">present, runtime + store</text>\n<text x=\"164.0\" y=\"403\" font-size=\"11\" fill=\"#74ad68\">reachable</text>\n<polygon points=\"272.0,448 351.0,478.0 272.0,508 193.0,478.0\" fill=\"#0c1a0c\" stroke=\"#54c24c\" stroke-width=\"1.8\" filter=\"url(#glow)\"/>\n<text x=\"272\" y=\"482\" font-size=\"11\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#54c24c\">g_verified</text>\n<text x=\"367\" y=\"482\" font-size=\"11\" fill=\"#93d98a\">\u22a8 sequence_resolved \u2227 contracts_present</text>\n<line x1=\"193.0\" y1=\"478.0\" x2=\"175\" y2=\"478.0\" stroke=\"#d4794e\" stroke-width=\"2\"/>\n<text x=\"184\" y=\"472\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#d4794e\">\u2717 fail</text>\n<rect x=\"55.0\" y=\"461\" width=\"120\" height=\"34\" fill=\"#170d09\" stroke=\"#d4794e\" stroke-width=\"1.6\"/>\n<text x=\"115.0\" y=\"482\" font-size=\"11\" text-anchor=\"middle\" fill=\"#e7a684\">exit / log</text>\n<rect x=\"160.0\" y=\"540\" width=\"224\" height=\"48\" fill=\"#0a1609\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<line x1=\"168.0\" y1=\"540\" x2=\"168.0\" y2=\"588\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<line x1=\"376.0\" y1=\"540\" x2=\"376.0\" y2=\"588\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<text x=\"272\" y=\"568\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#93d98a\">validator:check_contract</text>\n<rect x=\"151.0\" y=\"620\" width=\"242\" height=\"82\" fill=\"#0b140a\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"643\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#54c24c\" filter=\"url(#glow)\">VERIFIED<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\"></tspan></text>\n<text x=\"164.0\" y=\"661\" font-size=\"11\" fill=\"#74ad68\">the plan is contract-bound \u2014 the</text>\n<text x=\"164.0\" y=\"675\" font-size=\"11\" fill=\"#74ad68\">perk&#x27;s tool sequence resolves</text>\n<text x=\"164.0\" y=\"689\" font-size=\"11\" fill=\"#74ad68\">and its contract (I/O + checks)</text>\n<polygon points=\"272.0,734 351.0,764.0 272.0,794 193.0,764.0\" fill=\"#0c1a0c\" stroke=\"#54c24c\" stroke-width=\"1.8\" filter=\"url(#glow)\"/>\n<text x=\"272\" y=\"768\" font-size=\"11\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#54c24c\">g_governed</text>\n<text x=\"367\" y=\"768\" font-size=\"11\" fill=\"#93d98a\">\u22a8 governed_run \u2227 contract_checks_pass</text>\n<line x1=\"193.0\" y1=\"764.0\" x2=\"175\" y2=\"764.0\" stroke=\"#d4794e\" stroke-width=\"2\"/>\n<text x=\"184\" y=\"758\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#d4794e\">\u2717 fail</text>\n<rect x=\"55.0\" y=\"747\" width=\"120\" height=\"34\" fill=\"#170d09\" stroke=\"#d4794e\" stroke-width=\"1.6\"/>\n<text x=\"115.0\" y=\"768\" font-size=\"11\" text-anchor=\"middle\" fill=\"#e7a684\">exit / log</text>\n<rect x=\"160.0\" y=\"826\" width=\"224\" height=\"48\" fill=\"#0a1609\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<line x1=\"168.0\" y1=\"826\" x2=\"168.0\" y2=\"874\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<line x1=\"376.0\" y1=\"826\" x2=\"376.0\" y2=\"874\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<text x=\"272\" y=\"854\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#93d98a\">perk:sequence</text>\n<rect x=\"151.0\" y=\"906\" width=\"242\" height=\"82\" fill=\"#0f2410\" stroke=\"#93d98a\" stroke-width=\"2.2\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"929\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#93d98a\" filter=\"url(#glow)\">EXECUTED<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\">  \u00b7 terminal</tspan></text>\n<text x=\"164.0\" y=\"947\" font-size=\"11\" fill=\"#74ad68\">the perk&#x27;s tool sequence ran</text>\n<text x=\"164.0\" y=\"961\" font-size=\"11\" fill=\"#74ad68\">ONLY via executor.py \u2014 each step</text>\n<text x=\"164.0\" y=\"975\" font-size=\"11\" fill=\"#74ad68\">is recorded to the run-ledger AS</text>\n</svg>\n",
+  "skill_md": "---\nskill: cws-create\nname: Cyberware skill create\nperks: [evaluate, scaffold]\n---\n\n# cws-create \u2014 the on-ramp for new skills\n\nHand it a candidate skill (a name + a plain description of what it does) and it classifies it:\n\n- **execution** \u2014 a deterministic tool/pathway (run, build, query, fetch, \u2026). Fits cyberware directly.\n- **design** \u2014 a taste/aesthetic skill (palette, typography, layout, \u2026). **Not** the cyberware emphasis \u2014\n  the framework governs deterministic execution, not aesthetics. Keep it as guidance.\n- **transformable** \u2014 mixes both; extract the execution core into a governed pathway, leave the taste as guidance.\n- **unclear** \u2014 describe what it DOES (inputs \u2192 action \u2192 output) so it can be classified.\n\n## What to look out for\n`evaluate` emits the verdict + the signals it matched + a recommendation, to `evaluation.json`. The verdict\nis a keyword heuristic \u2014 a recommendation, not a proof; the intelligence makes the call.\n\n## Perks\n- `evaluate` \u2014 classify a candidate + recommendation (read-only).\n- `scaffold` \u2014 lay down the cyberware skeleton (blueprint + perks + contracts + snippet stubs) for a fitting\n  skill, via `infra/scaffold.py`.\n\n## How to use it\n1. `evaluate`: set `SKILL_NAME` + `SKILL_DESC` \u2192 the verdict.\n2. If execution / transformable \u2014 `scaffold`: set `NEW_SKILL` + `NEW_NAME` + `PERKS`\n   (space-separated `<pid>:<tool>[:<binary>]`) \u2192 the skeleton is created.\n",
+  "perks": [
+   {
+    "id": "evaluate",
+    "summary": "classify a candidate skill: execution | design | transformable",
+    "destructive": false,
+    "metadata": {
+     "perk": "evaluate",
+     "skill": "cws-create",
+     "description": "Classify a candidate skill: execution | design | transformable | unclear.",
+     "rules": [
+      "read-only \u2014 analyzes a description, writes no skill",
+      "keyword heuristic \u2014 a recommendation, not a proof"
+     ],
+     "usage": "Set SKILL_NAME + SKILL_DESC. Output: evaluation.json (verdict + signals + recommendation).",
+     "limitation": "Heuristic on the description text; the intelligence makes the final call.",
+     "minimal_example": {
+      "perk": "evaluate",
+      "vars": {
+       "SKILL_NAME": "pg-backup",
+       "SKILL_DESC": "runs pg_dump to back up a Postgres database to a file"
+      }
+     }
+    },
+    "sequence": [
+     "cws_evaluate"
+    ],
+    "tools": {
+     "cws_evaluate": {
+      "binary": "python3",
+      "params": {
+       "SKILL_NAME": "${SKILL_NAME}",
+       "SKILL_DESC": "${SKILL_DESC}"
+      }
+     }
+    },
+    "env": {
+     "SKILL_NAME": "${SKILL_NAME}",
+     "SKILL_DESC": "${SKILL_DESC}",
+     "RECORD_STORE": "${record_store}"
+    },
+    "requires": [
+     "python3"
+    ],
+    "contracts": {
+     "tool": "cws_evaluate",
+     "inputs": {
+      "SKILL_NAME": {
+       "type": "string",
+       "required": true
+      },
+      "SKILL_DESC": {
+       "type": "string",
+       "required": true
+      }
+     },
+     "outputs": {
+      "evaluation": {
+       "path": "${RECORD_STORE}/evaluation.json",
+       "type": "file"
+      }
+     },
+     "checks": {
+      "exit_zero": true,
+      "output_exists": "${RECORD_STORE}/evaluation.json"
+     }
+    },
+    "snippets": {
+     "cws_evaluate.py": "#!/usr/bin/env python3\n\"\"\"cws_evaluate \u2014 classify a candidate skill: execution (tool) | design (taste) | transformable | unclear.\n\nReads SKILL_NAME, SKILL_DESC, RECORD_STORE from the environment; writes evaluation.json and prints one\nstructured-JSON line. Keyword heuristic \u2014 the verdict is a recommendation, not a proof.\n\"\"\"\nfrom __future__ import annotations\nimport json\nimport os\nimport re\nimport sys\n\nEXEC = [\"run\", \"build\", \"fetch\", \"query\", \"deploy\", \"compile\", \"test\", \"lint\", \"transform\", \"convert\",\n        \"archive\", \"search\", \"commit\", \"tag\", \"execute\", \"send\", \"post\", \"request\", \"scan\", \"validate\",\n        \"generate\", \"migrate\", \"backup\", \"restore\", \"extract\", \"parse\", \"format\", \"check\", \"process\",\n        \"upload\", \"download\", \"sync\", \"render\", \"analyze\", \"count\", \"resolve\", \"diff\", \"snapshot\"]\nDESIGN = [\"color\", \"colour\", \"font\", \"layout\", \"aesthetic\", \"style\", \"theme\", \"visual\", \"fade\",\n          \"gradient\", \"spacing\", \"typography\", \"palette\", \"look\", \"feel\", \"beautiful\", \"pretty\",\n          \"vibe\", \"tasteful\", \"elegant\", \"minimalist\", \"ornament\", \"branding\", \"mood\"]\n\n\ndef signals(text: str, words: list) -> list:\n    \"\"\"The signal words present in text (whole-word).\"\"\"\n    low = text.lower()\n    return sorted({w for w in words if re.search(r\"\\b\" + re.escape(w) + r\"(?:s|es|ed|ing|d)?\\b\", low)})\n\n\ndef main() -> int:\n    \"\"\"Classify the candidate and write evaluation.json.\"\"\"\n    name = os.environ[\"SKILL_NAME\"]\n    desc = os.environ[\"SKILL_DESC\"]\n    store = os.environ[\"RECORD_STORE\"].rstrip(\"/\")\n    ex, dz = signals(desc, EXEC), signals(desc, DESIGN)\n    if ex and not dz:\n        verdict, onboard = \"execution\", True\n        rec = (f\"'{name}' is an execution / tool skill \u2014 a deterministic pathway. It fits cyberware \"\n               f\"directly: model it as a blueprint + perks, each tool emitting structured JSON. \"\n               f\"Run cws-create/scaffold to lay down the skeleton.\")\n    elif dz and not ex:\n        verdict, onboard = \"design\", False\n        rec = (f\"'{name}' is a design / taste skill (e.g. {', '.join(dz)}). That is NOT the cyberware \"\n               f\"emphasis \u2014 the framework governs deterministic execution, not aesthetics. Keep it as \"\n               f\"guidance, not a governed tool skill.\")\n    elif ex and dz:\n        verdict, onboard = \"transformable\", True\n        rec = (f\"'{name}' mixes execution ({', '.join(ex)}) and design ({', '.join(dz)}). Extract the \"\n               f\"execution core into a governed cyberware pathway; leave the taste/design part as \"\n               f\"guidance. Run cws-create/scaffold on the execution core.\")\n    else:\n        verdict, onboard = \"unclear\", False\n        rec = (f\"'{name}' shows no clear execution verbs or design signals \u2014 describe what it DOES \"\n               f\"(inputs -> action -> output) so it can be classified.\")\n    out = os.path.join(store, \"evaluation.json\")\n    result = {\"tool\": \"cws_evaluate\", \"status\": \"ok\", \"skill\": name, \"verdict\": verdict,\n              \"onboard\": onboard, \"execution_signals\": ex, \"design_signals\": dz,\n              \"recommendation\": rec, \"report\": out}\n    json.dump(result, open(out, \"w\"), indent=2)\n    print(json.dumps(result))\n    return 0\n\n\nif __name__ == \"__main__\":\n    sys.exit(main())\n",
+     "cws_evaluate.sh": "#!/usr/bin/env bash\n# cws_evaluate \u2014 porter: runs the Python core (cws_evaluate.py), which reads SKILL_NAME/SKILL_DESC/RECORD_STORE from the environment.\nset -euo pipefail\nHERE=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\nexec python3 \"$HERE/cws_evaluate.py\"\n"
+    },
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"668\" height=\"1028\" viewBox=\"0 0 668 1028\" font-family=\"ui-monospace,Menlo,Consolas,monospace\">\n<defs><filter id=\"glow\" x=\"-60%\" y=\"-60%\" width=\"220%\" height=\"220%\"><feGaussianBlur stdDeviation=\"1.3\" result=\"b\"/><feMerge><feMergeNode in=\"b\"/><feMergeNode in=\"SourceGraphic\"/></feMerge></filter><pattern id=\"px\" width=\"7\" height=\"7\" patternUnits=\"userSpaceOnUse\"><rect width=\"7\" height=\"7\" fill=\"#0a0f0a\"/><rect width=\"1\" height=\"1\" fill=\"#54c24c\" fill-opacity=\"0.13\"/></pattern><marker id=\"arr\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L9,4 L0,8 z\" fill=\"#5cc450\"/></marker></defs>\n<rect width=\"668\" height=\"1028\" fill=\"#0a0f0a\"/>\n<rect width=\"668\" height=\"1028\" fill=\"url(#px)\"/>\n<text x=\"16\" y=\"28\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"3\" fill=\"#54c24c\" filter=\"url(#glow)\">CWS-CREATE</text>\n<line x1=\"272.0\" y1=\"130\" x2=\"272.0\" y2=\"162\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"130\" x2=\"272.0\" y2=\"162\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"150\" font-size=\"12\" font-weight=\"700\" fill=\"#93d98a\">PREPARE</text>\n<line x1=\"272.0\" y1=\"222\" x2=\"272.0\" y2=\"254\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"222\" x2=\"272.0\" y2=\"254\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"242\" font-size=\"11\" font-weight=\"700\" fill=\"#93d98a\">\u2713 pass</text>\n<line x1=\"272.0\" y1=\"302\" x2=\"272.0\" y2=\"334\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"302\" x2=\"272.0\" y2=\"334\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<line x1=\"272.0\" y1=\"416\" x2=\"272.0\" y2=\"448\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"416\" x2=\"272.0\" y2=\"448\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"436\" font-size=\"12\" font-weight=\"700\" fill=\"#93d98a\">VERIFY</text>\n<line x1=\"272.0\" y1=\"508\" x2=\"272.0\" y2=\"540\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"508\" x2=\"272.0\" y2=\"540\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"528\" font-size=\"11\" font-weight=\"700\" fill=\"#93d98a\">\u2713 pass</text>\n<line x1=\"272.0\" y1=\"588\" x2=\"272.0\" y2=\"620\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"588\" x2=\"272.0\" y2=\"620\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<line x1=\"272.0\" y1=\"702\" x2=\"272.0\" y2=\"734\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"702\" x2=\"272.0\" y2=\"734\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"722\" font-size=\"12\" font-weight=\"700\" fill=\"#93d98a\">EXECUTE</text>\n<line x1=\"272.0\" y1=\"794\" x2=\"272.0\" y2=\"826\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"794\" x2=\"272.0\" y2=\"826\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"814\" font-size=\"11\" font-weight=\"700\" fill=\"#93d98a\">\u2713 pass</text>\n<line x1=\"272.0\" y1=\"874\" x2=\"272.0\" y2=\"906\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"874\" x2=\"272.0\" y2=\"906\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<rect x=\"151.0\" y=\"48\" width=\"242\" height=\"82\" fill=\"#0e1d0d\" stroke=\"#93d98a\" stroke-width=\"2.2\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"71\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#93d98a\" filter=\"url(#glow)\">READY<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\">  \u00b7 entry</tspan></text>\n<text x=\"164.0\" y=\"89\" font-size=\"11\" fill=\"#74ad68\">task-ledger submitted, nothing</text>\n<text x=\"164.0\" y=\"103\" font-size=\"11\" fill=\"#74ad68\">run</text>\n<polygon points=\"272.0,162 351.0,192.0 272.0,222 193.0,192.0\" fill=\"#0c1a0c\" stroke=\"#54c24c\" stroke-width=\"1.8\" filter=\"url(#glow)\"/>\n<text x=\"272\" y=\"196\" font-size=\"11\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#54c24c\">g_prepared</text>\n<text x=\"367\" y=\"196\" font-size=\"11\" fill=\"#93d98a\">\u22a8 inputs_present \u2227 store_writable</text>\n<line x1=\"193.0\" y1=\"192.0\" x2=\"175\" y2=\"192.0\" stroke=\"#d4794e\" stroke-width=\"2\"/>\n<text x=\"184\" y=\"186\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#d4794e\">\u2717 fail</text>\n<rect x=\"55.0\" y=\"175\" width=\"120\" height=\"34\" fill=\"#170d09\" stroke=\"#d4794e\" stroke-width=\"1.6\"/>\n<text x=\"115.0\" y=\"196\" font-size=\"11\" text-anchor=\"middle\" fill=\"#e7a684\">exit / log</text>\n<rect x=\"160.0\" y=\"254\" width=\"224\" height=\"48\" fill=\"#0a1609\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<line x1=\"168.0\" y1=\"254\" x2=\"168.0\" y2=\"302\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<line x1=\"376.0\" y1=\"254\" x2=\"376.0\" y2=\"302\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<text x=\"272\" y=\"282\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#93d98a\">validator:check_inputs</text>\n<rect x=\"151.0\" y=\"334\" width=\"242\" height=\"82\" fill=\"#0b140a\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"357\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#54c24c\" filter=\"url(#glow)\">PREPARED<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\"></tspan></text>\n<text x=\"164.0\" y=\"375\" font-size=\"11\" fill=\"#74ad68\">inputs validated \u2014 required vars</text>\n<text x=\"164.0\" y=\"389\" font-size=\"11\" fill=\"#74ad68\">present, runtime + store</text>\n<text x=\"164.0\" y=\"403\" font-size=\"11\" fill=\"#74ad68\">reachable</text>\n<polygon points=\"272.0,448 351.0,478.0 272.0,508 193.0,478.0\" fill=\"#0c1a0c\" stroke=\"#54c24c\" stroke-width=\"1.8\" filter=\"url(#glow)\"/>\n<text x=\"272\" y=\"482\" font-size=\"11\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#54c24c\">g_verified</text>\n<text x=\"367\" y=\"482\" font-size=\"11\" fill=\"#93d98a\">\u22a8 sequence_resolved \u2227 contracts_present</text>\n<line x1=\"193.0\" y1=\"478.0\" x2=\"175\" y2=\"478.0\" stroke=\"#d4794e\" stroke-width=\"2\"/>\n<text x=\"184\" y=\"472\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#d4794e\">\u2717 fail</text>\n<rect x=\"55.0\" y=\"461\" width=\"120\" height=\"34\" fill=\"#170d09\" stroke=\"#d4794e\" stroke-width=\"1.6\"/>\n<text x=\"115.0\" y=\"482\" font-size=\"11\" text-anchor=\"middle\" fill=\"#e7a684\">exit / log</text>\n<rect x=\"160.0\" y=\"540\" width=\"224\" height=\"48\" fill=\"#0a1609\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<line x1=\"168.0\" y1=\"540\" x2=\"168.0\" y2=\"588\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<line x1=\"376.0\" y1=\"540\" x2=\"376.0\" y2=\"588\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<text x=\"272\" y=\"568\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#93d98a\">validator:check_contract</text>\n<rect x=\"151.0\" y=\"620\" width=\"242\" height=\"82\" fill=\"#0b140a\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"643\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#54c24c\" filter=\"url(#glow)\">VERIFIED<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\"></tspan></text>\n<text x=\"164.0\" y=\"661\" font-size=\"11\" fill=\"#74ad68\">the plan is contract-bound \u2014 the</text>\n<text x=\"164.0\" y=\"675\" font-size=\"11\" fill=\"#74ad68\">perk&#x27;s tool sequence resolves</text>\n<text x=\"164.0\" y=\"689\" font-size=\"11\" fill=\"#74ad68\">and its contract (I/O + checks)</text>\n<polygon points=\"272.0,734 351.0,764.0 272.0,794 193.0,764.0\" fill=\"#0c1a0c\" stroke=\"#54c24c\" stroke-width=\"1.8\" filter=\"url(#glow)\"/>\n<text x=\"272\" y=\"768\" font-size=\"11\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#54c24c\">g_governed</text>\n<text x=\"367\" y=\"768\" font-size=\"11\" fill=\"#93d98a\">\u22a8 governed_run \u2227 contract_checks_pass</text>\n<line x1=\"193.0\" y1=\"764.0\" x2=\"175\" y2=\"764.0\" stroke=\"#d4794e\" stroke-width=\"2\"/>\n<text x=\"184\" y=\"758\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#d4794e\">\u2717 fail</text>\n<rect x=\"55.0\" y=\"747\" width=\"120\" height=\"34\" fill=\"#170d09\" stroke=\"#d4794e\" stroke-width=\"1.6\"/>\n<text x=\"115.0\" y=\"768\" font-size=\"11\" text-anchor=\"middle\" fill=\"#e7a684\">exit / log</text>\n<rect x=\"160.0\" y=\"826\" width=\"224\" height=\"48\" fill=\"#0a1609\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<line x1=\"168.0\" y1=\"826\" x2=\"168.0\" y2=\"874\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<line x1=\"376.0\" y1=\"826\" x2=\"376.0\" y2=\"874\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<text x=\"272\" y=\"854\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#93d98a\">perk:sequence</text>\n<text x=\"400\" y=\"854\" font-size=\"11\" fill=\"#54c24c\">\u25b6 cws_evaluate</text>\n<rect x=\"151.0\" y=\"906\" width=\"242\" height=\"82\" fill=\"#0f2410\" stroke=\"#93d98a\" stroke-width=\"2.2\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"929\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#93d98a\" filter=\"url(#glow)\">EXECUTED<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\">  \u00b7 terminal</tspan></text>\n<text x=\"164.0\" y=\"947\" font-size=\"11\" fill=\"#74ad68\">the perk&#x27;s tool sequence ran</text>\n<text x=\"164.0\" y=\"961\" font-size=\"11\" fill=\"#74ad68\">ONLY via executor.py \u2014 each step</text>\n<text x=\"164.0\" y=\"975\" font-size=\"11\" fill=\"#74ad68\">is recorded to the run-ledger AS</text>\n</svg>\n",
+    "demo": {
+     "ledger": {
+      "skill": "cws-create",
+      "perk": "evaluate",
+      "record_store": "/tmp/cws-create-demo",
+      "vars": {
+       "SKILL_NAME": "pg-backup",
+       "SKILL_DESC": "runs pg_dump to back up a Postgres database to a file"
+      }
+     },
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=cws-create perk=evaluate\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport SKILL_NAME=pg-backup SKILL_DESC='runs pg_dump to back up a Postgres database to a file' RECORD_STORE=/tmp/cws-create-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/cws-create/perks/evaluate/src\n\nstep1() {   # cws_evaluate\n  echo \"[step 1] cws_evaluate\"\n  bash \"$SNIP/cws_evaluate.sh\"\n  test -f \"${RECORD_STORE}/evaluation.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/evaluation.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tcws_evaluate\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+    }
+   },
+   {
+    "id": "scaffold",
+    "summary": "lay down the cyberware skeleton for a fitting skill (via scaffold.py)",
+    "destructive": false,
+    "metadata": {
+     "perk": "scaffold",
+     "skill": "cws-create",
+     "description": "Lay down a cyberware skill skeleton (blueprint + perks + contracts + snippet stubs).",
+     "rules": [
+      "calls infra/scaffold.py",
+      "creates skills/<NEW_SKILL>/ \u2014 composes out of the box; fill the snippets"
+     ],
+     "usage": "Set NEW_SKILL + NEW_NAME + PERKS (space-separated <pid>:<tool>[:<binary>]). Output: scaffold.log.",
+     "limitation": "Creates the skeleton only; you fill the snippets + vars.",
+     "minimal_example": {
+      "perk": "scaffold",
+      "vars": {
+       "NEW_SKILL": "pg_backup",
+       "NEW_NAME": "Postgres backup",
+       "PERKS": "dump:pg_dump:pg_dump"
+      }
+     }
+    },
+    "sequence": [
+     "cws_scaffold"
+    ],
+    "tools": {
+     "cws_scaffold": {
+      "binary": "python3",
+      "params": {
+       "NEW_SKILL": "${NEW_SKILL}",
+       "NEW_NAME": "${NEW_NAME}",
+       "PERKS": "${PERKS}"
+      }
+     }
+    },
+    "env": {
+     "NEW_SKILL": "${NEW_SKILL}",
+     "NEW_NAME": "${NEW_NAME}",
+     "PERKS": "${PERKS}",
+     "RECORD_STORE": "${record_store}"
+    },
+    "requires": [
+     "python3"
+    ],
+    "contracts": {
+     "tool": "cws_scaffold",
+     "inputs": {
+      "NEW_SKILL": {
+       "type": "string",
+       "required": true
+      },
+      "NEW_NAME": {
+       "type": "string",
+       "required": true
+      },
+      "PERKS": {
+       "type": "string",
+       "required": true
+      }
+     },
+     "outputs": {
+      "log": {
+       "path": "${RECORD_STORE}/scaffold.log",
+       "type": "file"
+      }
+     },
+     "checks": {
+      "exit_zero": true,
+      "output_exists": "${RECORD_STORE}/scaffold.log"
+     }
+    },
+    "snippets": {
+     "cws_scaffold.sh": "#!/usr/bin/env bash\n# cws_scaffold \u2014 lay down a cyberware skill skeleton via infra/scaffold.py (the \"create\" step). Structured JSON.\nset -uo pipefail\n: \"${NEW_SKILL:?}\" \"${NEW_NAME:?}\" \"${PERKS:?}\" \"${RECORD_STORE:?}\"\nHERE=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\nREPO=\"$(cd \"$HERE/../../../../..\" && pwd)\"\nOUT=\"${RECORD_STORE%/}/scaffold.log\"\nARGS=\"\"\nfor p in $PERKS; do ARGS=\"$ARGS --perk $p\"; done   # PERKS = space-separated <pid>:<tool>[:<binary>]\npython3 \"$REPO/infra/scaffold.py\" --skill \"$NEW_SKILL\" --name \"$NEW_NAME\" $ARGS > \"$OUT\" 2>&1\nRC=$?\nprintf '{\"tool\":\"cws_scaffold\",\"status\":\"%s\",\"skill\":\"%s\",\"exit\":%d,\"log\":\"%s\"}\\n' \"$([ $RC -eq 0 ] && echo ok || echo fail)\" \"$NEW_SKILL\" \"$RC\" \"$OUT\"\nexit $RC\n"
+    },
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"668\" height=\"1028\" viewBox=\"0 0 668 1028\" font-family=\"ui-monospace,Menlo,Consolas,monospace\">\n<defs><filter id=\"glow\" x=\"-60%\" y=\"-60%\" width=\"220%\" height=\"220%\"><feGaussianBlur stdDeviation=\"1.3\" result=\"b\"/><feMerge><feMergeNode in=\"b\"/><feMergeNode in=\"SourceGraphic\"/></feMerge></filter><pattern id=\"px\" width=\"7\" height=\"7\" patternUnits=\"userSpaceOnUse\"><rect width=\"7\" height=\"7\" fill=\"#0a0f0a\"/><rect width=\"1\" height=\"1\" fill=\"#54c24c\" fill-opacity=\"0.13\"/></pattern><marker id=\"arr\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L9,4 L0,8 z\" fill=\"#5cc450\"/></marker></defs>\n<rect width=\"668\" height=\"1028\" fill=\"#0a0f0a\"/>\n<rect width=\"668\" height=\"1028\" fill=\"url(#px)\"/>\n<text x=\"16\" y=\"28\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"3\" fill=\"#54c24c\" filter=\"url(#glow)\">CWS-CREATE</text>\n<line x1=\"272.0\" y1=\"130\" x2=\"272.0\" y2=\"162\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"130\" x2=\"272.0\" y2=\"162\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"150\" font-size=\"12\" font-weight=\"700\" fill=\"#93d98a\">PREPARE</text>\n<line x1=\"272.0\" y1=\"222\" x2=\"272.0\" y2=\"254\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"222\" x2=\"272.0\" y2=\"254\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"242\" font-size=\"11\" font-weight=\"700\" fill=\"#93d98a\">\u2713 pass</text>\n<line x1=\"272.0\" y1=\"302\" x2=\"272.0\" y2=\"334\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"302\" x2=\"272.0\" y2=\"334\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<line x1=\"272.0\" y1=\"416\" x2=\"272.0\" y2=\"448\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"416\" x2=\"272.0\" y2=\"448\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"436\" font-size=\"12\" font-weight=\"700\" fill=\"#93d98a\">VERIFY</text>\n<line x1=\"272.0\" y1=\"508\" x2=\"272.0\" y2=\"540\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"508\" x2=\"272.0\" y2=\"540\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"528\" font-size=\"11\" font-weight=\"700\" fill=\"#93d98a\">\u2713 pass</text>\n<line x1=\"272.0\" y1=\"588\" x2=\"272.0\" y2=\"620\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"588\" x2=\"272.0\" y2=\"620\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<line x1=\"272.0\" y1=\"702\" x2=\"272.0\" y2=\"734\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"702\" x2=\"272.0\" y2=\"734\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"722\" font-size=\"12\" font-weight=\"700\" fill=\"#93d98a\">EXECUTE</text>\n<line x1=\"272.0\" y1=\"794\" x2=\"272.0\" y2=\"826\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"794\" x2=\"272.0\" y2=\"826\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"814\" font-size=\"11\" font-weight=\"700\" fill=\"#93d98a\">\u2713 pass</text>\n<line x1=\"272.0\" y1=\"874\" x2=\"272.0\" y2=\"906\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"874\" x2=\"272.0\" y2=\"906\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<rect x=\"151.0\" y=\"48\" width=\"242\" height=\"82\" fill=\"#0e1d0d\" stroke=\"#93d98a\" stroke-width=\"2.2\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"71\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#93d98a\" filter=\"url(#glow)\">READY<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\">  \u00b7 entry</tspan></text>\n<text x=\"164.0\" y=\"89\" font-size=\"11\" fill=\"#74ad68\">task-ledger submitted, nothing</text>\n<text x=\"164.0\" y=\"103\" font-size=\"11\" fill=\"#74ad68\">run</text>\n<polygon points=\"272.0,162 351.0,192.0 272.0,222 193.0,192.0\" fill=\"#0c1a0c\" stroke=\"#54c24c\" stroke-width=\"1.8\" filter=\"url(#glow)\"/>\n<text x=\"272\" y=\"196\" font-size=\"11\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#54c24c\">g_prepared</text>\n<text x=\"367\" y=\"196\" font-size=\"11\" fill=\"#93d98a\">\u22a8 inputs_present \u2227 store_writable</text>\n<line x1=\"193.0\" y1=\"192.0\" x2=\"175\" y2=\"192.0\" stroke=\"#d4794e\" stroke-width=\"2\"/>\n<text x=\"184\" y=\"186\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#d4794e\">\u2717 fail</text>\n<rect x=\"55.0\" y=\"175\" width=\"120\" height=\"34\" fill=\"#170d09\" stroke=\"#d4794e\" stroke-width=\"1.6\"/>\n<text x=\"115.0\" y=\"196\" font-size=\"11\" text-anchor=\"middle\" fill=\"#e7a684\">exit / log</text>\n<rect x=\"160.0\" y=\"254\" width=\"224\" height=\"48\" fill=\"#0a1609\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<line x1=\"168.0\" y1=\"254\" x2=\"168.0\" y2=\"302\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<line x1=\"376.0\" y1=\"254\" x2=\"376.0\" y2=\"302\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<text x=\"272\" y=\"282\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#93d98a\">validator:check_inputs</text>\n<rect x=\"151.0\" y=\"334\" width=\"242\" height=\"82\" fill=\"#0b140a\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"357\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#54c24c\" filter=\"url(#glow)\">PREPARED<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\"></tspan></text>\n<text x=\"164.0\" y=\"375\" font-size=\"11\" fill=\"#74ad68\">inputs validated \u2014 required vars</text>\n<text x=\"164.0\" y=\"389\" font-size=\"11\" fill=\"#74ad68\">present, runtime + store</text>\n<text x=\"164.0\" y=\"403\" font-size=\"11\" fill=\"#74ad68\">reachable</text>\n<polygon points=\"272.0,448 351.0,478.0 272.0,508 193.0,478.0\" fill=\"#0c1a0c\" stroke=\"#54c24c\" stroke-width=\"1.8\" filter=\"url(#glow)\"/>\n<text x=\"272\" y=\"482\" font-size=\"11\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#54c24c\">g_verified</text>\n<text x=\"367\" y=\"482\" font-size=\"11\" fill=\"#93d98a\">\u22a8 sequence_resolved \u2227 contracts_present</text>\n<line x1=\"193.0\" y1=\"478.0\" x2=\"175\" y2=\"478.0\" stroke=\"#d4794e\" stroke-width=\"2\"/>\n<text x=\"184\" y=\"472\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#d4794e\">\u2717 fail</text>\n<rect x=\"55.0\" y=\"461\" width=\"120\" height=\"34\" fill=\"#170d09\" stroke=\"#d4794e\" stroke-width=\"1.6\"/>\n<text x=\"115.0\" y=\"482\" font-size=\"11\" text-anchor=\"middle\" fill=\"#e7a684\">exit / log</text>\n<rect x=\"160.0\" y=\"540\" width=\"224\" height=\"48\" fill=\"#0a1609\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<line x1=\"168.0\" y1=\"540\" x2=\"168.0\" y2=\"588\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<line x1=\"376.0\" y1=\"540\" x2=\"376.0\" y2=\"588\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<text x=\"272\" y=\"568\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#93d98a\">validator:check_contract</text>\n<rect x=\"151.0\" y=\"620\" width=\"242\" height=\"82\" fill=\"#0b140a\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"643\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#54c24c\" filter=\"url(#glow)\">VERIFIED<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\"></tspan></text>\n<text x=\"164.0\" y=\"661\" font-size=\"11\" fill=\"#74ad68\">the plan is contract-bound \u2014 the</text>\n<text x=\"164.0\" y=\"675\" font-size=\"11\" fill=\"#74ad68\">perk&#x27;s tool sequence resolves</text>\n<text x=\"164.0\" y=\"689\" font-size=\"11\" fill=\"#74ad68\">and its contract (I/O + checks)</text>\n<polygon points=\"272.0,734 351.0,764.0 272.0,794 193.0,764.0\" fill=\"#0c1a0c\" stroke=\"#54c24c\" stroke-width=\"1.8\" filter=\"url(#glow)\"/>\n<text x=\"272\" y=\"768\" font-size=\"11\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#54c24c\">g_governed</text>\n<text x=\"367\" y=\"768\" font-size=\"11\" fill=\"#93d98a\">\u22a8 governed_run \u2227 contract_checks_pass</text>\n<line x1=\"193.0\" y1=\"764.0\" x2=\"175\" y2=\"764.0\" stroke=\"#d4794e\" stroke-width=\"2\"/>\n<text x=\"184\" y=\"758\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#d4794e\">\u2717 fail</text>\n<rect x=\"55.0\" y=\"747\" width=\"120\" height=\"34\" fill=\"#170d09\" stroke=\"#d4794e\" stroke-width=\"1.6\"/>\n<text x=\"115.0\" y=\"768\" font-size=\"11\" text-anchor=\"middle\" fill=\"#e7a684\">exit / log</text>\n<rect x=\"160.0\" y=\"826\" width=\"224\" height=\"48\" fill=\"#0a1609\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<line x1=\"168.0\" y1=\"826\" x2=\"168.0\" y2=\"874\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<line x1=\"376.0\" y1=\"826\" x2=\"376.0\" y2=\"874\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<text x=\"272\" y=\"854\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#93d98a\">perk:sequence</text>\n<text x=\"400\" y=\"854\" font-size=\"11\" fill=\"#54c24c\">\u25b6 cws_scaffold</text>\n<rect x=\"151.0\" y=\"906\" width=\"242\" height=\"82\" fill=\"#0f2410\" stroke=\"#93d98a\" stroke-width=\"2.2\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"929\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#93d98a\" filter=\"url(#glow)\">EXECUTED<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\">  \u00b7 terminal</tspan></text>\n<text x=\"164.0\" y=\"947\" font-size=\"11\" fill=\"#74ad68\">the perk&#x27;s tool sequence ran</text>\n<text x=\"164.0\" y=\"961\" font-size=\"11\" fill=\"#74ad68\">ONLY via executor.py \u2014 each step</text>\n<text x=\"164.0\" y=\"975\" font-size=\"11\" fill=\"#74ad68\">is recorded to the run-ledger AS</text>\n</svg>\n",
+    "demo": {
+     "ledger": {
+      "skill": "cws-create",
+      "perk": "scaffold",
+      "record_store": "/tmp/cws-create-demo",
+      "vars": {
+       "NEW_SKILL": "pg_backup",
+       "NEW_NAME": "Postgres backup",
+       "PERKS": "dump:pg_dump:pg_dump"
+      }
+     },
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=cws-create perk=scaffold\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport NEW_SKILL=pg_backup NEW_NAME='Postgres backup' PERKS=dump:pg_dump:pg_dump RECORD_STORE=/tmp/cws-create-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/cws-create/perks/scaffold/src\n\nstep1() {   # cws_scaffold\n  echo \"[step 1] cws_scaffold\"\n  bash \"$SNIP/cws_scaffold.sh\"\n  test -f \"${RECORD_STORE}/scaffold.log\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/scaffold.log\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tcws_scaffold\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+    }
+   }
+  ]
+ },
+ {
   "id": "data",
   "name": "Data wrangling",
   "description": "Data transforms through proven pathways \u2014 CSV\u2192JSON and jq queries. Perk-agnostic lifecycle (ready \u2192 prepared \u2192 verified \u2192 executed); the perk supplies the concrete, contract-bound how. LOOK OUT FOR each tool's structured JSON; LOGS TO CHECK: the per-tool output + the executor run-ledger.",
@@ -3281,6 +3566,6 @@ window.DOCS = [
  {
   "id": "skills",
   "label": "Catalog",
-  "body": "# Skill catalog\n\nTool skills (operational pathways) \u2014 not design/taste skills. Each runs through the governed pipeline\n(`validate \u2192 compose \u2192 compile \u2192 oversight \u2192 executor`) and ships a `blueprint.{drawio,svg}`.\n\n| skill | perks | tools | notes / guard |\n|---|---|---|---|\n| **pg_ops** | `select` \u00b7 `migrate` | psql | governed PostgreSQL; `select` read-only, `migrate` in one transaction. DROP/TRUNCATE push back unless `--approve`. |\n| **http** | `get` \u00b7 `post` | curl | responses captured to record_store with status + size. pipe-to-shell blocked. |\n| **fs** | `archive` \u00b7 `find_large` | tar \u00b7 find | `archive` \u2192 tar.gz; `find_large` read-only listing. rm-at-root / rm -rf gated. |\n| **git_ops** | `snapshot` \u00b7 `status` | git | `snapshot` = stage+commit (no push \u2014 push is intentionally not a skill); `status` read-only. force-push / reset --hard gated. |\n| **py_qc** | `test` \u00b7 `lint` | pytest \u00b7 ruff/flake8 | run a project's tests / linter, reports to record_store. |\n| **codebaseqc** | `audit` | python3 (ast) | pure-Python QC: usage (dead code) \u00b7 contract (docstring+return type) \u00b7 coverage (referenced in tests). Name-based heuristics; sound resolution is the Intent-Fidelity frontier. |\n| **ci-codeqc** | `github_actions` | bash | generate/update `.github/workflows/codeqc.yml` (ruff + mypy + pytest) for any repo. Idempotent: existing workflow backed up to `.bk` before overwrite. |\n| **docker** | `build` \u00b7 `ps` | docker | build an image from a context dir; `ps` lists containers (read-only). Needs a running daemon. |\n| **net** | `healthcheck` \u00b7 `dns` | curl \u00b7 python3 | HTTP probe (status + latency); DNS resolve (python core via porter). Read-only. |\n| **data** | `csv2json` \u00b7 `jq` | python3 \u00b7 jq | CSV \u2192 JSON array (python core); jq query over a JSON file. |\n| **search** | `grep` \u00b7 `loc` | ripgrep/grep \u00b7 find | pattern search (rg, fallback grep); line counts by extension. Read-only. |\n| **release** | `tag` | git | annotated git tag at HEAD; no-op if it exists. No force, no push (push stays gated). |\n\n## Choosing a perk\n\nA **perk** is a *predetermined, proven, viable pathway*. The blueprint says what to watch and which\nlogs to check; a perk says exactly how to act. Pick the perk whose `metadata.json` matches your task\n(its `rules`, `usage`, `limitation`, and `minimal_example`), copy `ledger.json` \u2192 your\n`task-ledger.json`, fill the vars its `manifesto.json` declares, and submit it to the pipeline.\n\n## Adding a skill\n\nSee [authoring.md](authoring.md) \u2014 `scaffold.py` writes a composing skeleton; fill the snippets and\nvars. The registry is meant to grow: tools are the unit, perks are the proven pathways within them.\n\n## Self-audit\n\n`examples/self-audit/` holds the framework's own `codebaseqc` report \u2014 cyberware QC'd by cyberware.\nIt honestly shows the open gaps (no return-type hints, no `tests/` dir yet).\n"
+  "body": "# Skill catalog\n\nTool skills (operational pathways) \u2014 not design/taste skills. Each runs through the governed pipeline\n(`validate \u2192 compose \u2192 compile \u2192 oversight \u2192 executor`) and ships a `blueprint.{drawio,svg}`.\n\n| skill | perks | tools | notes / guard |\n|---|---|---|---|\n| **pg_ops** | `select` \u00b7 `migrate` | psql | governed PostgreSQL; `select` read-only, `migrate` in one transaction. DROP/TRUNCATE push back unless `--approve`. |\n| **http** | `get` \u00b7 `post` | curl | responses captured to record_store with status + size. pipe-to-shell blocked. |\n| **fs** | `archive` \u00b7 `find_large` | tar \u00b7 find | `archive` \u2192 tar.gz; `find_large` read-only listing. rm-at-root / rm -rf gated. |\n| **git_ops** | `snapshot` \u00b7 `status` | git | `snapshot` = stage+commit (no push \u2014 push is intentionally not a skill); `status` read-only. force-push / reset --hard gated. |\n| **py_qc** | `test` \u00b7 `lint` | pytest \u00b7 ruff/flake8 | run a project's tests / linter, reports to record_store. |\n| **codebaseqc** | `audit` | python3 (ast) | pure-Python QC: usage (dead code) \u00b7 contract (docstring+return type) \u00b7 coverage (referenced in tests). Name-based heuristics; sound resolution is the Intent-Fidelity frontier. |\n| **ci-codeqc** | `github_actions` | bash | generate/update `.github/workflows/codeqc.yml` (ruff + mypy + pytest) for any repo. Idempotent: existing workflow backed up to `.bk` before overwrite. |\n| **docker** | `build` \u00b7 `ps` | docker | build an image from a context dir; `ps` lists containers (read-only). Needs a running daemon. |\n| **net** | `healthcheck` \u00b7 `dns` | curl \u00b7 python3 | HTTP probe (status + latency); DNS resolve (python core via porter). Read-only. |\n| **data** | `csv2json` \u00b7 `jq` | python3 \u00b7 jq | CSV \u2192 JSON array (python core); jq query over a JSON file. |\n| **search** | `grep` \u00b7 `loc` | ripgrep/grep \u00b7 find | pattern search (rg, fallback grep); line counts by extension. Read-only. |\n| **release** | `tag` | git | annotated git tag at HEAD; no-op if it exists. No force, no push (push stays gated). |\n| **cws-create** | `evaluate` \u00b7 `scaffold` | python3 \u00b7 scaffold.py | **the on-ramp** \u2014 classify a candidate skill (execution / design / transformable / unclear) and, if it fits, scaffold it into cyberware format. |\n\n## Choosing a perk\n\nA **perk** is a *predetermined, proven, viable pathway*. The blueprint says what to watch and which\nlogs to check; a perk says exactly how to act. Pick the perk whose `metadata.json` matches your task\n(its `rules`, `usage`, `limitation`, and `minimal_example`), copy `ledger.json` \u2192 your\n`task-ledger.json`, fill the vars its `manifesto.json` declares, and submit it to the pipeline.\n\n## Adding a skill\n\nSee [authoring.md](authoring.md) \u2014 `scaffold.py` writes a composing skeleton; fill the snippets and\nvars. The registry is meant to grow: tools are the unit, perks are the proven pathways within them.\n\n## Self-audit\n\n`examples/self-audit/` holds the framework's own `codebaseqc` report \u2014 cyberware QC'd by cyberware.\nIt honestly shows the open gaps (no return-type hints, no `tests/` dir yet).\n"
  }
 ];

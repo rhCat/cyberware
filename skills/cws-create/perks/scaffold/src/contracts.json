@@ -1,0 +1,27 @@
+{
+  "tool": "cws_scaffold",
+  "inputs": {
+    "NEW_SKILL": {
+      "type": "string",
+      "required": true
+    },
+    "NEW_NAME": {
+      "type": "string",
+      "required": true
+    },
+    "PERKS": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "log": {
+      "path": "${RECORD_STORE}/scaffold.log",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/scaffold.log"
+  }
+}

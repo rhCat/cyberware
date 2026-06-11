@@ -1,0 +1,23 @@
+{
+  "_perk": "evaluate",
+  "sequence": [
+    "cws_evaluate"
+  ],
+  "tools": {
+    "cws_evaluate": {
+      "binary": "python3",
+      "params": {
+        "SKILL_NAME": "${SKILL_NAME}",
+        "SKILL_DESC": "${SKILL_DESC}"
+      }
+    }
+  },
+  "env": {
+    "SKILL_NAME": "${SKILL_NAME}",
+    "SKILL_DESC": "${SKILL_DESC}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "python3"
+  ]
+}
