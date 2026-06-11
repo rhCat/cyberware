@@ -12,6 +12,8 @@ inspection — it touches nothing it doesn't own.
 from __future__ import annotations
 import argparse, json, os, shutil, socket, sys
 
+from runlog import run_dir
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -35,21 +37,21 @@ def main():
     a = ap.parse_args()
     L = load(a.ledger)
     skill, perk = L["skill"], L["perk"]
-    store, vars = L.get("record_store", ""), L.get("vars", {})
+    store, vars = run_dir(L), L.get("vars", {})
     sd = skill_dir(skill)
     manifesto = load(os.path.join(sd, "perks", perk, "manifesto.json"))
     contract = load(os.path.join(sd, "perks", perk, "src", "contracts.json"))
     print(f"validator · skill={skill} perk={perk}")
     ok = True
 
-    # 1. record_store is (or can become) a writable dir
-    if is_placeholder(store):
-        ok &= check("record_store set", False, "still a placeholder")
-    elif os.path.isdir(store):
-        ok &= check("record_store writable", os.access(store, os.W_OK), store)
+    # 1. the run dir (record_store, or the ~/cyberware_run_logs default) is/can become a writable dir
+    if os.path.isdir(store):
+        ok &= check("run dir writable", os.access(store, os.W_OK), store)
     else:
-        parent = os.path.dirname(os.path.abspath(store)) or "."
-        ok &= check("record_store creatable", os.path.isdir(parent) and os.access(parent, os.W_OK), store)
+        anc = store
+        while anc and not os.path.isdir(anc):
+            anc = os.path.dirname(anc)
+        ok &= check("run dir creatable", bool(anc) and os.access(anc, os.W_OK), store)
 
     # 2. runtimes / required binaries reachable
     ok &= check("python3 reachable", shutil.which("python3") is not None)

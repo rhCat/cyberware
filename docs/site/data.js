@@ -203,7 +203,7 @@ window.SKILLS = [
      "ledger": {
       "skill": "ci-codeqc",
       "perk": "github_actions",
-      "record_store": "/tmp/ci-codeqc-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "PROJECT_DIR": "/path/to/repo",
        "SRC_DIR": "src",
@@ -212,7 +212,7 @@ window.SKILLS = [
        "BRANCH": "main"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=ci-codeqc perk=github_actions\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PROJECT_DIR=/path/to/repo SRC_DIR=src TEST_DIR=tests PYTHON_VERSION=3.12 BRANCH=main RECORD_STORE=/tmp/ci-codeqc-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/ci-codeqc/perks/github_actions/src\n\nstep1() {   # ci_github_actions\n  echo \"[step 1] ci_github_actions\"\n  bash \"$SNIP/ci_github_actions.sh\"\n  test -f \"${RECORD_STORE}/codeqc.yml\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/codeqc.yml\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tci_github_actions\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=ci-codeqc perk=github_actions\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PROJECT_DIR=/path/to/repo SRC_DIR=src TEST_DIR=tests PYTHON_VERSION=3.12 BRANCH=main RECORD_STORE=~/cyberware_run_logs/ci-codeqc__github_actions__3d975f19\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/ci-codeqc/perks/github_actions/src\n\nstep1() {   # ci_github_actions\n  echo \"[step 1] ci_github_actions\"\n  bash \"$SNIP/ci_github_actions.sh\"\n  test -f \"${RECORD_STORE}/codeqc.yml\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/codeqc.yml\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tci_github_actions\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]
@@ -425,14 +425,14 @@ window.SKILLS = [
      "ledger": {
       "skill": "codebaseqc",
       "perk": "audit",
-      "record_store": "/tmp/codebaseqc-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "PROJECT_DIR": "/path/to/repo",
        "SRC_DIR": "src",
        "TEST_DIR": "tests"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=codebaseqc perk=audit\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PROJECT_DIR=/path/to/repo SRC_DIR=src TEST_DIR=tests RECORD_STORE=/tmp/codebaseqc-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/codebaseqc/perks/audit/src\n\nstep1() {   # cbqc_usage\n  echo \"[step 1] cbqc_usage\"\n  bash \"$SNIP/cbqc_usage.sh\"\n}\n\nstep2() {   # cbqc_contract\n  echo \"[step 2] cbqc_contract\"\n  bash \"$SNIP/cbqc_contract.sh\"\n}\n\nstep3() {   # cbqc_coverage\n  echo \"[step 3] cbqc_coverage\"\n  bash \"$SNIP/cbqc_coverage.sh\"\n  test -f \"${RECORD_STORE}/coverage_gaps.json\" || { echo \"CONTRACT FAIL step 3: missing ${RECORD_STORE}/coverage_gaps.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tcbqc_usage\\n2\\tcbqc_contract\\n3\\tcbqc_coverage\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 && step2 && step3 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=codebaseqc perk=audit\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PROJECT_DIR=/path/to/repo SRC_DIR=src TEST_DIR=tests RECORD_STORE=~/cyberware_run_logs/codebaseqc__audit__54b887a4\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/codebaseqc/perks/audit/src\n\nstep1() {   # cbqc_usage\n  echo \"[step 1] cbqc_usage\"\n  bash \"$SNIP/cbqc_usage.sh\"\n}\n\nstep2() {   # cbqc_contract\n  echo \"[step 2] cbqc_contract\"\n  bash \"$SNIP/cbqc_contract.sh\"\n}\n\nstep3() {   # cbqc_coverage\n  echo \"[step 3] cbqc_coverage\"\n  bash \"$SNIP/cbqc_coverage.sh\"\n  test -f \"${RECORD_STORE}/coverage_gaps.json\" || { echo \"CONTRACT FAIL step 3: missing ${RECORD_STORE}/coverage_gaps.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tcbqc_usage\\n2\\tcbqc_contract\\n3\\tcbqc_coverage\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 && step2 && step3 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]
@@ -630,14 +630,14 @@ window.SKILLS = [
      "ledger": {
       "skill": "cws-addperk",
       "perk": "evaluate",
-      "record_store": "/tmp/cws-addperk-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "SKILL": "git_ops",
        "PERK": "push",
        "PERK_DESC": "push the current branch to a remote"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=cws-addperk perk=evaluate\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport SKILL=git_ops PERK=push PERK_DESC='push the current branch to a remote' RECORD_STORE=/tmp/cws-addperk-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/cws-addperk/perks/evaluate/src\n\nstep1() {   # addperk_eval\n  echo \"[step 1] addperk_eval\"\n  bash \"$SNIP/addperk_eval.sh\"\n  test -f \"${RECORD_STORE}/perk_eval.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/perk_eval.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\taddperk_eval\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=cws-addperk perk=evaluate\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport SKILL=git_ops PERK=push PERK_DESC='push the current branch to a remote' RECORD_STORE=~/cyberware_run_logs/cws-addperk__evaluate__b998bddc\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/cws-addperk/perks/evaluate/src\n\nstep1() {   # addperk_eval\n  echo \"[step 1] addperk_eval\"\n  bash \"$SNIP/addperk_eval.sh\"\n  test -f \"${RECORD_STORE}/perk_eval.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/perk_eval.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\taddperk_eval\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    },
    {
@@ -748,7 +748,7 @@ window.SKILLS = [
      "ledger": {
       "skill": "cws-addperk",
       "perk": "apply",
-      "record_store": "/tmp/cws-addperk-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "SKILL": "git_ops",
        "PERK": "push",
@@ -758,7 +758,7 @@ window.SKILLS = [
        "BASE": ""
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=cws-addperk perk=apply\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport SKILL=git_ops PERK=push PERK_DESC='push the current branch' TOOL=git_push BINARY=bash BASE='' RECORD_STORE=/tmp/cws-addperk-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/cws-addperk/perks/apply/src\n\nstep1() {   # addperk_branch\n  echo \"[step 1] addperk_branch\"\n  bash \"$SNIP/addperk_branch.sh\"\n}\n\nstep2() {   # addperk_formulate\n  echo \"[step 2] addperk_formulate\"\n  bash \"$SNIP/addperk_formulate.sh\"\n}\n\nstep3() {   # addperk_pr\n  echo \"[step 3] addperk_pr\"\n  bash \"$SNIP/addperk_pr.sh\"\n  test -f \"${RECORD_STORE}/pr.json\" || { echo \"CONTRACT FAIL step 3: missing ${RECORD_STORE}/pr.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\taddperk_branch\\n2\\taddperk_formulate\\n3\\taddperk_pr\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 && step2 && step3 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=cws-addperk perk=apply\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport SKILL=git_ops PERK=push PERK_DESC='push the current branch' TOOL=git_push BINARY=bash BASE='' RECORD_STORE=~/cyberware_run_logs/cws-addperk__apply__4961137a\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/cws-addperk/perks/apply/src\n\nstep1() {   # addperk_branch\n  echo \"[step 1] addperk_branch\"\n  bash \"$SNIP/addperk_branch.sh\"\n}\n\nstep2() {   # addperk_formulate\n  echo \"[step 2] addperk_formulate\"\n  bash \"$SNIP/addperk_formulate.sh\"\n}\n\nstep3() {   # addperk_pr\n  echo \"[step 3] addperk_pr\"\n  bash \"$SNIP/addperk_pr.sh\"\n  test -f \"${RECORD_STORE}/pr.json\" || { echo \"CONTRACT FAIL step 3: missing ${RECORD_STORE}/pr.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\taddperk_branch\\n2\\taddperk_formulate\\n3\\taddperk_pr\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 && step2 && step3 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]
@@ -948,13 +948,13 @@ window.SKILLS = [
      "ledger": {
       "skill": "cws-create",
       "perk": "evaluate",
-      "record_store": "/tmp/cws-create-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "SKILL_NAME": "pg-backup",
        "SKILL_DESC": "runs pg_dump to back up a Postgres database to a file"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=cws-create perk=evaluate\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport SKILL_NAME=pg-backup SKILL_DESC='runs pg_dump to back up a Postgres database to a file' RECORD_STORE=/tmp/cws-create-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/cws-create/perks/evaluate/src\n\nstep1() {   # cws_evaluate\n  echo \"[step 1] cws_evaluate\"\n  bash \"$SNIP/cws_evaluate.sh\"\n  test -f \"${RECORD_STORE}/evaluation.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/evaluation.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tcws_evaluate\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=cws-create perk=evaluate\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport SKILL_NAME=pg-backup SKILL_DESC='runs pg_dump to back up a Postgres database to a file' RECORD_STORE=~/cyberware_run_logs/cws-create__evaluate__6a10b519\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/cws-create/perks/evaluate/src\n\nstep1() {   # cws_evaluate\n  echo \"[step 1] cws_evaluate\"\n  bash \"$SNIP/cws_evaluate.sh\"\n  test -f \"${RECORD_STORE}/evaluation.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/evaluation.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tcws_evaluate\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    },
    {
@@ -1037,14 +1037,14 @@ window.SKILLS = [
      "ledger": {
       "skill": "cws-create",
       "perk": "scaffold",
-      "record_store": "/tmp/cws-create-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "NEW_SKILL": "pg_backup",
        "NEW_NAME": "Postgres backup",
        "PERKS": "dump:pg_dump:pg_dump"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=cws-create perk=scaffold\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport NEW_SKILL=pg_backup NEW_NAME='Postgres backup' PERKS=dump:pg_dump:pg_dump RECORD_STORE=/tmp/cws-create-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/cws-create/perks/scaffold/src\n\nstep1() {   # cws_scaffold\n  echo \"[step 1] cws_scaffold\"\n  bash \"$SNIP/cws_scaffold.sh\"\n  test -f \"${RECORD_STORE}/scaffold.log\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/scaffold.log\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tcws_scaffold\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=cws-create perk=scaffold\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport NEW_SKILL=pg_backup NEW_NAME='Postgres backup' PERKS=dump:pg_dump:pg_dump RECORD_STORE=~/cyberware_run_logs/cws-create__scaffold__6d22eda9\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/cws-create/perks/scaffold/src\n\nstep1() {   # cws_scaffold\n  echo \"[step 1] cws_scaffold\"\n  bash \"$SNIP/cws_scaffold.sh\"\n  test -f \"${RECORD_STORE}/scaffold.log\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/scaffold.log\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tcws_scaffold\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]
@@ -1227,12 +1227,12 @@ window.SKILLS = [
      "ledger": {
       "skill": "data",
       "perk": "csv2json",
-      "record_store": "/tmp/data-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "CSV_FILE": "/path/to/data.csv"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=data perk=csv2json\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport CSV_FILE=/path/to/data.csv RECORD_STORE=/tmp/data-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/data/perks/csv2json/src\n\nstep1() {   # data_csv2json\n  echo \"[step 1] data_csv2json\"\n  bash \"$SNIP/data_csv2json.sh\"\n  test -f \"${RECORD_STORE}/data.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/data.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tdata_csv2json\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=data perk=csv2json\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport CSV_FILE=/path/to/data.csv RECORD_STORE=~/cyberware_run_logs/data__csv2json__67c89ffa\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/data/perks/csv2json/src\n\nstep1() {   # data_csv2json\n  echo \"[step 1] data_csv2json\"\n  bash \"$SNIP/data_csv2json.sh\"\n  test -f \"${RECORD_STORE}/data.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/data.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tdata_csv2json\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    },
    {
@@ -1307,13 +1307,13 @@ window.SKILLS = [
      "ledger": {
       "skill": "data",
       "perk": "jq",
-      "record_store": "/tmp/data-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "JSON_FILE": "/path/to/in.json",
        "QUERY": ".items | length"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=data perk=jq\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport JSON_FILE=/path/to/in.json QUERY='.items | length' RECORD_STORE=/tmp/data-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/data/perks/jq/src\n\nstep1() {   # data_jq\n  echo \"[step 1] data_jq\"\n  bash \"$SNIP/data_jq.sh\"\n  test -f \"${RECORD_STORE}/jq_result.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/jq_result.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tdata_jq\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=data perk=jq\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport JSON_FILE=/path/to/in.json QUERY='.items | length' RECORD_STORE=~/cyberware_run_logs/data__jq__da68076c\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/data/perks/jq/src\n\nstep1() {   # data_jq\n  echo \"[step 1] data_jq\"\n  bash \"$SNIP/data_jq.sh\"\n  test -f \"${RECORD_STORE}/jq_result.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/jq_result.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tdata_jq\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]
@@ -1528,7 +1528,7 @@ window.SKILLS = [
      "ledger": {
       "skill": "datadog",
       "perk": "github_ci",
-      "record_store": "/tmp/datadog-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "PROJECT_DIR": "/path/to/repo",
        "SERVICE": "my-app",
@@ -1538,7 +1538,7 @@ window.SKILLS = [
        "BRANCH": "main"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=datadog perk=github_ci\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PROJECT_DIR=/path/to/repo SERVICE=my-app TEST_CMD='pytest --junitxml=junit.xml' JUNIT_PATH=junit.xml DD_SITE=datadoghq.com BRANCH=main RECORD_STORE=/tmp/datadog-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/datadog/perks/github_ci/src\n\nstep1() {   # datadog_github_ci\n  echo \"[step 1] datadog_github_ci\"\n  bash \"$SNIP/datadog_github_ci.sh\"\n  test -f \"${RECORD_STORE}/datadog-ci.yml\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/datadog-ci.yml\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tdatadog_github_ci\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=datadog perk=github_ci\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PROJECT_DIR=/path/to/repo SERVICE=my-app TEST_CMD='pytest --junitxml=junit.xml' JUNIT_PATH=junit.xml DD_SITE=datadoghq.com BRANCH=main RECORD_STORE=~/cyberware_run_logs/datadog__github_ci__cd4dcb1c\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/datadog/perks/github_ci/src\n\nstep1() {   # datadog_github_ci\n  echo \"[step 1] datadog_github_ci\"\n  bash \"$SNIP/datadog_github_ci.sh\"\n  test -f \"${RECORD_STORE}/datadog-ci.yml\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/datadog-ci.yml\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tdatadog_github_ci\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]
@@ -1733,14 +1733,14 @@ window.SKILLS = [
      "ledger": {
       "skill": "docker",
       "perk": "build",
-      "record_store": "/tmp/docker-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "CONTEXT_DIR": ".",
        "IMAGE_TAG": "myapp:dev",
        "DOCKERFILE": ""
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=docker perk=build\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport CONTEXT_DIR=. IMAGE_TAG=myapp:dev DOCKERFILE='' RECORD_STORE=/tmp/docker-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/docker/perks/build/src\n\nstep1() {   # docker_build\n  echo \"[step 1] docker_build\"\n  bash \"$SNIP/docker_build.sh\"\n  test -f \"${RECORD_STORE}/docker_build.log\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/docker_build.log\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tdocker_build\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=docker perk=build\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport CONTEXT_DIR=. IMAGE_TAG=myapp:dev DOCKERFILE='' RECORD_STORE=~/cyberware_run_logs/docker__build__bce23c40\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/docker/perks/build/src\n\nstep1() {   # docker_build\n  echo \"[step 1] docker_build\"\n  bash \"$SNIP/docker_build.sh\"\n  test -f \"${RECORD_STORE}/docker_build.log\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/docker_build.log\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tdocker_build\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    },
    {
@@ -1807,12 +1807,12 @@ window.SKILLS = [
      "ledger": {
       "skill": "docker",
       "perk": "ps",
-      "record_store": "/tmp/docker-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "ALL": ""
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=docker perk=ps\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport ALL='' RECORD_STORE=/tmp/docker-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/docker/perks/ps/src\n\nstep1() {   # docker_ps\n  echo \"[step 1] docker_ps\"\n  bash \"$SNIP/docker_ps.sh\"\n  test -f \"${RECORD_STORE}/containers.txt\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/containers.txt\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tdocker_ps\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=docker perk=ps\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport ALL='' RECORD_STORE=~/cyberware_run_logs/docker__ps__8ae48ec6\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/docker/perks/ps/src\n\nstep1() {   # docker_ps\n  echo \"[step 1] docker_ps\"\n  bash \"$SNIP/docker_ps.sh\"\n  test -f \"${RECORD_STORE}/containers.txt\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/containers.txt\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tdocker_ps\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]
@@ -1994,12 +1994,12 @@ window.SKILLS = [
      "ledger": {
       "skill": "fs",
       "perk": "archive",
-      "record_store": "/tmp/fs-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "SOURCE_DIR": "/path/to/dir"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=fs perk=archive\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport SOURCE_DIR=/path/to/dir RECORD_STORE=/tmp/fs-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/fs/perks/archive/src\n\nstep1() {   # fs_archive\n  echo \"[step 1] fs_archive\"\n  bash \"$SNIP/fs_archive.sh\"\n  test -f \"${RECORD_STORE}/archive.tar.gz\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/archive.tar.gz\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tfs_archive\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=fs perk=archive\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport SOURCE_DIR=/path/to/dir RECORD_STORE=~/cyberware_run_logs/fs__archive__15619e00\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/fs/perks/archive/src\n\nstep1() {   # fs_archive\n  echo \"[step 1] fs_archive\"\n  bash \"$SNIP/fs_archive.sh\"\n  test -f \"${RECORD_STORE}/archive.tar.gz\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/archive.tar.gz\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tfs_archive\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    },
    {
@@ -2074,13 +2074,13 @@ window.SKILLS = [
      "ledger": {
       "skill": "fs",
       "perk": "find_large",
-      "record_store": "/tmp/fs-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "SEARCH_DIR": "/var/log",
        "MIN_SIZE": ""
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=fs perk=find_large\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport SEARCH_DIR=/var/log MIN_SIZE='' RECORD_STORE=/tmp/fs-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/fs/perks/find_large/src\n\nstep1() {   # fs_find_large\n  echo \"[step 1] fs_find_large\"\n  bash \"$SNIP/fs_find_large.sh\"\n  test -f \"${RECORD_STORE}/large_files.txt\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/large_files.txt\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tfs_find_large\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=fs perk=find_large\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport SEARCH_DIR=/var/log MIN_SIZE='' RECORD_STORE=~/cyberware_run_logs/fs__find_large__b79dc3d4\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/fs/perks/find_large/src\n\nstep1() {   # fs_find_large\n  echo \"[step 1] fs_find_large\"\n  bash \"$SNIP/fs_find_large.sh\"\n  test -f \"${RECORD_STORE}/large_files.txt\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/large_files.txt\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tfs_find_large\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]
@@ -2269,13 +2269,13 @@ window.SKILLS = [
      "ledger": {
       "skill": "git_ops",
       "perk": "snapshot",
-      "record_store": "/tmp/git_ops-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "REPO_DIR": "/path/to/repo",
        "MESSAGE": "checkpoint"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=git_ops perk=snapshot\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport REPO_DIR=/path/to/repo MESSAGE=checkpoint RECORD_STORE=/tmp/git_ops-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/git_ops/perks/snapshot/src\n\nstep1() {   # git_snapshot\n  echo \"[step 1] git_snapshot\"\n  bash \"$SNIP/git_snapshot.sh\"\n  test -f \"${RECORD_STORE}/git_snapshot.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/git_snapshot.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tgit_snapshot\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=git_ops perk=snapshot\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport REPO_DIR=/path/to/repo MESSAGE=checkpoint RECORD_STORE=~/cyberware_run_logs/git_ops__snapshot__5f789022\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/git_ops/perks/snapshot/src\n\nstep1() {   # git_snapshot\n  echo \"[step 1] git_snapshot\"\n  bash \"$SNIP/git_snapshot.sh\"\n  test -f \"${RECORD_STORE}/git_snapshot.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/git_snapshot.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tgit_snapshot\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    },
    {
@@ -2343,12 +2343,12 @@ window.SKILLS = [
      "ledger": {
       "skill": "git_ops",
       "perk": "status",
-      "record_store": "/tmp/git_ops-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "REPO_DIR": "/path/to/repo"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=git_ops perk=status\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport REPO_DIR=/path/to/repo RECORD_STORE=/tmp/git_ops-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/git_ops/perks/status/src\n\nstep1() {   # git_status\n  echo \"[step 1] git_status\"\n  bash \"$SNIP/git_status.sh\"\n  test -f \"${RECORD_STORE}/git_status.txt\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/git_status.txt\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tgit_status\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=git_ops perk=status\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport REPO_DIR=/path/to/repo RECORD_STORE=~/cyberware_run_logs/git_ops__status__49c86a9d\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/git_ops/perks/status/src\n\nstep1() {   # git_status\n  echo \"[step 1] git_status\"\n  bash \"$SNIP/git_status.sh\"\n  test -f \"${RECORD_STORE}/git_status.txt\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/git_status.txt\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tgit_status\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]
@@ -2536,13 +2536,13 @@ window.SKILLS = [
      "ledger": {
       "skill": "http",
       "perk": "get",
-      "record_store": "/tmp/http-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "URL": "https://api.example.com/v1/x",
        "HEADER": ""
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=http perk=get\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport URL=https://api.example.com/v1/x HEADER='' RECORD_STORE=/tmp/http-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/http/perks/get/src\n\nstep1() {   # http_get\n  echo \"[step 1] http_get\"\n  bash \"$SNIP/http_get.sh\"\n  test -f \"${RECORD_STORE}/response.body\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/response.body\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\thttp_get\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=http perk=get\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport URL=https://api.example.com/v1/x HEADER='' RECORD_STORE=~/cyberware_run_logs/http__get__cc0128ce\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/http/perks/get/src\n\nstep1() {   # http_get\n  echo \"[step 1] http_get\"\n  bash \"$SNIP/http_get.sh\"\n  test -f \"${RECORD_STORE}/response.body\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/response.body\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\thttp_get\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    },
    {
@@ -2618,13 +2618,13 @@ window.SKILLS = [
      "ledger": {
       "skill": "http",
       "perk": "post",
-      "record_store": "/tmp/http-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "URL": "https://api.example.com/v1/x",
        "BODY": "a JSON string"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=http perk=post\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport URL=https://api.example.com/v1/x BODY='a JSON string' RECORD_STORE=/tmp/http-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/http/perks/post/src\n\nstep1() {   # http_post\n  echo \"[step 1] http_post\"\n  bash \"$SNIP/http_post.sh\"\n  test -f \"${RECORD_STORE}/response.body\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/response.body\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\thttp_post\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=http perk=post\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport URL=https://api.example.com/v1/x BODY='a JSON string' RECORD_STORE=~/cyberware_run_logs/http__post__562e7b76\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/http/perks/post/src\n\nstep1() {   # http_post\n  echo \"[step 1] http_post\"\n  bash \"$SNIP/http_post.sh\"\n  test -f \"${RECORD_STORE}/response.body\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/response.body\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\thttp_post\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]
@@ -2812,13 +2812,13 @@ window.SKILLS = [
      "ledger": {
       "skill": "net",
       "perk": "healthcheck",
-      "record_store": "/tmp/net-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "URL": "https://example.com/health",
        "TIMEOUT": "10"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=net perk=healthcheck\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport URL=https://example.com/health TIMEOUT=10 RECORD_STORE=/tmp/net-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/net/perks/healthcheck/src\n\nstep1() {   # net_healthcheck\n  echo \"[step 1] net_healthcheck\"\n  bash \"$SNIP/net_healthcheck.sh\"\n  test -f \"${RECORD_STORE}/healthcheck.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/healthcheck.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tnet_healthcheck\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=net perk=healthcheck\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport URL=https://example.com/health TIMEOUT=10 RECORD_STORE=~/cyberware_run_logs/net__healthcheck__1f8da32c\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/net/perks/healthcheck/src\n\nstep1() {   # net_healthcheck\n  echo \"[step 1] net_healthcheck\"\n  bash \"$SNIP/net_healthcheck.sh\"\n  test -f \"${RECORD_STORE}/healthcheck.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/healthcheck.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tnet_healthcheck\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    },
    {
@@ -2888,12 +2888,12 @@ window.SKILLS = [
      "ledger": {
       "skill": "net",
       "perk": "dns",
-      "record_store": "/tmp/net-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "HOST": "example.com"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=net perk=dns\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport HOST=example.com RECORD_STORE=/tmp/net-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/net/perks/dns/src\n\nstep1() {   # net_dns\n  echo \"[step 1] net_dns\"\n  bash \"$SNIP/net_dns.sh\"\n  test -f \"${RECORD_STORE}/dns.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/dns.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tnet_dns\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=net perk=dns\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport HOST=example.com RECORD_STORE=~/cyberware_run_logs/net__dns__81ee6c24\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/net/perks/dns/src\n\nstep1() {   # net_dns\n  echo \"[step 1] net_dns\"\n  bash \"$SNIP/net_dns.sh\"\n  test -f \"${RECORD_STORE}/dns.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/dns.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tnet_dns\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]
@@ -3100,7 +3100,7 @@ window.SKILLS = [
      "ledger": {
       "skill": "pg_ops",
       "perk": "select",
-      "record_store": "/tmp/pg_ops-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "PGHOST": "localhost",
        "PGPORT": "5432",
@@ -3108,7 +3108,7 @@ window.SKILLS = [
        "PGUSER": "reader"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=pg_ops perk=select\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PGHOST=localhost PGPORT=5432 PGDATABASE=demo PGUSER=reader RECORD_STORE=/tmp/pg_ops-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/pg_ops/perks/select/src\n\nstep1() {   # psql_select\n  echo \"[step 1] psql_select\"\n  bash \"$SNIP/psql_select.sh\"\n  test -f \"${RECORD_STORE}/select_rows.csv\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/select_rows.csv\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tpsql_select\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=pg_ops perk=select\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PGHOST=localhost PGPORT=5432 PGDATABASE=demo PGUSER=reader RECORD_STORE=~/cyberware_run_logs/pg_ops__select__ed2ea95b\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/pg_ops/perks/select/src\n\nstep1() {   # psql_select\n  echo \"[step 1] psql_select\"\n  bash \"$SNIP/psql_select.sh\"\n  test -f \"${RECORD_STORE}/select_rows.csv\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/select_rows.csv\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tpsql_select\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    },
    {
@@ -3196,7 +3196,7 @@ window.SKILLS = [
      "ledger": {
       "skill": "pg_ops",
       "perk": "migrate",
-      "record_store": "/tmp/pg_ops-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "PGHOST": "localhost",
        "PGPORT": "5432",
@@ -3204,7 +3204,7 @@ window.SKILLS = [
        "PGUSER": "admin"
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=pg_ops perk=migrate\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PGHOST=localhost PGPORT=5432 PGDATABASE=demo PGUSER=admin RECORD_STORE=/tmp/pg_ops-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/pg_ops/perks/migrate/src\n\nstep1() {   # psql_migrate\n  echo \"[step 1] psql_migrate\"\n  bash \"$SNIP/psql_migrate.sh\"\n  test -f \"${RECORD_STORE}/migrate_applied.log\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/migrate_applied.log\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tpsql_migrate\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=pg_ops perk=migrate\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PGHOST=localhost PGPORT=5432 PGDATABASE=demo PGUSER=admin RECORD_STORE=~/cyberware_run_logs/pg_ops__migrate__2228c072\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/pg_ops/perks/migrate/src\n\nstep1() {   # psql_migrate\n  echo \"[step 1] psql_migrate\"\n  bash \"$SNIP/psql_migrate.sh\"\n  test -f \"${RECORD_STORE}/migrate_applied.log\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/migrate_applied.log\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tpsql_migrate\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]
@@ -3398,14 +3398,14 @@ window.SKILLS = [
      "ledger": {
       "skill": "py_qc",
       "perk": "test",
-      "record_store": "/tmp/py_qc-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "PROJECT_DIR": "/path/to/proj",
        "TEST_DIR": "tests",
        "PYTEST_ARGS": ""
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=py_qc perk=test\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PROJECT_DIR=/path/to/proj TEST_DIR=tests PYTEST_ARGS='' RECORD_STORE=/tmp/py_qc-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/py_qc/perks/test/src\n\nstep1() {   # py_test\n  echo \"[step 1] py_test\"\n  bash \"$SNIP/py_test.sh\"\n  test -f \"${RECORD_STORE}/pytest.out\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/pytest.out\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tpy_test\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=py_qc perk=test\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PROJECT_DIR=/path/to/proj TEST_DIR=tests PYTEST_ARGS='' RECORD_STORE=~/cyberware_run_logs/py_qc__test__0c2cd980\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/py_qc/perks/test/src\n\nstep1() {   # py_test\n  echo \"[step 1] py_test\"\n  bash \"$SNIP/py_test.sh\"\n  test -f \"${RECORD_STORE}/pytest.out\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/pytest.out\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tpy_test\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    },
    {
@@ -3479,13 +3479,13 @@ window.SKILLS = [
      "ledger": {
       "skill": "py_qc",
       "perk": "lint",
-      "record_store": "/tmp/py_qc-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "PROJECT_DIR": "/path/to/proj",
        "LINT_TARGET": ""
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=py_qc perk=lint\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PROJECT_DIR=/path/to/proj LINT_TARGET='' RECORD_STORE=/tmp/py_qc-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/py_qc/perks/lint/src\n\nstep1() {   # py_lint\n  echo \"[step 1] py_lint\"\n  bash \"$SNIP/py_lint.sh\"\n  test -f \"${RECORD_STORE}/lint.out\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/lint.out\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tpy_lint\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=py_qc perk=lint\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PROJECT_DIR=/path/to/proj LINT_TARGET='' RECORD_STORE=~/cyberware_run_logs/py_qc__lint__2441018f\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/py_qc/perks/lint/src\n\nstep1() {   # py_lint\n  echo \"[step 1] py_lint\"\n  bash \"$SNIP/py_lint.sh\"\n  test -f \"${RECORD_STORE}/lint.out\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/lint.out\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tpy_lint\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]
@@ -3681,14 +3681,14 @@ window.SKILLS = [
      "ledger": {
       "skill": "release",
       "perk": "tag",
-      "record_store": "/tmp/release-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "REPO_DIR": "/path/to/repo",
        "VERSION": "v1.2.0",
        "MESSAGE": ""
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=release perk=tag\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport REPO_DIR=/path/to/repo VERSION=v1.2.0 MESSAGE='' RECORD_STORE=/tmp/release-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/release/perks/tag/src\n\nstep1() {   # release_tag\n  echo \"[step 1] release_tag\"\n  bash \"$SNIP/release_tag.sh\"\n  test -f \"${RECORD_STORE}/release_tag.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/release_tag.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\trelease_tag\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=release perk=tag\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport REPO_DIR=/path/to/repo VERSION=v1.2.0 MESSAGE='' RECORD_STORE=~/cyberware_run_logs/release__tag__6a59b14d\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/release/perks/tag/src\n\nstep1() {   # release_tag\n  echo \"[step 1] release_tag\"\n  bash \"$SNIP/release_tag.sh\"\n  test -f \"${RECORD_STORE}/release_tag.json\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/release_tag.json\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\trelease_tag\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]
@@ -3877,13 +3877,13 @@ window.SKILLS = [
      "ledger": {
       "skill": "search",
       "perk": "grep",
-      "record_store": "/tmp/search-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "PATTERN": "TODO",
        "SEARCH_DIR": "."
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=search perk=grep\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PATTERN=TODO SEARCH_DIR=. RECORD_STORE=/tmp/search-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/search/perks/grep/src\n\nstep1() {   # search_grep\n  echo \"[step 1] search_grep\"\n  bash \"$SNIP/search_grep.sh\"\n  test -f \"${RECORD_STORE}/matches.txt\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/matches.txt\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tsearch_grep\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=search perk=grep\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport PATTERN=TODO SEARCH_DIR=. RECORD_STORE=~/cyberware_run_logs/search__grep__6dc94da2\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/search/perks/grep/src\n\nstep1() {   # search_grep\n  echo \"[step 1] search_grep\"\n  bash \"$SNIP/search_grep.sh\"\n  test -f \"${RECORD_STORE}/matches.txt\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/matches.txt\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tsearch_grep\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    },
    {
@@ -3958,13 +3958,13 @@ window.SKILLS = [
      "ledger": {
       "skill": "search",
       "perk": "loc",
-      "record_store": "/tmp/search-demo",
+      "record_store": "<default: ~/cyberware_run_logs>",
       "vars": {
        "SEARCH_DIR": ".",
        "EXT": ""
       }
      },
-     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=search perk=loc\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport SEARCH_DIR=. EXT='' RECORD_STORE=/tmp/search-demo\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/search/perks/loc/src\n\nstep1() {   # search_loc\n  echo \"[step 1] search_loc\"\n  bash \"$SNIP/search_loc.sh\"\n  test -f \"${RECORD_STORE}/loc.txt\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/loc.txt\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tsearch_loc\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
+     "compiled": "#!/usr/bin/env bash\n# COMPILED by cyberware \u00b7 skill=search perk=loc\n# Run ONLY through executor.py \u2014 it is the governed channel. Proven-pathway snippets live in the registry.\nset -uo pipefail\nexport SEARCH_DIR=. EXT='' RECORD_STORE=~/cyberware_run_logs/search__loc__da3c4b5f\nmkdir -p \"$RECORD_STORE\"\nSNIP=skills/search/perks/loc/src\n\nstep1() {   # search_loc\n  echo \"[step 1] search_loc\"\n  bash \"$SNIP/search_loc.sh\"\n  test -f \"${RECORD_STORE}/loc.txt\" || { echo \"CONTRACT FAIL step 1: missing ${RECORD_STORE}/loc.txt\" >&2; exit 3; }\n}\n\ncase \"${1:-}\" in\n  --list) printf \"1\\tsearch_loc\\n\" ;;\n  --step) shift; \"step${1:?step number}\" ;;\n  --all) step1 ;;\n  *) echo \"usage: $0 --list | --step <N> | --all\" >&2; exit 2 ;;\nesac\n"
     }
    }
   ]
@@ -3974,7 +3974,7 @@ window.DOCS = [
  {
   "id": "operate",
   "label": "Operate",
-  "body": "# cyberware \u2014 operating guide for the agent\n\n> **This is the governing document.** If you are an agent (an LLM) using cyberware, read this first.\n> It tells you how to run skills through the governed channel \u2014 and what you must never do.\n\n## The model \u2014 you propose, the framework governs\n\ncyberware is a **verifiable governance runtime for skill execution**. You do **not** run commands\nad-hoc. You write a small JSON form \u2014 a **task-ledger** \u2014 that names a **skill**, a **perk**, and the\ninputs, and the framework **validates \u2192 composes \u2192 compiles \u2192 oversees \u2192 executes** it.\n**`infra/executor.py` is the only channel that runs.** The runtime *is* the rule: bypass it and you\nleave a visible gap (an unrecorded run, a tamper mismatch, a skipped step).\n\n## The one rule\n\nChannel **all** execution through `infra/executor.py`. Never:\n\n- run a snippet (`skills/<skill>/perks/<perk>/src/<tool>.sh`) directly;\n- edit a compiled `run.sh` to slip past a contract \u2014 the `.bk` tamper-check snapshots it on first run\n  and **refuses** on drift;\n- skip a stage, or run a step whose upstream steps have not run (the executor refuses).\n\nIf a task needs a destructive action, it **pushes back at oversight**; it proceeds only with an\nexplicit, logged `--approve`.\n\n## How to run a skill \u2014 the loop\n\n**1. Pick a skill + perk.** Browse `skills/`, or the [dashboard](https://rhcat.github.io/cyberware/).\nRead the skill's `SKILL.md` and the perk's `perks/<perk>/metadata.json` (rules \u00b7 usage \u00b7 limitation \u00b7\nminimal_example) to learn the inputs.\n\n**2. Write the task-ledger** \u2014 copy `skills/<skill>/ledger.json` \u2192 `task-ledger.json` and fill only\nthese fields:\n\n```json\n{\n  \"skill\": \"<skill>\",\n  \"perk\": \"<perk>\",\n  \"record_store\": \"<absolute dir for outputs + the run-ledger>\",\n  \"vars\": { \"...\": \"the vars the perk's manifesto declares\" }\n}\n```\n\n**3. Run the pipeline** (in order):\n\n```sh\nL=task-ledger.json\npython3 infra/validator.py --ledger \"$L\"                 # claims real?\npython3 infra/composer.py  --ledger \"$L\"                 # L++ -> TLC: no deadlock\npython3 infra/compiler.py  --ledger \"$L\" -o run.sh       # -> step-wise bash (+ run.{drawio,svg})\npython3 infra/oversight.py --script run.sh               # OVERSIGHT_RULE (push back on danger)\npython3 infra/executor.py  --script run.sh --all         # THE governed run (the ONLY channel)\n```\n\n**4. Read the result.** Each tool prints **one line of structured JSON** (the audit + debug log); every\nstep is appended to `run-ledger.json` under your `record_store` as it runs.\n\n## What each stage enforces\n\n| stage | enforces |\n|---|---|\n| `validator` | record_store writable \u00b7 runtimes + required binaries reachable \u00b7 required vars present |\n| `composer` | the L++ blueprint cannot deadlock (TLC, with a structural fallback) |\n| `compiler` | the perk's tool sequence + contracts \u2192 one step-wise bash; each tool a gated step + its contract check |\n| `oversight` | the script clears `OVERSIGHT_RULE`; destructive/dangerous patterns push back unless `--approve`d |\n| `executor` | `.bk` tamper-check \u00b7 upstream-step gate \u00b7 run-ledger provenance. **THE channel.** |\n\n## Growing the registry \u2014 use the internals, don't hand-roll\n\n- **A new skill?** Run **`cws-create/evaluate`** first. It classifies the idea: **execution** (a\n  deterministic tool/pathway \u2014 fits cyberware), **design** (taste/aesthetics \u2014 *not* the emphasis; keep\n  it as guidance), **transformable** (extract the execution core). Only execution skills belong. Then\n  **`cws-create/scaffold`** lays down the skeleton.\n- **A new perk for an existing skill?** Use **`cws-addperk`** \u2014 `evaluate` (exists? generalizable?\n  scope?) \u2192 `apply` (branch \u2192 formulate + validate \u2192 open a PR). **The merge is never automatic** \u2014 you\n  review and merge on approval.\n\n## The boundary\n\nBuild **tool skills** \u2014 operational pathways (query, fetch, build, scan, archive, tag, \u2026). **Not**\n**design / taste skills** (palette, typography, \"no purple fade\"). cyberware governs *deterministic\nexecution*, not aesthetics. A taste skill stays guidance; it does not become a governed pathway.\n\n## Anatomy + conventions\n\nA skill is `skills/<skill>/`:\n\n```\nSKILL.md       context for you \u2014 what it does, what to watch, which logs to check\nblueprint.json the L++ lifecycle: ready \u2192 prepared \u2192 verified \u2192 executed  (executed = terminal)\nperks.json     the proven pathways (id \u00b7 summary \u00b7 tools \u00b7 destructive?)\nledger.json    the FORM you fill \u2192 task-ledger.json\nperks/<perk>/\n  metadata.json   rules \u00b7 usage \u00b7 limitation \u00b7 minimal_example\n  manifesto.json  the ${VAR} template: sequence (tool order) \u00b7 tools \u00b7 env \u00b7 requires\n  src/contracts.json   the tool's I/O + checks\n  src/<tool>.sh        the entry point (bash-core logic here; other-language core = standalone file + thin porter)\n```\n\n- **The `.sh` is the entry point.** Bash-core logic lives in it; for Python (etc.) keep the core a\n  standalone `<tool>.py` behind a thin `.sh` porter \u2014 never bury logic in a `<<'PY'` heredoc.\n- **Structured JSON output is the contract surface** \u2014 the executor records its hash for tamper-evidence.\n- **Recording is part of executing** \u2014 each step is written to the run-ledger *as it runs*, which is why\n  the lifecycle ends at `executed`, not a separate `recorded`.\n\n## More\n\n[`docs/architecture.md`](docs/architecture.md) \u00b7 [`docs/authoring.md`](docs/authoring.md) \u00b7\n[`docs/skills.md`](docs/skills.md) \u00b7 [`docs/SPEC.md`](docs/SPEC.md) \u00b7 the live\n[dashboard](https://rhcat.github.io/cyberware/) (blueprints, perk flows, contracts, code).\n"
+  "body": "# cyberware \u2014 operating guide for the agent\n\n> **This is the governing document.** If you are an agent (an LLM) using cyberware, read this first.\n> It tells you how to run skills through the governed channel \u2014 and what you must never do.\n\n## The model \u2014 you propose, the framework governs\n\ncyberware is a **verifiable governance runtime for skill execution**. You do **not** run commands\nad-hoc. You write a small JSON form \u2014 a **task-ledger** \u2014 that names a **skill**, a **perk**, and the\ninputs, and the framework **validates \u2192 composes \u2192 compiles \u2192 oversees \u2192 executes** it.\n**`infra/executor.py` is the only channel that runs.** The runtime *is* the rule: bypass it and you\nleave a visible gap (an unrecorded run, a tamper mismatch, a skipped step).\n\n## The one rule\n\nChannel **all** execution through `infra/executor.py`. Never:\n\n- run a snippet (`skills/<skill>/perks/<perk>/src/<tool>.sh`) directly;\n- edit a compiled `run.sh` to slip past a contract \u2014 the `.bk` tamper-check snapshots it on first run\n  and **refuses** on drift;\n- skip a stage, or run a step whose upstream steps have not run (the executor refuses).\n\nIf a task needs a destructive action, it **pushes back at oversight**; it proceeds only with an\nexplicit, logged `--approve`.\n\n## How to run a skill \u2014 the loop\n\n**1. Pick a skill + perk.** Browse `skills/`, or the [dashboard](https://rhcat.github.io/cyberware/).\nRead the skill's `SKILL.md` and the perk's `perks/<perk>/metadata.json` (rules \u00b7 usage \u00b7 limitation \u00b7\nminimal_example) to learn the inputs.\n\n**2. Write the task-ledger** \u2014 copy `skills/<skill>/ledger.json` \u2192 `task-ledger.json` and fill only\nthese fields:\n\n```json\n{\n  \"skill\": \"<skill>\",\n  \"perk\": \"<perk>\",\n  \"record_store\": \"<absolute dir for outputs + the run-ledger>\",\n  \"vars\": { \"...\": \"the vars the perk's manifesto declares\" }\n}\n```\n\n**3. Run the pipeline** (in order). With a default `record_store` and no `-o`, every artifact for the run\nis grouped under **`~/cyberware_run_logs/<skill>__<perk>__<id>/`** \u2014 the compiler prints that run dir, or\nresolve it yourself with `runlog.py`:\n\n```sh\nL=task-ledger.json\nRUN=$(python3 infra/runlog.py --ledger \"$L\")             # the grouped run dir\npython3 infra/validator.py --ledger \"$L\"                 # claims real?\npython3 infra/composer.py  --ledger \"$L\"                 # L++ -> TLC: no deadlock\npython3 infra/compiler.py  --ledger \"$L\"                 # writes $RUN/run.sh (+ run.{drawio,svg})\npython3 infra/oversight.py --script \"$RUN/run.sh\"        # OVERSIGHT_RULE (push back on danger)\npython3 infra/executor.py  --script \"$RUN/run.sh\" --all  # THE governed run (the ONLY channel)\n```\n\n**4. Read the result.** Everything for the run lands in `$RUN/`: `run.sh` \u00b7 `run.{drawio,svg}` \u00b7\n`.run.sh.bk` (tamper snapshot) \u00b7 `run-ledger.json` (the provenance log, appended as each step runs) \u00b7 the\ntool outputs \u00b7 and a `task-ledger.json` whose **`run`** field points to the **outputs** and **logs**. Each\ntool also prints one line of structured JSON. Set `record_store` explicitly to override the location;\n`$CYBERWARE_RUN_LOGS` moves the root. **Don't scatter run artifacts in /tmp** \u2014 they belong, grouped,\nunder the run-logs root.\n\n## What each stage enforces\n\n| stage | enforces |\n|---|---|\n| `validator` | record_store writable \u00b7 runtimes + required binaries reachable \u00b7 required vars present |\n| `composer` | the L++ blueprint cannot deadlock (TLC, with a structural fallback) |\n| `compiler` | the perk's tool sequence + contracts \u2192 one step-wise bash; each tool a gated step + its contract check |\n| `oversight` | the script clears `OVERSIGHT_RULE`; destructive/dangerous patterns push back unless `--approve`d |\n| `executor` | `.bk` tamper-check \u00b7 upstream-step gate \u00b7 run-ledger provenance. **THE channel.** |\n\n## Growing the registry \u2014 use the internals, don't hand-roll\n\n- **A new skill?** Run **`cws-create/evaluate`** first. It classifies the idea: **execution** (a\n  deterministic tool/pathway \u2014 fits cyberware), **design** (taste/aesthetics \u2014 *not* the emphasis; keep\n  it as guidance), **transformable** (extract the execution core). Only execution skills belong. Then\n  **`cws-create/scaffold`** lays down the skeleton.\n- **A new perk for an existing skill?** Use **`cws-addperk`** \u2014 `evaluate` (exists? generalizable?\n  scope?) \u2192 `apply` (branch \u2192 formulate + validate \u2192 open a PR). **The merge is never automatic** \u2014 you\n  review and merge on approval.\n\n## The boundary\n\nBuild **tool skills** \u2014 operational pathways (query, fetch, build, scan, archive, tag, \u2026). **Not**\n**design / taste skills** (palette, typography, \"no purple fade\"). cyberware governs *deterministic\nexecution*, not aesthetics. A taste skill stays guidance; it does not become a governed pathway.\n\n## Anatomy + conventions\n\nA skill is `skills/<skill>/`:\n\n```\nSKILL.md       context for you \u2014 what it does, what to watch, which logs to check\nblueprint.json the L++ lifecycle: ready \u2192 prepared \u2192 verified \u2192 executed  (executed = terminal)\nperks.json     the proven pathways (id \u00b7 summary \u00b7 tools \u00b7 destructive?)\nledger.json    the FORM you fill \u2192 task-ledger.json\nperks/<perk>/\n  metadata.json   rules \u00b7 usage \u00b7 limitation \u00b7 minimal_example\n  manifesto.json  the ${VAR} template: sequence (tool order) \u00b7 tools \u00b7 env \u00b7 requires\n  src/contracts.json   the tool's I/O + checks\n  src/<tool>.sh        the entry point (bash-core logic here; other-language core = standalone file + thin porter)\n```\n\n- **The `.sh` is the entry point.** Bash-core logic lives in it; for Python (etc.) keep the core a\n  standalone `<tool>.py` behind a thin `.sh` porter \u2014 never bury logic in a `<<'PY'` heredoc.\n- **Structured JSON output is the contract surface** \u2014 the executor records its hash for tamper-evidence.\n- **Recording is part of executing** \u2014 each step is written to the run-ledger *as it runs*, which is why\n  the lifecycle ends at `executed`, not a separate `recorded`.\n\n## More\n\n[`docs/architecture.md`](docs/architecture.md) \u00b7 [`docs/authoring.md`](docs/authoring.md) \u00b7\n[`docs/skills.md`](docs/skills.md) \u00b7 [`docs/SPEC.md`](docs/SPEC.md) \u00b7 the live\n[dashboard](https://rhcat.github.io/cyberware/) (blueprints, perk flows, contracts, code).\n"
  },
  {
   "id": "architecture",
