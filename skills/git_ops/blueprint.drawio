@@ -1,0 +1,19 @@
+<mxfile host="cyberware">
+  <diagram name="git_ops">
+    <mxGraphModel dx="900" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="s_ready" value="ready&#10;task-ledger submitted, nothing run" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=6;spacingTop=4;fontSize=11;" vertex="1" parent="1"><mxGeometry x="40" y="40" width="200" height="72" as="geometry"/></mxCell>
+        <mxCell id="s_prepared" value="prepared&#10;inputs validated — required vars present, runtime + store ready" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left;verticalAlign=top;spacing=6;spacingTop=4;fontSize=11;" vertex="1" parent="1"><mxGeometry x="40" y="172" width="200" height="72" as="geometry"/></mxCell>
+        <mxCell id="s_operated" value="operated&#10;the chosen perk&#x27;s tool sequence ran — ONLY via executor.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left;verticalAlign=top;spacing=6;spacingTop=4;fontSize=11;" vertex="1" parent="1"><mxGeometry x="40" y="304" width="200" height="72" as="geometry"/></mxCell>
+        <mxCell id="s_verified" value="verified&#10;the perk&#x27;s contract checks passed (exit 0, declared outputs exist)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left;verticalAlign=top;spacing=6;spacingTop=4;fontSize=11;" vertex="1" parent="1"><mxGeometry x="40" y="436" width="200" height="72" as="geometry"/></mxCell>
+        <mxCell id="s_recorded" value="recorded&#10;run metadata + outputs recorded to the run-ledger" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;verticalAlign=top;spacing=6;spacingTop=4;fontSize=11;" vertex="1" parent="1"><mxGeometry x="40" y="568" width="200" height="72" as="geometry"/></mxCell>
+        <mxCell id="t_0" value="PREPARE&#10;a_prepare / ⊨ g_prepared" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;endArrow=block;strokeColor=#444444;" edge="1" parent="1" source="s_ready" target="s_prepared"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="t_1" value="OPERATE&#10;a_operate / ⊨ g_operated" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;endArrow=block;strokeColor=#444444;" edge="1" parent="1" source="s_prepared" target="s_operated"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="t_2" value="VERIFY&#10;a_verify / ⊨ g_verified" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;endArrow=block;strokeColor=#444444;" edge="1" parent="1" source="s_operated" target="s_verified"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="t_3" value="RECORD&#10;a_record" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;endArrow=block;strokeColor=#444444;" edge="1" parent="1" source="s_verified" target="s_recorded"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
