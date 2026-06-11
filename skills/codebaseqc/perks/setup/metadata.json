@@ -1,0 +1,18 @@
+{
+  "perk": "setup",
+  "skill": "codebaseqc",
+  "description": "Install a standalone codebaseqc landing script (usage + contract + coverage) into a directory, so it runs without the cyberware pipeline.",
+  "rules": [
+    "copies the cbqc_* checks + a runner into TARGET_DIR",
+    "the landing script's reports go to a dir YOU choose \u2014 they STAY there, not the run logs",
+    "non-destructive \u2014 writes only under TARGET_DIR"
+  ],
+  "usage": "Set TARGET_DIR. Output: TARGET_DIR/codebaseqc.sh (+ cbqc_*.py). Then run: ./codebaseqc.sh <project_dir> [src] [out_dir].",
+  "limitation": "Python ast checks (name-based heuristics).",
+  "minimal_example": {
+    "perk": "setup",
+    "vars": {
+      "TARGET_DIR": "/path/to/tools"
+    }
+  }
+}

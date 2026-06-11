@@ -1,0 +1,19 @@
+{
+  "tool": "cbqc_setup",
+  "inputs": {
+    "TARGET_DIR": {
+      "type": "dir",
+      "required": true
+    }
+  },
+  "outputs": {
+    "landing": {
+      "path": "${TARGET_DIR}/codebaseqc.sh",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${TARGET_DIR}/codebaseqc.sh"
+  }
+}

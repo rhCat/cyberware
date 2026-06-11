@@ -1,0 +1,22 @@
+{
+  "_perk": "setup",
+  "sequence": [
+    "cbqc_setup"
+  ],
+  "tools": {
+    "cbqc_setup": {
+      "binary": "bash",
+      "params": {
+        "TARGET_DIR": "${TARGET_DIR}"
+      }
+    }
+  },
+  "env": {
+    "TARGET_DIR": "${TARGET_DIR}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "bash",
+    "python3"
+  ]
+}

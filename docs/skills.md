@@ -10,7 +10,7 @@ Tool skills (operational pathways) — not design/taste skills. Each runs throug
 | **fs** | `archive` · `find_large` | tar · find | `archive` → tar.gz; `find_large` read-only listing. rm-at-root / rm -rf gated. |
 | **git_ops** | `snapshot` · `status` | git | `snapshot` = stage+commit (no push — push is intentionally not a skill); `status` read-only. force-push / reset --hard gated. |
 | **py_qc** | `test` · `lint` | pytest · ruff/flake8 | run a project's tests / linter, reports to record_store. |
-| **codebaseqc** | `audit` | python3 (ast) | pure-Python QC: usage (dead code) · contract (docstring+return type) · coverage (referenced in tests). Name-based heuristics; sound resolution is the Intent-Fidelity frontier. |
+| **codebaseqc** | `audit` · `setup` | python3 (ast) | pure-Python QC: usage (dead code) · contract (docstring+return type) · coverage (referenced in tests). `setup` installs a standalone landing script (`codebaseqc.sh`) into a dir — runs without the pipeline, reports go where you choose. Name-based heuristics. |
 | **ci-codeqc** | `github_actions` | bash | generate/update `.github/workflows/codeqc.yml` (ruff + mypy + pytest) for any repo. Idempotent: existing workflow backed up to `.bk` before overwrite. |
 | **datadog** | `github_ci` | bash · datadog-ci | generate/update `.github/workflows/datadog-ci.yml` — install datadog-ci, run tests, upload JUnit results to Datadog (CI Test Visibility). Idempotent; add the `DD_API_KEY` secret after. |
 | **docker** | `build` · `ps` | docker | build an image from a context dir; `ps` lists containers (read-only). Needs a running daemon. |

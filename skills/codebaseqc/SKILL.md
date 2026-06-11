@@ -1,7 +1,7 @@
 ---
 skill: codebaseqc
 name: Codebase QC (usage / contract / coverage)
-perks: [audit]
+perks: [audit, setup]
 ---
 
 # codebaseqc — pure-Python codebase QC
@@ -20,6 +20,10 @@ The `audit` perk runs the three tools in sequence; each emits structured JSON an
 > distinguishing `obj.method()` calls, jedi/pyright-grade — is the Intent-Fidelity frontier and the
 > reason the original codebaseqc reached for alembic. This migration is the dependency-free version.
 
-## How to use it
-Fill `PROJECT_DIR` (+ optional `SRC_DIR`, `TEST_DIR`), then validate → compose → compile → oversight →
-executor (the run is 3 governed steps).
+## Perks
+- **`audit`** — run all three checks through the governed pipeline. Fill `PROJECT_DIR` (+ optional
+  `SRC_DIR`, `TEST_DIR`); the run is 3 governed steps and the `*_gaps.json` reports land in the run dir.
+- **`setup`** — install a **standalone landing script** (`codebaseqc.sh` + the three `cbqc_*.py`) into a
+  `TARGET_DIR`, so you can run codebaseqc *without* the cyberware pipeline. Then:
+  `./codebaseqc.sh <project_dir> [src_subdir] [out_dir]` — its reports go to a dir **you** choose (they
+  stay there, not the run logs).
