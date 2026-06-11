@@ -17,12 +17,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def load(p): return json.load(open(p))
 
 
-def main():
-    ap = argparse.ArgumentParser(description="compile a task-ledger into a step-wise bash script")
-    ap.add_argument("--ledger", required=True)
-    ap.add_argument("-o", "--out", default=None)
-    a = ap.parse_args()
-    L = load(a.ledger)
+def build_script(L):
+    """Compile a task-ledger dict into (bash text, tool sequence). Pure — touches nothing on disk."""
     skill, perk, store, vars = L["skill"], L["perk"], L["record_store"], dict(L.get("vars", {}))
     pdir = os.path.join(ROOT, "skills", skill, "perks", perk)
     manifesto = load(os.path.join(pdir, "manifesto.json"))
@@ -66,7 +62,17 @@ def main():
         "esac",
         "",
     ]
-    text = "\n".join(out)
+    return "\n".join(out), seq
+
+
+def main():
+    ap = argparse.ArgumentParser(description="compile a task-ledger into a step-wise bash script")
+    ap.add_argument("--ledger", required=True)
+    ap.add_argument("-o", "--out", default=None)
+    a = ap.parse_args()
+    L = load(a.ledger)
+    skill, perk = L["skill"], L["perk"]
+    text, seq = build_script(L)
     if a.out:
         open(a.out, "w").write(text)
         os.chmod(a.out, 0o755)

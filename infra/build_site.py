@@ -13,6 +13,7 @@ import json
 import os
 
 import visualize
+import compiler
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -47,13 +48,30 @@ def perk_data(pdir: str, pm: dict, bp: dict) -> dict:
     }
 
 
+def demo_data(sid: str, perk: dict, tpl_vars: dict) -> dict:
+    """A worked example: a pre-filled task-ledger for the perk + its real compiled script."""
+    ex = perk.get("metadata", {}).get("minimal_example", {}).get("vars", {})
+    dvars = {}
+    for v in perk.get("env", {}):
+        if v != "RECORD_STORE":
+            dvars[v] = ex.get(v, tpl_vars.get(v, ""))
+    ledger = {"skill": sid, "perk": perk["id"], "record_store": f"/tmp/{sid}-demo", "vars": dvars}
+    try:
+        text, _ = compiler.build_script(ledger)
+        compiled = text.replace(ROOT + "/", "")   # relativize the SNIP path for display
+    except Exception as exc:
+        compiled = f"# (compile preview unavailable: {exc})"
+    return {"perk": perk["id"], "ledger": ledger, "compiled": compiled}
+
+
 def skill_data(sdir: str) -> dict | None:
-    """Assemble one skill: blueprint + svg + SKILL.md + perks."""
+    """Assemble one skill: blueprint + svg + SKILL.md + perks + a worked demo."""
     bp = load(os.path.join(sdir, "blueprint.json"))
     if not bp:
         return None
     perks = [perk_data(os.path.join(sdir, "perks", pm["id"]), pm, bp)
              for pm in load(os.path.join(sdir, "perks.json")).get("perks", [])]
+    tpl_vars = load(os.path.join(sdir, "ledger.json")).get("vars", {})
     return {
         "id": bp["id"], "name": bp.get("name", bp["id"]), "description": bp.get("description", ""),
         "states": bp.get("states", {}), "transitions": bp.get("transitions", []),
@@ -61,6 +79,7 @@ def skill_data(sdir: str) -> dict | None:
         "safety_invariants": bp.get("safety_invariants", []),
         "svg": read(os.path.join(sdir, "blueprint.svg")), "skill_md": read(os.path.join(sdir, "SKILL.md")),
         "perks": perks,
+        "demo": demo_data(bp["id"], perks[0], tpl_vars) if perks else None,
     }
 
 
