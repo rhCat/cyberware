@@ -1,0 +1,5 @@
+# cyberware's infra is intentionally dense — compact stdlib imports and one-liner helpers for the
+# small governance scripts. E401 (multiple imports) and E702 (one-line statements) are a deliberate
+# style choice here. The F-rules (unused imports/vars, undefined names) stay on — those are real.
+[lint]
+ignore = ["E401", "E702"]
