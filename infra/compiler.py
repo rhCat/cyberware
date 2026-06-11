@@ -9,7 +9,7 @@ through `executor.py`. The compiler touches nothing — it returns a string.
   compiler.py --ledger task-ledger.json [-o run.sh]
 """
 from __future__ import annotations
-import argparse, json, os, shlex, sys
+import argparse, json, os, re, shlex, sys
 
 from runlog import run_dir
 
@@ -67,6 +67,60 @@ def build_script(L):
     return "\n".join(out), seq
 
 
+def task_blueprint(L, run, seq=None):
+    """The skill's blueprint specialised for THIS task: each gate's abstract predicate bound to the
+    concrete check it stands for — resolved against the perk's contract + the task vars — plus the
+    resolved contract itself. So the diagram shows what is *actually* validated, not the generic lifecycle."""
+    skill, perk, vars = L["skill"], L["perk"], dict(L.get("vars", {}))
+    pdir = os.path.join(ROOT, "skills", skill, "perks", perk)
+    bp = load(os.path.join(ROOT, "skills", skill, "blueprint.json"))
+    contract = load(os.path.join(pdir, "src", "contracts.json"))
+    manifesto = load(os.path.join(pdir, "manifesto.json"))
+    if seq is None:
+        seq = manifesto.get("sequence", [])
+    subs = {**vars, "RECORD_STORE": run, "record_store": run}
+
+    def resolve(s):
+        for k, v in subs.items():
+            s = s.replace("${" + k + "}", str(v))
+        return s
+
+    inputs, checks = contract.get("inputs", {}), contract.get("checks", {})
+    required = [k for k, spec in inputs.items() if spec.get("required")]
+    oe = resolve(checks["output_exists"]) if checks.get("output_exists") else ""
+    oed = oe.replace(run, "$RUN") if oe.startswith(run) else oe   # $RUN abbreviates the run dir (defined in the header)
+    passes = (["exit_zero == 0"] if checks.get("exit_zero") else []) + ([f"test -f {oed}"] if oe else [])
+    rcontract = {                                       # the contract resolved for THIS task
+        "tool": contract.get("tool", ""),
+        "inputs": {k: {"value": vars.get(k, ""), "type": spec.get("type", ""), "required": spec.get("required", False)}
+                   for k, spec in inputs.items()},
+        "outputs": {k: {"path": resolve(o.get("path", "")), **({"type": o["type"]} if o.get("type") else {})}
+                    for k, o in contract.get("outputs", {}).items()},
+        "checks": {**checks, **({"output_exists": oe} if oe else {})},
+        "requires": manifesto.get("requires", []),
+    }
+    atom = {                                            # abstract predicate → the concrete check for this task
+        "inputs_present": " ∧ ".join(f"{k}={vars.get(k, '∅')}" for k in required) or "(no required inputs)",
+        "store_writable": "store $RUN writable",
+        "sequence_resolved": " → ".join(seq) or "(empty)",
+        "contracts_present": "I/O + checks bound",
+        "governed_run": "ran via executor.py",
+        "contract_checks_pass": " ∧ ".join(passes) or "(no checks)",
+    }
+
+    def bind(expr):
+        out = []
+        for p in re.split(r"(/\\|\\/)", expr):
+            t = p.strip()
+            out.append("∧" if t == "/\\" else "∨" if t == "\\/" else (atom.get(t, t) if t else ""))
+        return " ".join(x for x in out if x)
+
+    gates = {gid: {**g, "binding": bind(g.get("expression", ""))} for gid, g in bp.get("gates", {}).items()}
+    return {**bp, "gates": gates,
+            "task": {"skill": skill, "perk": perk, "vars": vars, "tools": seq,
+                     "run_dir": run, "contract": rcontract}}
+
+
 def main():
     ap = argparse.ArgumentParser(description="compile a task-ledger into a step-wise bash script")
     ap.add_argument("--ledger", required=True)
@@ -88,9 +142,7 @@ def main():
     diagrams = []
     try:
         import visualize
-        bp = load(os.path.join(ROOT, "skills", skill, "blueprint.json"))
-        task_bp = {**bp, "task": {"skill": skill, "perk": perk, "vars": dict(L.get("vars", {})),
-                                  "tools": seq, "run_dir": run}}
+        task_bp = task_blueprint(L, run, seq)
         open(task_bp_path, "w").write(json.dumps(task_bp, indent=2) + "\n")
         diagrams = visualize.render(task_bp, seq, base, ["drawio", "svg"])
     except Exception as e:

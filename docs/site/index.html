@@ -249,7 +249,7 @@ function blueprintHtml(s) {
       <p class="muted" style="font-size:12.5px">The intelligence fills the <b>task config</b>; it compiles to the <b>script</b> the executor runs — its shape visualized in <b>this task's blueprint</b>: the lifecycle carrying this task's actual settings (perk · vars · run dir), saved to the run dir as <code>task-blueprint.json</code> and the source the run diagrams compile from.</p>
       <div class="lbl">task config <span class="muted">— task-ledger.json</span></div>
       <pre>${esc(JSON.stringify(d.ledger || {}, null, 2))}</pre>
-      <div class="lbl">task blueprint <span class="muted">— the lifecycle specialized with this task's settings (header) + perk tools</span></div>
+      <div class="lbl">task blueprint <span class="muted">— header = the resolved contract (inputs · types · requires); each gate's abstract predicate (⊨) resolved to this task's concrete check (↳)</span></div>
       <div class="card" id="bp">${p.svg || ""}</div>
       <div class="lbl">task blueprint — L++ source <span class="muted">— task-blueprint.json; the <code>task</code> field carries the perk, vars, tools + run dir</span></div>
       <pre class="tall">${esc(JSON.stringify(d.blueprint || s.blueprint || {}, null, 2))}</pre>
