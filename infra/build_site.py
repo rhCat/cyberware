@@ -12,6 +12,8 @@ import glob
 import json
 import os
 
+import visualize
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -25,11 +27,12 @@ def read(p: str) -> str:
     return open(p, encoding="utf-8").read() if os.path.isfile(p) else ""
 
 
-def perk_data(pdir: str, pm: dict) -> dict:
-    """Assemble one perk: metadata + manifesto + contracts + the snippet code per tool."""
+def perk_data(pdir: str, pm: dict, bp: dict) -> dict:
+    """Assemble one perk: metadata + manifesto + contracts + snippet code + the perk-annotated SVG."""
     man = load(os.path.join(pdir, "manifesto.json"))
+    seq = man.get("sequence", [])
     snippets = {}
-    for tool in man.get("sequence", []):
+    for tool in seq:
         for ext in (".py", ".sh"):
             fp = os.path.join(pdir, "src", tool + ext)
             if os.path.isfile(fp):
@@ -37,9 +40,10 @@ def perk_data(pdir: str, pm: dict) -> dict:
     return {
         "id": pm["id"], "summary": pm.get("summary", ""), "destructive": pm.get("destructive", False),
         "metadata": load(os.path.join(pdir, "metadata.json")),
-        "sequence": man.get("sequence", []), "tools": man.get("tools", {}),
+        "sequence": seq, "tools": man.get("tools", {}),
         "env": man.get("env", {}), "requires": man.get("requires", []),
         "contracts": load(os.path.join(pdir, "src", "contracts.json")), "snippets": snippets,
+        "svg": visualize.svg(bp, seq),
     }
 
 
@@ -48,7 +52,7 @@ def skill_data(sdir: str) -> dict | None:
     bp = load(os.path.join(sdir, "blueprint.json"))
     if not bp:
         return None
-    perks = [perk_data(os.path.join(sdir, "perks", pm["id"]), pm)
+    perks = [perk_data(os.path.join(sdir, "perks", pm["id"]), pm, bp)
              for pm in load(os.path.join(sdir, "perks.json")).get("perks", [])]
     return {
         "id": bp["id"], "name": bp.get("name", bp["id"]), "description": bp.get("description", ""),

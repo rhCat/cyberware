@@ -57,6 +57,14 @@
   .md p, .md li { color:var(--dim); }
   .md blockquote { border-left:3px solid var(--line); margin:8px 0; padding:2px 12px; color:var(--dim); }
   .muted { color:var(--dim); }
+  .tabs { display:flex; gap:2px; flex-wrap:wrap; border-bottom:1px solid var(--line); margin:16px 0 2px; }
+  .tab { padding:8px 15px; cursor:pointer; font-size:13px; color:var(--dim); border-bottom:2px solid transparent; font-family:var(--mono); }
+  .tab:hover { color:var(--ink); }
+  .tab.active { color:var(--acc); border-bottom-color:var(--acc); }
+  .tab.ov { font-family:inherit; }
+  .perkhead { display:flex; align-items:center; gap:10px; margin:18px 0 2px; }
+  .perkhead b { font-size:17px; } .perkhead .sum { color:var(--dim); font-size:13px; }
+  details.bp > summary { cursor:pointer; color:var(--blue); font-size:12px; margin:14px 0 6px; }
 </style>
 </head>
 <body>
@@ -97,31 +105,41 @@ function renderList() {
     `${S.length} skills · ${S.reduce((a,s)=>a+s.perks.length,0)} perks · ${new Set(S.flatMap(s=>s.perks.flatMap(p=>p.sequence))).size} tools`;
   document.getElementById("list").innerHTML = S.map((s,i) =>
     `<div class="item" data-i="${i}"><span class="dot"></span><b>${esc(s.id)}</b><span class="n">${s.perks.length}</span></div>`).join("");
-  document.querySelectorAll("#list .item").forEach(el => el.onclick = () => select(+el.dataset.i));
+  document.querySelectorAll("#list .item").forEach(el => el.onclick = () => openSkill(+el.dataset.i));
 }
 
-function select(i) {
-  document.querySelectorAll("#list .item").forEach((el,j)=>el.classList.toggle("active", j===i));
-  const s = S[i];
+let cur = { i: 0, tab: "overview" };
+
+function openSkill(i) { cur = { i, tab: "overview" }; render(); }
+function setTab(t) { cur.tab = t; render(); }
+
+function render() {
+  const s = S[cur.i];
+  document.querySelectorAll("#list .item").forEach((el,j)=>el.classList.toggle("active", j===cur.i));
+  const tabs = `<span class="tab ov ${cur.tab==='overview'?'active':''}" data-tab="overview">Overview</span>` +
+    s.perks.map(p=>`<span class="tab ${p.id===cur.tab?'active':''}" data-tab="${esc(p.id)}">${esc(p.id)}</span>`).join("");
+  const body = cur.tab==="overview" ? overviewHtml(s) : perkPanel(s.perks.find(p=>p.id===cur.tab));
   document.getElementById("detail").innerHTML = `
     <h2>${esc(s.name)} <span class="muted" style="font-size:13px">· ${esc(s.id)}</span></h2>
     <p class="desc">${esc(s.description)}</p>
+    <div class="tabs">${tabs}</div>
+    <div class="tabc">${body}</div>`;
+  document.querySelectorAll(".tab").forEach(el => el.onclick = () => setTab(el.dataset.tab));
+}
 
-    <h3>Blueprint</h3>
+function overviewHtml(s) {
+  return `
+    <h3>Lifecycle — the shared blueprint</h3>
     <div class="card" id="bp">${s.svg || '<span class="muted">no diagram</span>'}</div>
-
+    <p class="muted" style="font-size:12px;margin-top:8px">Every skill runs this same lifecycle — what differs is the <b>perks</b> (the tabs above): the proven pathways, their contracts, and their code.</p>
     <h3>Guardrails — safety_invariants</h3>
     <div class="card">${(s.safety_invariants||[]).map(inv =>
       `<div class="inv"><b>${esc(inv.name)}</b><span>${esc((inv.description||"").replace(/^GUARDRAIL:\s*/,""))}</span></div>`).join("") || '<span class="muted">none</span>'}</div>
-
-    <h3>Perks — ${s.perks.length}</h3>
-    ${s.perks.map(perk).join("")}
-
     <h3>Context — SKILL.md</h3>
     <div class="card md">${md(s.skill_md || "")}</div>`;
 }
 
-function perk(p) {
+function perkPanel(p) {
   const meta = p.metadata || {}, c = p.contracts || {};
   const inputs = Object.entries(c.inputs || {}).map(([k,v]) =>
     `<tr><td class="${v.required?'req':''}">${esc(k)}${v.required?' *':''}</td><td>${esc(v.type||'')}</td></tr>`).join("");
@@ -130,11 +148,11 @@ function perk(p) {
   const snippets = Object.entries(p.snippets || {}).map(([name,code]) =>
     `<details class="code"><summary>${esc(name)}</summary><pre>${esc(code)}</pre></details>`).join("");
   return `
-  <details class="perk">
-    <summary><b>${esc(p.id)}</b><span class="sum">${esc(p.summary)}</span>
-      <span class="badge ${p.destructive?'dx':'ro'}">${p.destructive?'destructive':'read-only'}</span></summary>
-    <div class="body">
-      <div class="flow">${p.sequence.map(t=>`<span class="step">${esc(t)}</span>`).join('<span class="arr">→</span>')}</div>
+    <div class="perkhead"><b>${esc(p.id)}</b><span class="sum">${esc(p.summary)}</span>
+      <span class="badge ${p.destructive?'dx':'ro'}">${p.destructive?'destructive':'read-only'}</span></div>
+    <div class="flow">${p.sequence.map(t=>`<span class="step">${esc(t)}</span>`).join('<span class="arr">→</span>')}</div>
+    <h3>Spec</h3>
+    <div class="card">
       ${meta.usage ? `<div class="kv"><b>usage</b> — ${esc(meta.usage)}</div>` : ""}
       ${meta.limitation ? `<div class="kv"><b>limitation</b> — ${esc(meta.limitation)}</div>` : ""}
       ${(meta.rules&&meta.rules.length) ? `<ul class="rules">${meta.rules.map(r=>`<li>${esc(r)}</li>`).join("")}</ul>` : ""}
@@ -142,13 +160,15 @@ function perk(p) {
       ${inputs ? `<table class="io"><tr><th>input</th><th>type</th></tr>${inputs}</table>` : ""}
       ${outputs ? `<table class="io"><tr><th>output</th><th>path</th></tr>${outputs}</table>` : ""}
       ${c.checks ? `<div class="kv"><b>checks</b> — ${esc(JSON.stringify(c.checks))}</div>` : ""}
-      ${snippets || '<span class="muted">no snippet</span>'}
     </div>
-  </details>`;
+    <h3>Code</h3>
+    <div class="card">${snippets || '<span class="muted">no snippet</span>'}</div>
+    <details class="bp"><summary>lifecycle — blueprint annotated with this perk's steps</summary>
+      <div class="card" id="bp">${p.svg || ''}</div></details>`;
 }
 
 renderList();
-if (S.length) select(0);
+if (S.length) openSkill(0);
 </script>
 </body>
 </html>
