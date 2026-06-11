@@ -41,19 +41,26 @@ these fields:
 }
 ```
 
-**3. Run the pipeline** (in order):
+**3. Run the pipeline** (in order). With a default `record_store` and no `-o`, every artifact for the run
+is grouped under **`~/cyberware_run_logs/<skill>__<perk>__<id>/`** — the compiler prints that run dir, or
+resolve it yourself with `runlog.py`:
 
 ```sh
 L=task-ledger.json
+RUN=$(python3 infra/runlog.py --ledger "$L")             # the grouped run dir
 python3 infra/validator.py --ledger "$L"                 # claims real?
 python3 infra/composer.py  --ledger "$L"                 # L++ -> TLC: no deadlock
-python3 infra/compiler.py  --ledger "$L" -o run.sh       # -> step-wise bash (+ run.{drawio,svg})
-python3 infra/oversight.py --script run.sh               # OVERSIGHT_RULE (push back on danger)
-python3 infra/executor.py  --script run.sh --all         # THE governed run (the ONLY channel)
+python3 infra/compiler.py  --ledger "$L"                 # writes $RUN/run.sh (+ run.{drawio,svg})
+python3 infra/oversight.py --script "$RUN/run.sh"        # OVERSIGHT_RULE (push back on danger)
+python3 infra/executor.py  --script "$RUN/run.sh" --all  # THE governed run (the ONLY channel)
 ```
 
-**4. Read the result.** Each tool prints **one line of structured JSON** (the audit + debug log); every
-step is appended to `run-ledger.json` under your `record_store` as it runs.
+**4. Read the result.** Everything for the run lands in `$RUN/`: `run.sh` · `run.{drawio,svg}` ·
+`.run.sh.bk` (tamper snapshot) · `run-ledger.json` (the provenance log, appended as each step runs) · the
+tool outputs · and a `task-ledger.json` whose **`run`** field points to the **outputs** and **logs**. Each
+tool also prints one line of structured JSON. Set `record_store` explicitly to override the location;
+`$CYBERWARE_RUN_LOGS` moves the root. **Don't scatter run artifacts in /tmp** — they belong, grouped,
+under the run-logs root.
 
 ## What each stage enforces
 

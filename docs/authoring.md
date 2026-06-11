@@ -97,15 +97,19 @@ exec python3 "$HERE/<tool>.py"
 ```sh
 python3 infra/visualize.py --skill myskill            # → blueprint.{drawio,svg}
 # fill ledger.json → task-ledger.json, then:
+RUN=$(python3 infra/runlog.py --ledger task-ledger.json)         # the grouped run dir
 python3 infra/validator.py --ledger task-ledger.json
 python3 infra/composer.py  --ledger task-ledger.json
-python3 infra/compiler.py  --ledger task-ledger.json -o run.sh   # + run.{drawio,svg}
-python3 infra/oversight.py --script run.sh
-python3 infra/executor.py  --script run.sh --all                 # the governed run
+python3 infra/compiler.py  --ledger task-ledger.json             # writes $RUN/run.sh (+ run.{drawio,svg})
+python3 infra/oversight.py --script "$RUN/run.sh"
+python3 infra/executor.py  --script "$RUN/run.sh" --all          # the governed run
 ```
 
-Every `compiler.py` run also drops `run.drawio` + `run.svg` (the operate step annotated with this
-task's tools) — open the SVG in a browser to eyeball what will run before the executor does.
+With a default `record_store` and no `-o`, the compiler groups every artifact for the run —
+`run.sh`, `run.{drawio,svg}`, `.run.sh.bk`, `run-ledger.json`, the outputs, and a pointer-bearing
+`task-ledger.json` — under **`~/cyberware_run_logs/<skill>__<perk>__<id>/`** (override with an explicit
+`record_store`, or `$CYBERWARE_RUN_LOGS`). Open `$RUN/run.svg` to eyeball what will run before the
+executor does.
 
 ## Conventions
 

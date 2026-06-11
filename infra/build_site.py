@@ -42,10 +42,10 @@ def perk_data(pdir: str, pm: dict, bp: dict, sid: str, tpl_vars: dict) -> dict:
     # a worked demo: a pre-filled task-ledger for THIS perk + its real compiled script
     ex = meta.get("minimal_example", {}).get("vars", {})
     dvars = {v: ex.get(v, tpl_vars.get(v, "")) for v in man.get("env", {}) if v != "RECORD_STORE"}
-    ledger = {"skill": sid, "perk": pm["id"], "record_store": f"/tmp/{sid}-demo", "vars": dvars}
+    ledger = {"skill": sid, "perk": pm["id"], "record_store": "<default: ~/cyberware_run_logs>", "vars": dvars}
     try:
         text, _ = compiler.build_script(ledger)
-        compiled = text.replace(ROOT + "/", "")   # relativize the SNIP path for display
+        compiled = text.replace(ROOT + "/", "").replace(os.path.expanduser("~"), "~")   # readable paths
     except Exception as exc:
         compiled = f"# (compile preview unavailable: {exc})"
     return {

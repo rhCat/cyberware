@@ -11,6 +11,8 @@ through `executor.py`. The compiler touches nothing — it returns a string.
 from __future__ import annotations
 import argparse, json, os, shlex, sys
 
+from runlog import run_dir
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -19,7 +21,7 @@ def load(p): return json.load(open(p))
 
 def build_script(L):
     """Compile a task-ledger dict into (bash text, tool sequence). Pure — touches nothing on disk."""
-    skill, perk, store, vars = L["skill"], L["perk"], L["record_store"], dict(L.get("vars", {}))
+    skill, perk, store, vars = L["skill"], L["perk"], run_dir(L), dict(L.get("vars", {}))
     pdir = os.path.join(ROOT, "skills", skill, "perks", perk)
     manifesto = load(os.path.join(pdir, "manifesto.json"))
     contract = load(os.path.join(pdir, "src", "contracts.json"))
@@ -72,22 +74,35 @@ def main():
     a = ap.parse_args()
     L = load(a.ledger)
     skill, perk = L["skill"], L["perk"]
+    run = run_dir(L)                                # the grouped run dir (~/cyberware_run_logs/... by default)
+    os.makedirs(run, exist_ok=True)
+    out = a.out or os.path.join(run, "run.sh")      # the compiled script lives in the run dir unless -o overrides
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     text, seq = build_script(L)
-    if a.out:
-        open(a.out, "w").write(text)
-        os.chmod(a.out, 0o755)
-        # quick-inspect artifacts beside the script: the blueprint diagram annotated with THIS perk's
-        # tool sequence, in both draw.io XML and self-contained SVG — the only fast way to eyeball it.
-        try:
-            import visualize
-            bp = load(os.path.join(ROOT, "skills", skill, "blueprint.json"))
-            base = a.out[:-3] if a.out.endswith(".sh") else a.out
-            extra = ", ".join(os.path.basename(w) for w in visualize.render(bp, seq, base, ["drawio", "svg"]))
-            print(f"compiled {skill}/{perk} → {a.out}  (+ {extra} · {len(seq)} steps)")
-        except Exception as e:
-            print(f"compiled {skill}/{perk} → {a.out}  ({len(seq)} steps; diagram skipped: {e})")
-    else:
-        sys.stdout.write(text)
+    open(out, "w").write(text)
+    os.chmod(out, 0o755)
+    # the blueprint diagram (annotated with this perk's tools), beside the script
+    base = out[:-3] if out.endswith(".sh") else out
+    diagrams = []
+    try:
+        import visualize
+        bp = load(os.path.join(ROOT, "skills", skill, "blueprint.json"))
+        diagrams = visualize.render(bp, seq, base, ["drawio", "svg"])
+    except Exception as e:
+        print(f"  (diagram skipped: {e})", file=sys.stderr)
+    # a copy of the task-ledger in the run dir, carrying a pointer to the outputs + logs
+    contract = load(os.path.join(ROOT, "skills", skill, "perks", perk, "src", "contracts.json"))
+    outs = []
+    for o in contract.get("outputs", {}).values():
+        p = (o.get("path") or "").replace("${RECORD_STORE}", run).replace("${record_store}", run)
+        if p and p not in outs:
+            outs.append(p)
+    led = {**L, "record_store": run,
+           "run": {"dir": run, "script": out, "diagrams": diagrams,
+                   "outputs": outs, "logs": os.path.join(run, "run-ledger.json")}}
+    open(os.path.join(run, "task-ledger.json"), "w").write(json.dumps(led, indent=2) + "\n")
+    print(f"compiled {skill}/{perk} → {out}  ({len(seq)} steps)")
+    print(f"  run dir: {run}  · task-ledger.json points to outputs + run-ledger.json (all land here)")
 
 
 if __name__ == "__main__":
