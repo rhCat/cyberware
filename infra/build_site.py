@@ -64,14 +64,21 @@ def skill_data(sdir: str) -> dict | None:
     }
 
 
+DOC_TABS = [("architecture", "Architecture"), ("authoring", "Authoring"), ("skills", "Catalog")]
+
+
 def main() -> int:
-    """Emit docs/site/data.js."""
+    """Emit docs/site/data.js — the skills plus the markdown review docs."""
     skills = [d for sdir in sorted(glob.glob(os.path.join(ROOT, "skills", "*")))
               if os.path.isdir(sdir) and (d := skill_data(sdir))]
+    docs = [{"id": name, "label": label, "body": read(os.path.join(ROOT, "docs", name + ".md"))}
+            for name, label in DOC_TABS]
     out = os.path.join(ROOT, "docs", "site", "data.js")
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    open(out, "w").write("window.SKILLS = " + json.dumps(skills, indent=1) + ";\n")
-    print(f"wrote {os.path.relpath(out, ROOT)} — {len(skills)} skills, {sum(len(s['perks']) for s in skills)} perks")
+    open(out, "w").write("window.SKILLS = " + json.dumps(skills, indent=1)
+                         + ";\nwindow.DOCS = " + json.dumps(docs, indent=1) + ";\n")
+    print(f"wrote {os.path.relpath(out, ROOT)} — {len(skills)} skills, "
+          f"{sum(len(s['perks']) for s in skills)} perks, {len(docs)} docs")
     return 0
 
 
