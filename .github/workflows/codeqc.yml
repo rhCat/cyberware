@@ -22,4 +22,5 @@ jobs:
       - name: types (mypy)
         run: mypy infra || true
       - name: test (pytest)
-        run: pytest tests --cov=infra || echo "no tests yet"
+        run: |
+          if [ -d tests ]; then pytest tests --cov=infra; else echo "no tests/ dir — skipping"; fi

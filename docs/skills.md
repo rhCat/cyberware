@@ -36,4 +36,5 @@ vars. The registry is meant to grow: tools are the unit, perks are the proven pa
 ## Self-audit
 
 `examples/self-audit/` holds the framework's own `codebaseqc` report — cyberware QC'd by cyberware.
-It honestly shows the open gaps (no return-type hints, no `tests/` dir yet).
+It honestly shows the open gaps (e.g., no return-type hints yet). The infra is now covered by a real
+`tests/` suite (unit + integration + per-skill), gated in CI — see [Tests](../README.md#tests).
