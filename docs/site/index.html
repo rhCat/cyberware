@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cyberware — skill dashboard</title>
+<style>
+  :root { --bg:#0e1016; --panel:#161a23; --panel2:#1c212d; --line:#262c3a; --ink:#e7e9ef; --dim:#8a92a6;
+          --acc:#d6b656; --green:#82b366; --red:#c0504d; --blue:#6c8ebf; --mono:ui-monospace,Menlo,Consolas,monospace; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.55 -apple-system,Segoe UI,Roboto,sans-serif; }
+  header { padding:18px 26px; border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
+  header h1 { margin:0; font-size:19px; letter-spacing:.4px; }
+  header .sub { color:var(--acc); font-size:12px; border:1px solid var(--acc); border-radius:10px; padding:2px 9px; }
+  header .stats { color:var(--dim); font-size:12px; margin-left:auto; }
+  .layout { display:grid; grid-template-columns:240px 1fr; min-height:calc(100vh - 60px); }
+  aside { border-right:1px solid var(--line); padding:14px 10px; overflow:auto; }
+  aside .item { padding:9px 12px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:8px; }
+  aside .item:hover { background:var(--panel); }
+  aside .item.active { background:var(--panel2); outline:1px solid var(--line); }
+  aside .item b { font-weight:600; }
+  aside .item .n { color:var(--dim); font-size:11px; margin-left:auto; }
+  aside .item .dot { width:7px; height:7px; border-radius:50%; background:var(--blue); flex:none; }
+  main { padding:22px 28px; overflow:auto; }
+  h2 { font-size:16px; margin:0 0 4px; }
+  h3 { font-size:12px; color:var(--acc); text-transform:uppercase; letter-spacing:1px; margin:26px 0 10px; }
+  .desc { color:var(--dim); max-width:820px; margin:0 0 8px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px; min-width:0; }
+  #bp { overflow:auto; }
+  #bp svg { max-width:100%; height:auto; background:#fff; border-radius:8px; }
+  .inv { display:flex; gap:8px; padding:6px 0; border-bottom:1px dashed var(--line); }
+  .inv b { color:var(--green); font-family:var(--mono); font-size:12px; white-space:nowrap; }
+  .inv span { color:var(--dim); font-size:13px; }
+  .perk { background:var(--panel); border:1px solid var(--line); border-radius:10px; margin:10px 0; overflow:hidden; }
+  .perk > summary { padding:12px 16px; cursor:pointer; display:flex; align-items:center; gap:10px; list-style:none; }
+  .perk > summary::-webkit-details-marker { display:none; }
+  .perk > summary b { font-size:14px; }
+  .perk > summary .sum { color:var(--dim); font-size:13px; }
+  .badge { font-size:10px; padding:2px 7px; border-radius:6px; margin-left:auto; }
+  .badge.ro { background:#23402a; color:#a9d6b3; } .badge.dx { background:#43221f; color:#e6a9a4; }
+  .perk .body { padding:4px 16px 16px; border-top:1px solid var(--line); }
+  .flow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:10px 0; }
+  .flow .step { background:var(--panel2); border:1px solid var(--line); border-radius:7px; padding:5px 11px; font-family:var(--mono); font-size:12px; }
+  .flow .arr { color:var(--dim); }
+  .kv { color:var(--dim); font-size:13px; margin:2px 0; }
+  .kv code { color:#cdd3e1; }
+  ul.rules { margin:6px 0; padding-left:18px; color:var(--dim); font-size:13px; }
+  table.io { border-collapse:collapse; font-size:12.5px; margin:6px 0; }
+  table.io td, table.io th { border:1px solid var(--line); padding:4px 9px; text-align:left; }
+  table.io th { color:var(--dim); font-weight:600; }
+  table.io .req { color:var(--acc); }
+  code { background:#0b0d13; border:1px solid var(--line); border-radius:5px; padding:1px 6px; color:#cdd3e1; font-family:var(--mono); }
+  details.code { margin:8px 0; }
+  details.code > summary { cursor:pointer; color:var(--blue); font-size:12px; font-family:var(--mono); }
+  pre { background:#0b0d13; border:1px solid var(--line); border-radius:8px; padding:12px; overflow:auto; font:12px/1.5 var(--mono); color:#cdd3e1; margin:6px 0; }
+  .md h4 { color:var(--ink); margin:12px 0 4px; font-size:14px; }
+  .md p, .md li { color:var(--dim); }
+  .md blockquote { border-left:3px solid var(--line); margin:8px 0; padding:2px 12px; color:var(--dim); }
+  .muted { color:var(--dim); }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚙︎ cyberware</h1><span class="sub">skill dashboard</span>
+  <span class="stats" id="stats"></span>
+</header>
+<div class="layout">
+  <aside id="list"></aside>
+  <main id="detail"><p class="muted">select a skill →</p></main>
+</div>
+
+<script src="data.js"></script>
+<script>
+const S = window.SKILLS || [];
+const esc = (t) => String(t==null?"":t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// minimal markdown (headings, bold, inline code, lists, blockquote) — strips frontmatter
+function md(src) {
+  src = src.replace(/^---[\s\S]*?---\s*/, "");
+  const out = []; let inList = false;
+  for (let line of src.split("\n")) {
+    const flush = () => { if (inList) { out.push("</ul>"); inList = false; } };
+    let m;
+    if ((m = line.match(/^#{1,6}\s+(.*)/))) { flush(); out.push(`<h4>${inline(m[1])}</h4>`); }
+    else if ((m = line.match(/^[-*]\s+(.*)/))) { if (!inList) { out.push("<ul>"); inList = true; } out.push(`<li>${inline(m[1])}</li>`); }
+    else if ((m = line.match(/^>\s?(.*)/))) { flush(); out.push(`<blockquote>${inline(m[1])}</blockquote>`); }
+    else if (line.trim() === "") { flush(); }
+    else { flush(); out.push(`<p>${inline(line)}</p>`); }
+  }
+  if (inList) out.push("</ul>");
+  return out.join("\n");
+  function inline(t) { return esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>"); }
+}
+
+function renderList() {
+  document.getElementById("stats").textContent =
+    `${S.length} skills · ${S.reduce((a,s)=>a+s.perks.length,0)} perks · ${new Set(S.flatMap(s=>s.perks.flatMap(p=>p.sequence))).size} tools`;
+  document.getElementById("list").innerHTML = S.map((s,i) =>
+    `<div class="item" data-i="${i}"><span class="dot"></span><b>${esc(s.id)}</b><span class="n">${s.perks.length}</span></div>`).join("");
+  document.querySelectorAll("#list .item").forEach(el => el.onclick = () => select(+el.dataset.i));
+}
+
+function select(i) {
+  document.querySelectorAll("#list .item").forEach((el,j)=>el.classList.toggle("active", j===i));
+  const s = S[i];
+  document.getElementById("detail").innerHTML = `
+    <h2>${esc(s.name)} <span class="muted" style="font-size:13px">· ${esc(s.id)}</span></h2>
+    <p class="desc">${esc(s.description)}</p>
+
+    <h3>Blueprint</h3>
+    <div class="card" id="bp">${s.svg || '<span class="muted">no diagram</span>'}</div>
+
+    <h3>Guardrails — safety_invariants</h3>
+    <div class="card">${(s.safety_invariants||[]).map(inv =>
+      `<div class="inv"><b>${esc(inv.name)}</b><span>${esc((inv.description||"").replace(/^GUARDRAIL:\s*/,""))}</span></div>`).join("") || '<span class="muted">none</span>'}</div>
+
+    <h3>Perks — ${s.perks.length}</h3>
+    ${s.perks.map(perk).join("")}
+
+    <h3>Context — SKILL.md</h3>
+    <div class="card md">${md(s.skill_md || "")}</div>`;
+}
+
+function perk(p) {
+  const meta = p.metadata || {}, c = p.contracts || {};
+  const inputs = Object.entries(c.inputs || {}).map(([k,v]) =>
+    `<tr><td class="${v.required?'req':''}">${esc(k)}${v.required?' *':''}</td><td>${esc(v.type||'')}</td></tr>`).join("");
+  const outputs = Object.entries(c.outputs || {}).map(([k,v]) =>
+    `<tr><td>${esc(k)}</td><td><code>${esc(v.path||'')}</code></td></tr>`).join("");
+  const snippets = Object.entries(p.snippets || {}).map(([name,code]) =>
+    `<details class="code"><summary>${esc(name)}</summary><pre>${esc(code)}</pre></details>`).join("");
+  return `
+  <details class="perk">
+    <summary><b>${esc(p.id)}</b><span class="sum">${esc(p.summary)}</span>
+      <span class="badge ${p.destructive?'dx':'ro'}">${p.destructive?'destructive':'read-only'}</span></summary>
+    <div class="body">
+      <div class="flow">${p.sequence.map(t=>`<span class="step">${esc(t)}</span>`).join('<span class="arr">→</span>')}</div>
+      ${meta.usage ? `<div class="kv"><b>usage</b> — ${esc(meta.usage)}</div>` : ""}
+      ${meta.limitation ? `<div class="kv"><b>limitation</b> — ${esc(meta.limitation)}</div>` : ""}
+      ${(meta.rules&&meta.rules.length) ? `<ul class="rules">${meta.rules.map(r=>`<li>${esc(r)}</li>`).join("")}</ul>` : ""}
+      <div class="kv"><b>requires</b> — ${(p.requires||[]).map(r=>`<code>${esc(r)}</code>`).join(" ") || "—"}</div>
+      ${inputs ? `<table class="io"><tr><th>input</th><th>type</th></tr>${inputs}</table>` : ""}
+      ${outputs ? `<table class="io"><tr><th>output</th><th>path</th></tr>${outputs}</table>` : ""}
+      ${c.checks ? `<div class="kv"><b>checks</b> — ${esc(JSON.stringify(c.checks))}</div>` : ""}
+      ${snippets || '<span class="muted">no snippet</span>'}
+    </div>
+  </details>`;
+}
+
+renderList();
+if (S.length) select(0);
+</script>
+</body>
+</html>
