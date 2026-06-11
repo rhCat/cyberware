@@ -17,6 +17,13 @@ skills/<skill>/
       <tool>.sh            the proven pathway — emits deterministic structured JSON (audit + debug log)
 ```
 
+## 0. Evaluate first (the on-ramp)
+
+Before authoring, run the idea through **`cws-create/evaluate`** — it classifies it as **execution**
+(a tool/pathway — fits cyberware), **design** (taste/aesthetics — *not* the emphasis; keep it as
+guidance), or **transformable** (extract the execution core into a governed pathway). Only execution /
+transformable skills belong here. If it fits, **`cws-create/scaffold`** lays down the skeleton below.
+
 ## 1. Scaffold
 
 ```sh
@@ -25,8 +32,9 @@ python3 infra/scaffold.py --skill myskill --name "My Skill" \
 #   --perk  <perk_id>:<tool>[:<binary>]
 ```
 
-This writes the whole skeleton with the standard lifecycle blueprint and a snippet **stub** per tool.
-It already **composes** out of the box — you fill in the snippets and vars.
+This writes the whole skeleton with the standard lifecycle blueprint (`ready → prepared → verified →
+executed`, where the executor records each step *as it runs*) and a snippet **stub** per tool. It
+already **composes** out of the box — you fill in the snippets and vars.
 
 ## 2. The manifesto — the `${VAR}` template
 

@@ -104,5 +104,4 @@ python3 -m http.server -d docs/site 8765     # → http://localhost:8765
 - [architecture](docs/architecture.md) — the two sides, the pipeline, the governance model
 - [authoring](docs/authoring.md) — scaffold + the perk / manifesto / contract / snippet pattern
 - [skills](docs/skills.md) — the catalog
-
-See [`SPEC.md`](SPEC.md) for the original specification.
+- [spec](docs/SPEC.md) — the original specification
