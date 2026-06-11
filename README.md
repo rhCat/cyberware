@@ -9,6 +9,10 @@ oversees, and is the **only channel that executes**.
 Blueprints are [L++](https://github.com/rhCat/lpp) (the 4-axiom logic frame). Python is the glue —
 because glue is what this needs.
 
+> **Using cyberware as an agent?** Start with **[`cyberware.md`](cyberware.md)** — the operating guide:
+> how to run a skill through the governed channel (validate → compose → compile → oversee → execute),
+> how to grow the registry (`cws-create`, `cws-addperk`), and what you must never do.
+
 ## Two sides
 
 ```
