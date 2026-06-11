@@ -4,6 +4,10 @@
 The agent never runs the compiled bash directly — it calls executor.py, which:
   * snapshots the script to `.<script>.bk` on first run, and REFUSES if the script later drifts
     (an agent editing a compiled step to slip past a contract is caught — tamper-check);
+  * enforces OVERSIGHT_RULE *inside the channel* — the script is scanned before any step runs and
+    REFUSED on unwaived violations; approvable rules are waived only by an explicit `--approve <id>`,
+    and every waiver is recorded to the run-ledger (running `oversight.py` first is pre-flight
+    visibility, but the executor re-checks regardless — the gate cannot be skipped);
   * REFUSES a step whose upstream steps have not been recorded as run (require_upstream);
   * registers every run — ts, step, exit, duration, output hash, output tail — to a persistent
     `run-ledger.json` under the record_store (the provenance chain);
@@ -13,10 +17,12 @@ If a step's output later disagrees with the hash recorded here, the drift is vis
 governance you cannot bypass without leaving a hole in the chain.
 
   executor.py --script run.sh --step 1
-  executor.py --script run.sh --all
+  executor.py --script run.sh --all [--approve <rule_id>]
 """
 from __future__ import annotations
 import argparse, hashlib, json, os, re, subprocess, sys, time
+
+from oversight import scan
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -31,6 +37,7 @@ def record_store_of(script):
         m = re.search(r"RECORD_STORE=('([^']*)'|\"([^\"]*)\"|(\S+))", line)
         if m:
             return next(g for g in m.groups()[1:] if g is not None)
+    print("  [warn] no RECORD_STORE found in script — recording beside the script", file=sys.stderr)
     return os.path.dirname(os.path.abspath(script))
 
 
@@ -39,6 +46,8 @@ def main():
     ap.add_argument("--script", required=True)
     ap.add_argument("--step")
     ap.add_argument("--all", action="store_true")
+    ap.add_argument("--approve", action="append", default=[],
+                    help="waive an approvable OVERSIGHT_RULE id — an explicit, ledger-recorded decision")
     a = ap.parse_args()
     R = rules()
     script = os.path.abspath(a.script)
@@ -64,24 +73,51 @@ def main():
         else:
             print(f"  [tamper] script matches snapshot (sha {sha(body)})")
 
-    # which steps
+    # 2. oversight INSIDE the channel — the same OVERSIGHT_RULE scan, enforced before anything runs
+    if R.get("oversight_check", True):
+        violations, waived = scan(body.decode(errors="replace"), a.approve)
+        for r in waived:
+            print(f"  [oversight] WAIVED {r['id']} — {r['reason']} (explicit --approve, recorded)")
+        if waived:
+            ledger["runs"].append({"ts": now(), "event": "oversight_waived",
+                                   "rules": [r["id"] for r in waived], "sha": sha(body)})
+            json.dump(ledger, open(lpath, "w"), indent=2)
+        if violations:
+            for r in violations:
+                how = f"  (approvable: --approve {r['id']})" if r.get("approvable") else "  (non-approvable)"
+                print(f"  [OVERSIGHT] {r['id']} — {r['reason']}{how}")
+            print(f"  [OVERSIGHT] {len(violations)} unwaived violation(s) — REFUSED")
+            ledger["runs"].append({"ts": now(), "event": "oversight_refused",
+                                   "rules": [r["id"] for r in violations], "sha": sha(body)})
+            json.dump(ledger, open(lpath, "w"), indent=2)
+            sys.exit(7)
+        print("  [oversight] clear" + (f" ({len(waived)} waived)" if waived else ""))
+
+    # which steps — both paths validate against the script's own --list
+    listing = subprocess.run(["bash", script, "--list"], capture_output=True, text=True).stdout
+    declared = [ln.split("\t")[0].strip() for ln in listing.strip().splitlines() if ln.strip()]
     if a.all:
-        listing = subprocess.run(["bash", script, "--list"], capture_output=True, text=True).stdout
-        steps = [ln.split("\t")[0].strip() for ln in listing.strip().splitlines() if ln.strip()]
+        steps = declared
     elif a.step:
-        steps = [a.step]
+        if a.step.strip() not in declared:
+            print(f"  [STEP] '{a.step}' is not a declared step (have: {', '.join(declared) or 'none'}) — REFUSED")
+            sys.exit(2)
+        steps = [a.step.strip()]
     else:
         print("specify --step <N> or --all"); sys.exit(2)
 
     ran = {r["step"] for r in ledger["runs"] if r.get("status") == "ok" and "step" in r}
     for st in steps:
-        # 2. upstream gate
+        # 3. upstream gate
         if R.get("require_upstream", True):
+            if not st.isdigit() or int(st) < 1:
+                print(f"  [STEP] '{st}' is not a valid step number — REFUSED")
+                sys.exit(2)
             missing = [str(i) for i in range(1, int(st)) if str(i) not in ran]
             if missing:
                 print(f"  [UPSTREAM] step {st} blocked — upstream not run: {', '.join(missing)} — REFUSED")
                 sys.exit(5)
-        # 3. governed run + provenance record
+        # 4. governed run + provenance record
         print(f"  [run] step {st}")
         t0 = time.time()
         try:

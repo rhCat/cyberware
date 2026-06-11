@@ -96,8 +96,8 @@
     },
     {
       "name": "oversight_clears_script",
-      "expression": "TRUE",
-      "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE (destructive/dangerous patterns push back unless explicitly approved)."
+      "expression": "state /= 'executed' \\/ oversight_cleared",
+      "description": "GUARDRAIL: the compiled script must clear OVERSIGHT_RULE \u2014 enforced INSIDE the executor (scanned before any step runs; approvable rules waived only by an explicit --approve, recorded in the run-ledger)."
     }
   ]
 }

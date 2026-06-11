@@ -73,8 +73,7 @@ def run_tlc(tla, name):
         r = subprocess.run(["java", "-cp", jar, "tlc2.TLC", f"{name}.tla"],
                            cwd=d, capture_output=True, text=True, timeout=120)
         out = r.stdout + r.stderr
-        deadlock = "Deadlock reached" in out or "deadlock" in out.lower() and "no error" not in out.lower()
-        ok = ("No error has been found" in out) or ("Model checking completed" in out and not deadlock)
+        ok = "No error has been found" in out   # TLC's success line; deadlock/violation prints an Error: instead
         return ok, ("no deadlock (TLC)" if ok else "TLC found a deadlock / error")
     except Exception as e:
         return None, f"TLC error: {e}"

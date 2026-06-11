@@ -25,8 +25,9 @@ SKILL.md ─► LLM fills the form → task-ledger.json
    compiler.py    blueprint + manifesto + contracts + snippets → ONE step-wise bash + run.{drawio,svg}
             │                        (the diagram annotated with this task's tool sequence)
    oversight.py   OVERSIGHT_RULE over the script — destructive/dangerous patterns push back; approvable
-            │                        rules waived only by an explicit, logged --approve
-   executor.py    THE channel — .bk tamper-check, upstream gate, run-ledger provenance, EXECUTOR_RULE
+            │                        rules waived only by an explicit, logged --approve (pre-flight view)
+   executor.py    THE channel — .bk tamper-check, IN-CHANNEL oversight scan (refuses on violations;
+                                 waivers ledger-recorded), upstream gate, run-ledger provenance, EXECUTOR_RULE
 ```
 
 > This same pipeline is captured as a formal **L++ blueprint** — [`infra/pipeline.blueprint.json`](../infra/pipeline.blueprint.json) — so the framework is described in its own formalism (the **ouroboros**). The dashboard renders it at the top of this page; each gate's `✗ fail` route is the stage refusing and logging.
@@ -37,10 +38,13 @@ SKILL.md ─► LLM fills the form → task-ledger.json
 
 1. **Tamper-check** — the script is snapshotted to `.<script>.bk` on first run; if it later drifts
    (an agent editing a compiled step to slip past a contract), the run is **refused**.
-2. **Upstream gate** — a step cannot run unless its predecessors are recorded as run.
-3. **Provenance ledger** — every run (ts, step, exit, duration, output hash, output tail) is appended
+2. **In-channel oversight** — the same `OVERSIGHT_RULE` scan runs inside the executor before any step;
+   unwaived violations are **refused** (exit 7) and recorded. Skipping the `oversight.py` pre-flight
+   does not skip the gate; `--approve` waivers are explicit and ledger-recorded.
+3. **Upstream gate** — a step cannot run unless its predecessors are recorded as run.
+4. **Provenance ledger** — every run (ts, step, exit, duration, output hash, output tail) is appended
    to `run-ledger.json` under the record_store. Out-of-band runs leave a hole in the chain.
-4. **EXECUTOR_RULE** — timeout and other call-boundary limits.
+5. **EXECUTOR_RULE** — timeout and other call-boundary limits.
 
 The runtime *is* the rule: you cannot bypass governance without leaving a visible gap (an unrecorded
 run, a `.bk` mismatch, a missing upstream step).

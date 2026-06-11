@@ -12,17 +12,13 @@ inspection — it touches nothing it doesn't own.
 from __future__ import annotations
 import argparse, json, os, shutil, socket, sys
 
-from runlog import run_dir
+from runlog import is_default as is_placeholder, run_dir   # one definition of "still a placeholder"
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def load(p): return json.load(open(p))
 def skill_dir(skill): return os.path.join(ROOT, "skills", skill)
-
-
-def is_placeholder(v):
-    return not isinstance(v, str) or v.strip() == "" or v.strip().startswith("<") or v.strip().startswith("${")
 
 
 def check(name, ok, detail="", gating=True):
