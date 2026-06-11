@@ -59,9 +59,30 @@ the final step.
 
 ## 4. The snippet — the proven pathway
 
-A `src/<tool>.sh` reads its env vars and emits **one line of structured JSON** on stdout (the audit +
-debug log). Keep it deterministic; write artifacts under `$RECORD_STORE`. For Python logic, wrap it:
-`python3 - "$ARG" <<'PY' … PY` (see `skills/codebaseqc`).
+`src/<tool>.sh` is the tool's entry point (the framework runs `bash <tool>.sh`). It reads its env vars
+and emits **one line of structured JSON** on stdout (the audit + debug log); keep it deterministic and
+write artifacts under `$RECORD_STORE`.
+
+**When the core is bash** (psql, curl, tar, git, …) — the logic lives in the `.sh`.
+
+**When the core is another language** (Python, …) — keep the logic as its own standalone file and make
+the `.sh` a thin **porter**. Don't bury logic in a `<<'PY'` heredoc — a standalone file is far easier
+to read, lint, and update:
+
+```
+src/<tool>.py     # the core — inspect / lint / test / edit directly; reads its inputs from the env
+src/<tool>.sh     # the porter
+```
+
+```bash
+# src/<tool>.sh
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 "$HERE/<tool>.py"
+```
+
+`scaffold.py` writes exactly this when a perk's binary is `python3` (see `skills/codebaseqc`, whose
+`cbqc_*` tools are standalone `.py` cores behind thin porters).
 
 ## 5. Visualize + run
 
