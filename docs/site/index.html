@@ -104,9 +104,8 @@
 </div>
 <div class="docview" id="docview" style="display:none"></div>
 
-<script src="data.js"></script>
 <script>
-const S = window.SKILLS || [], DOCS = window.DOCS || [];
+let S = [], DOCS = [];
 const esc = (t) => String(t==null?"":t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const STAGES = [
   ["validator", "confirms the inputs are real — record_store writable, the required binaries reachable, required vars present"],
@@ -272,9 +271,18 @@ function perkPanel(p) {
       <div class="card" id="bp">${p.svg || ''}</div></details>`;
 }
 
-renderNav();
-renderList();
-if (S.length) openSkill(0);
+function boot() {
+  S = window.SKILLS || []; DOCS = window.DOCS || [];
+  renderNav(); renderList(); if (S.length) openSkill(0);
+}
+// load the data with a version query so a deploy is never served stale from cache
+(function () {
+  const el = document.createElement("script");
+  el.src = "data.js?v=" + Date.now();
+  el.onload = boot;
+  el.onerror = () => { document.getElementById("detail").innerHTML = '<p class="muted">failed to load data.js</p>'; };
+  document.head.appendChild(el);
+})();
 </script>
 </body>
 </html>
