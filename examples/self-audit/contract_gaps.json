@@ -1,0 +1,269 @@
+{
+  "dimension": "contract",
+  "gaps": [
+    {
+      "fn": "load",
+      "at": "infra/validator.py:18",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "skill_dir",
+      "at": "infra/validator.py:19",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "is_placeholder",
+      "at": "infra/validator.py:22",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "check",
+      "at": "infra/validator.py:26",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "main",
+      "at": "infra/validator.py:32",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "main",
+      "at": "infra/oversight.py:17",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "load",
+      "at": "infra/compiler.py:17",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "main",
+      "at": "infra/compiler.py:20",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "load",
+      "at": "infra/composer.py:18",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "adjacency",
+      "at": "infra/composer.py:21",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "structural",
+      "at": "infra/composer.py:28",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "emit_tla",
+      "at": "infra/composer.py:49",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "run_tlc",
+      "at": "infra/composer.py:65",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "main",
+      "at": "infra/composer.py:83",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "E",
+      "at": "infra/visualize.py:20",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "wrap",
+      "at": "infra/visualize.py:24",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "depths",
+      "at": "infra/visualize.py:36",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "annotated_states",
+      "at": "infra/visualize.py:54",
+      "missing": [
+        "return_type"
+      ]
+    },
+    {
+      "fn": "drawio",
+      "at": "infra/visualize.py:80",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "svg",
+      "at": "infra/visualize.py:100",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "render",
+      "at": "infra/visualize.py:132",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "main",
+      "at": "infra/visualize.py:141",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "wj",
+      "at": "infra/scaffold.py:19",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "wsh",
+      "at": "infra/scaffold.py:24",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "blueprint",
+      "at": "infra/scaffold.py:30",
+      "missing": [
+        "return_type"
+      ]
+    },
+    {
+      "fn": "snippet_stub",
+      "at": "infra/scaffold.py:70",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "skill_md",
+      "at": "infra/scaffold.py:81",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "main",
+      "at": "infra/scaffold.py:95",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "sha",
+      "at": "infra/executor.py:24",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "now",
+      "at": "infra/executor.py:25",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "rules",
+      "at": "infra/executor.py:26",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "record_store_of",
+      "at": "infra/executor.py:29",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "main",
+      "at": "infra/executor.py:37",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    }
+  ],
+  "public_total": 33,
+  "gap_count": 33
+}
