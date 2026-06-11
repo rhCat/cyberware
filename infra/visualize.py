@@ -11,7 +11,7 @@ sequence, so each compiled task shows exactly what it will run.
   visualize.py --blueprint path -o out --format svg  # one format only
 """
 from __future__ import annotations
-import argparse, html, json, os, sys
+import argparse, html, json, os
 from collections import deque
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -79,7 +79,7 @@ def _layout(bp):
 
 def drawio(bp, perk_steps=None):
     states = annotated_states(bp, perk_steps)
-    terms, entry, gates = set(bp.get("terminal_states", {})), bp["entry_state"], bp.get("gates", {})
+    terms, entry = set(bp.get("terminal_states", {})), bp["entry_state"]
     pos, d, W, H, _, _ = _layout(bp)
     cells = []
     for s in bp["states"]:
