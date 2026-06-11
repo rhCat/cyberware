@@ -29,6 +29,8 @@ SKILL.md ─► LLM fills the form → task-ledger.json
    executor.py    THE channel — .bk tamper-check, upstream gate, run-ledger provenance, EXECUTOR_RULE
 ```
 
+> This same pipeline is captured as a formal **L++ blueprint** — [`infra/pipeline.blueprint.json`](../infra/pipeline.blueprint.json) — so the framework is described in its own formalism (the **ouroboros**). The dashboard renders it at the top of this page; each gate's `✗ fail` route is the stage refusing and logging.
+
 ## The governance model
 
 `executor.py` is the chokepoint. The agent channels **all** work through it:

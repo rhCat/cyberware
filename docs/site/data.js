@@ -3293,7 +3293,153 @@ window.DOCS = [
  {
   "id": "architecture",
   "label": "Architecture",
-  "body": "# Architecture\n\ncyberware is a **verifiable governance runtime for skill execution** \u2014 a subset of the Cyberware\nAlchemistry at a different angle, and the local instance of the\n[Zero Trust Framework](https://github.com/rhCat/trust-model-reflection)'s delegation pillars: the\nintelligence *proposes*, the framework *validates / composes / compiles / oversees*, and is the only\nchannel that *executes*. Blueprints are [L++](https://github.com/rhCat/lpp); Python is the glue.\n\n## Two sides\n\n| side | what | where |\n|---|---|---|\n| **user** | the skill registry \u2014 a skill's context, logic, and proven pathways | `skills/<skill>/` |\n| **governance** | the infrastructure that validates, composes, compiles, oversees, executes | `infra/` |\n\n## The pipeline\n\n```\nSKILL.md \u2500\u25ba LLM fills the form \u2192 task-ledger.json\n            \u2502\n   validator.py   claims real? \u2014 record_store writable, runtime + required binaries reachable,\n            \u2502                    contract's required inputs present, host reachable (soft)\n   composer.py    L++ \u2192 TLA+ \u2192 TLC \u2014 no abstract deadlock (non-terminal sink); structural fallback\n            \u2502                        (reachability / terminal-reachable) when no JRE/tla2tools\n   compiler.py    blueprint + manifesto + contracts + snippets \u2192 ONE step-wise bash + run.{drawio,svg}\n            \u2502                        (the diagram annotated with this task's tool sequence)\n   oversight.py   OVERSIGHT_RULE over the script \u2014 destructive/dangerous patterns push back; approvable\n            \u2502                        rules waived only by an explicit, logged --approve\n   executor.py    THE channel \u2014 .bk tamper-check, upstream gate, run-ledger provenance, EXECUTOR_RULE\n```\n\n## The governance model\n\n`executor.py` is the chokepoint. The agent channels **all** work through it:\n\n1. **Tamper-check** \u2014 the script is snapshotted to `.<script>.bk` on first run; if it later drifts\n   (an agent editing a compiled step to slip past a contract), the run is **refused**.\n2. **Upstream gate** \u2014 a step cannot run unless its predecessors are recorded as run.\n3. **Provenance ledger** \u2014 every run (ts, step, exit, duration, output hash, output tail) is appended\n   to `run-ledger.json` under the record_store. Out-of-band runs leave a hole in the chain.\n4. **EXECUTOR_RULE** \u2014 timeout and other call-boundary limits.\n\nThe runtime *is* the rule: you cannot bypass governance without leaving a visible gap (an unrecorded\nrun, a `.bk` mismatch, a missing upstream step).\n\n## The blueprint (L++)\n\nEvery tool skill shares one **perk-agnostic lifecycle**:\n\n```\nready \u2192 prepared \u2192 operated \u2192 verified \u2192 recorded        (recorded = terminal)\n```\n\nwith `safety_invariants` that the conductor cannot violate \u2014 chiefly **`governed_execution_only`**\n(tools run only through `executor.py`) and the skill's own guardrails (e.g. `no_destructive_without_\napproval`). Perks are *optional* in the blueprint: the blueprint says what to watch and which logs to\ncheck; a perk supplies the concrete, contract-bound *how*.\n\n## Relationship to the rest\n\ncyberware is **not Athenor** (the hosted service that powers the whole Cyberware Alchemistry\nworkflow). It is the standalone, local enforcement layer \u2014 the same verifiable infrastructure\n(L++ blueprints, contracts, compiled bash, audit ledgers), pointed at general skill execution.\n"
+  "body": "# Architecture\n\ncyberware is a **verifiable governance runtime for skill execution** \u2014 a subset of the Cyberware\nAlchemistry at a different angle, and the local instance of the\n[Zero Trust Framework](https://github.com/rhCat/trust-model-reflection)'s delegation pillars: the\nintelligence *proposes*, the framework *validates / composes / compiles / oversees*, and is the only\nchannel that *executes*. Blueprints are [L++](https://github.com/rhCat/lpp); Python is the glue.\n\n## Two sides\n\n| side | what | where |\n|---|---|---|\n| **user** | the skill registry \u2014 a skill's context, logic, and proven pathways | `skills/<skill>/` |\n| **governance** | the infrastructure that validates, composes, compiles, oversees, executes | `infra/` |\n\n## The pipeline\n\n```\nSKILL.md \u2500\u25ba LLM fills the form \u2192 task-ledger.json\n            \u2502\n   validator.py   claims real? \u2014 record_store writable, runtime + required binaries reachable,\n            \u2502                    contract's required inputs present, host reachable (soft)\n   composer.py    L++ \u2192 TLA+ \u2192 TLC \u2014 no abstract deadlock (non-terminal sink); structural fallback\n            \u2502                        (reachability / terminal-reachable) when no JRE/tla2tools\n   compiler.py    blueprint + manifesto + contracts + snippets \u2192 ONE step-wise bash + run.{drawio,svg}\n            \u2502                        (the diagram annotated with this task's tool sequence)\n   oversight.py   OVERSIGHT_RULE over the script \u2014 destructive/dangerous patterns push back; approvable\n            \u2502                        rules waived only by an explicit, logged --approve\n   executor.py    THE channel \u2014 .bk tamper-check, upstream gate, run-ledger provenance, EXECUTOR_RULE\n```\n\n> This same pipeline is captured as a formal **L++ blueprint** \u2014 [`infra/pipeline.blueprint.json`](../infra/pipeline.blueprint.json) \u2014 so the framework is described in its own formalism (the **ouroboros**). The dashboard renders it at the top of this page; each gate's `\u2717 fail` route is the stage refusing and logging.\n\n## The governance model\n\n`executor.py` is the chokepoint. The agent channels **all** work through it:\n\n1. **Tamper-check** \u2014 the script is snapshotted to `.<script>.bk` on first run; if it later drifts\n   (an agent editing a compiled step to slip past a contract), the run is **refused**.\n2. **Upstream gate** \u2014 a step cannot run unless its predecessors are recorded as run.\n3. **Provenance ledger** \u2014 every run (ts, step, exit, duration, output hash, output tail) is appended\n   to `run-ledger.json` under the record_store. Out-of-band runs leave a hole in the chain.\n4. **EXECUTOR_RULE** \u2014 timeout and other call-boundary limits.\n\nThe runtime *is* the rule: you cannot bypass governance without leaving a visible gap (an unrecorded\nrun, a `.bk` mismatch, a missing upstream step).\n\n## The blueprint (L++)\n\nEvery tool skill shares one **perk-agnostic lifecycle**:\n\n```\nready \u2192 prepared \u2192 operated \u2192 verified \u2192 recorded        (recorded = terminal)\n```\n\nwith `safety_invariants` that the conductor cannot violate \u2014 chiefly **`governed_execution_only`**\n(tools run only through `executor.py`) and the skill's own guardrails (e.g. `no_destructive_without_\napproval`). Perks are *optional* in the blueprint: the blueprint says what to watch and which logs to\ncheck; a perk supplies the concrete, contract-bound *how*.\n\n## Relationship to the rest\n\ncyberware is **not Athenor** (the hosted service that powers the whole Cyberware Alchemistry\nworkflow). It is the standalone, local enforcement layer \u2014 the same verifiable infrastructure\n(L++ blueprints, contracts, compiled bash, audit ledgers), pointed at general skill execution.\n",
+  "pipeline": {
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"766\" height=\"1600\" viewBox=\"0 0 766 1600\" font-family=\"ui-monospace,Menlo,Consolas,monospace\">\n<defs><filter id=\"glow\" x=\"-60%\" y=\"-60%\" width=\"220%\" height=\"220%\"><feGaussianBlur stdDeviation=\"1.3\" result=\"b\"/><feMerge><feMergeNode in=\"b\"/><feMergeNode in=\"SourceGraphic\"/></feMerge></filter><pattern id=\"px\" width=\"7\" height=\"7\" patternUnits=\"userSpaceOnUse\"><rect width=\"7\" height=\"7\" fill=\"#0a0f0a\"/><rect width=\"1\" height=\"1\" fill=\"#54c24c\" fill-opacity=\"0.13\"/></pattern><marker id=\"arr\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L9,4 L0,8 z\" fill=\"#5cc450\"/></marker></defs>\n<rect width=\"766\" height=\"1600\" fill=\"#0a0f0a\"/>\n<rect width=\"766\" height=\"1600\" fill=\"url(#px)\"/>\n<text x=\"16\" y=\"28\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"3\" fill=\"#54c24c\" filter=\"url(#glow)\">PIPELINE</text>\n<line x1=\"272.0\" y1=\"130\" x2=\"272.0\" y2=\"162\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"130\" x2=\"272.0\" y2=\"162\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"150\" font-size=\"12\" font-weight=\"700\" fill=\"#93d98a\">VALIDATE</text>\n<line x1=\"272.0\" y1=\"222\" x2=\"272.0\" y2=\"254\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"222\" x2=\"272.0\" y2=\"254\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"242\" font-size=\"11\" font-weight=\"700\" fill=\"#93d98a\">\u2713 pass</text>\n<line x1=\"272.0\" y1=\"302\" x2=\"272.0\" y2=\"334\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"302\" x2=\"272.0\" y2=\"334\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<line x1=\"272.0\" y1=\"416\" x2=\"272.0\" y2=\"448\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"416\" x2=\"272.0\" y2=\"448\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"436\" font-size=\"12\" font-weight=\"700\" fill=\"#93d98a\">COMPOSE</text>\n<line x1=\"272.0\" y1=\"508\" x2=\"272.0\" y2=\"540\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"508\" x2=\"272.0\" y2=\"540\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"528\" font-size=\"11\" font-weight=\"700\" fill=\"#93d98a\">\u2713 pass</text>\n<line x1=\"272.0\" y1=\"588\" x2=\"272.0\" y2=\"620\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"588\" x2=\"272.0\" y2=\"620\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<line x1=\"272.0\" y1=\"702\" x2=\"272.0\" y2=\"734\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"702\" x2=\"272.0\" y2=\"734\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"722\" font-size=\"12\" font-weight=\"700\" fill=\"#93d98a\">COMPILE</text>\n<line x1=\"272.0\" y1=\"794\" x2=\"272.0\" y2=\"826\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"794\" x2=\"272.0\" y2=\"826\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"814\" font-size=\"11\" font-weight=\"700\" fill=\"#93d98a\">\u2713 pass</text>\n<line x1=\"272.0\" y1=\"874\" x2=\"272.0\" y2=\"906\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"874\" x2=\"272.0\" y2=\"906\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<line x1=\"272.0\" y1=\"988\" x2=\"272.0\" y2=\"1020\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"988\" x2=\"272.0\" y2=\"1020\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"1008\" font-size=\"12\" font-weight=\"700\" fill=\"#93d98a\">OVERSEE</text>\n<line x1=\"272.0\" y1=\"1080\" x2=\"272.0\" y2=\"1112\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"1080\" x2=\"272.0\" y2=\"1112\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"1100\" font-size=\"11\" font-weight=\"700\" fill=\"#93d98a\">\u2713 pass</text>\n<line x1=\"272.0\" y1=\"1160\" x2=\"272.0\" y2=\"1192\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"1160\" x2=\"272.0\" y2=\"1192\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<line x1=\"272.0\" y1=\"1274\" x2=\"272.0\" y2=\"1306\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"1274\" x2=\"272.0\" y2=\"1306\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"1294\" font-size=\"12\" font-weight=\"700\" fill=\"#93d98a\">EXECUTE</text>\n<line x1=\"272.0\" y1=\"1366\" x2=\"272.0\" y2=\"1398\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"1366\" x2=\"272.0\" y2=\"1398\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<text x=\"283\" y=\"1386\" font-size=\"11\" font-weight=\"700\" fill=\"#93d98a\">\u2713 pass</text>\n<line x1=\"272.0\" y1=\"1446\" x2=\"272.0\" y2=\"1478\" stroke=\"#54c24c\" stroke-width=\"7\" opacity=\"0.16\" filter=\"url(#glow)\"/>\n<line x1=\"272.0\" y1=\"1446\" x2=\"272.0\" y2=\"1478\" stroke=\"#5cc450\" stroke-width=\"2.6\" marker-end=\"url(#arr)\"/>\n<rect x=\"151.0\" y=\"48\" width=\"242\" height=\"82\" fill=\"#0e1d0d\" stroke=\"#93d98a\" stroke-width=\"2.2\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"71\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#93d98a\" filter=\"url(#glow)\">SUBMITTED<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\">  \u00b7 entry</tspan></text>\n<text x=\"164.0\" y=\"89\" font-size=\"11\" fill=\"#74ad68\">a task-ledger (skill, perk,</text>\n<text x=\"164.0\" y=\"103\" font-size=\"11\" fill=\"#74ad68\">vars, record_store) is</text>\n<text x=\"164.0\" y=\"117\" font-size=\"11\" fill=\"#74ad68\">submitted; nothing has run</text>\n<polygon points=\"272.0,162 351.0,192.0 272.0,222 193.0,192.0\" fill=\"#0c1a0c\" stroke=\"#54c24c\" stroke-width=\"1.8\" filter=\"url(#glow)\"/>\n<text x=\"272\" y=\"196\" font-size=\"11\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#54c24c\">g_claims_real</text>\n<text x=\"367\" y=\"196\" font-size=\"11\" fill=\"#93d98a\">\u22a8 store_writable \u2227 runtime_reachable \u2227 inputs_present</text>\n<line x1=\"193.0\" y1=\"192.0\" x2=\"175\" y2=\"192.0\" stroke=\"#d4794e\" stroke-width=\"2\"/>\n<text x=\"184\" y=\"186\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#d4794e\">\u2717 fail</text>\n<rect x=\"55.0\" y=\"175\" width=\"120\" height=\"34\" fill=\"#170d09\" stroke=\"#d4794e\" stroke-width=\"1.6\"/>\n<text x=\"115.0\" y=\"196\" font-size=\"11\" text-anchor=\"middle\" fill=\"#e7a684\">exit / log</text>\n<rect x=\"160.0\" y=\"254\" width=\"224\" height=\"48\" fill=\"#0a1609\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<line x1=\"168.0\" y1=\"254\" x2=\"168.0\" y2=\"302\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<line x1=\"376.0\" y1=\"254\" x2=\"376.0\" y2=\"302\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<text x=\"272\" y=\"282\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#93d98a\">validator:check_claims</text>\n<rect x=\"151.0\" y=\"334\" width=\"242\" height=\"82\" fill=\"#0b140a\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"357\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#54c24c\" filter=\"url(#glow)\">VALIDATED<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\"></tspan></text>\n<text x=\"164.0\" y=\"375\" font-size=\"11\" fill=\"#74ad68\">validator.py confirmed the</text>\n<text x=\"164.0\" y=\"389\" font-size=\"11\" fill=\"#74ad68\">claims are real \u2014 store</text>\n<text x=\"164.0\" y=\"403\" font-size=\"11\" fill=\"#74ad68\">writable, runtime + binaries</text>\n<polygon points=\"272.0,448 351.0,478.0 272.0,508 193.0,478.0\" fill=\"#0c1a0c\" stroke=\"#54c24c\" stroke-width=\"1.8\" filter=\"url(#glow)\"/>\n<text x=\"272\" y=\"482\" font-size=\"11\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#54c24c\">g_no_deadlock</text>\n<text x=\"367\" y=\"482\" font-size=\"11\" fill=\"#93d98a\">\u22a8 tlc_no_deadlock \u2228 structurally_sound</text>\n<line x1=\"193.0\" y1=\"478.0\" x2=\"175\" y2=\"478.0\" stroke=\"#d4794e\" stroke-width=\"2\"/>\n<text x=\"184\" y=\"472\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#d4794e\">\u2717 fail</text>\n<rect x=\"55.0\" y=\"461\" width=\"120\" height=\"34\" fill=\"#170d09\" stroke=\"#d4794e\" stroke-width=\"1.6\"/>\n<text x=\"115.0\" y=\"482\" font-size=\"11\" text-anchor=\"middle\" fill=\"#e7a684\">exit / log</text>\n<rect x=\"160.0\" y=\"540\" width=\"224\" height=\"48\" fill=\"#0a1609\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<line x1=\"168.0\" y1=\"540\" x2=\"168.0\" y2=\"588\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<line x1=\"376.0\" y1=\"540\" x2=\"376.0\" y2=\"588\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<text x=\"272\" y=\"568\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#93d98a\">composer:model_check</text>\n<rect x=\"151.0\" y=\"620\" width=\"242\" height=\"82\" fill=\"#0b140a\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"643\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#54c24c\" filter=\"url(#glow)\">COMPOSED<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\"></tspan></text>\n<text x=\"164.0\" y=\"661\" font-size=\"11\" fill=\"#74ad68\">composer.py model-checked the</text>\n<text x=\"164.0\" y=\"675\" font-size=\"11\" fill=\"#74ad68\">L++ blueprint (-&gt; TLC) \u2014 no</text>\n<text x=\"164.0\" y=\"689\" font-size=\"11\" fill=\"#74ad68\">logical deadlock</text>\n<polygon points=\"272.0,734 351.0,764.0 272.0,794 193.0,764.0\" fill=\"#0c1a0c\" stroke=\"#54c24c\" stroke-width=\"1.8\" filter=\"url(#glow)\"/>\n<text x=\"272\" y=\"768\" font-size=\"11\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#54c24c\">g_contract_bound</text>\n<text x=\"367\" y=\"768\" font-size=\"11\" fill=\"#93d98a\">\u22a8 sequence_resolved \u2227 contracts_present</text>\n<line x1=\"193.0\" y1=\"764.0\" x2=\"175\" y2=\"764.0\" stroke=\"#d4794e\" stroke-width=\"2\"/>\n<text x=\"184\" y=\"758\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#d4794e\">\u2717 fail</text>\n<rect x=\"55.0\" y=\"747\" width=\"120\" height=\"34\" fill=\"#170d09\" stroke=\"#d4794e\" stroke-width=\"1.6\"/>\n<text x=\"115.0\" y=\"768\" font-size=\"11\" text-anchor=\"middle\" fill=\"#e7a684\">exit / log</text>\n<rect x=\"160.0\" y=\"826\" width=\"224\" height=\"48\" fill=\"#0a1609\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<line x1=\"168.0\" y1=\"826\" x2=\"168.0\" y2=\"874\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<line x1=\"376.0\" y1=\"826\" x2=\"376.0\" y2=\"874\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<text x=\"272\" y=\"854\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#93d98a\">compiler:build_script</text>\n<rect x=\"151.0\" y=\"906\" width=\"242\" height=\"82\" fill=\"#0b140a\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"929\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#54c24c\" filter=\"url(#glow)\">COMPILED<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\"></tspan></text>\n<text x=\"164.0\" y=\"947\" font-size=\"11\" fill=\"#74ad68\">compiler.py turned ledger +</text>\n<text x=\"164.0\" y=\"961\" font-size=\"11\" fill=\"#74ad68\">manifesto + contracts + snippets</text>\n<text x=\"164.0\" y=\"975\" font-size=\"11\" fill=\"#74ad68\">into ONE step-wise bash script</text>\n<polygon points=\"272.0,1020 351.0,1050.0 272.0,1080 193.0,1050.0\" fill=\"#0c1a0c\" stroke=\"#54c24c\" stroke-width=\"1.8\" filter=\"url(#glow)\"/>\n<text x=\"272\" y=\"1054\" font-size=\"11\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#54c24c\">g_oversight_clear</text>\n<text x=\"367\" y=\"1054\" font-size=\"11\" fill=\"#93d98a\">\u22a8 no_dangerous_pattern \u2228 approved</text>\n<line x1=\"193.0\" y1=\"1050.0\" x2=\"175\" y2=\"1050.0\" stroke=\"#d4794e\" stroke-width=\"2\"/>\n<text x=\"184\" y=\"1044\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#d4794e\">\u2717 fail</text>\n<rect x=\"55.0\" y=\"1033\" width=\"120\" height=\"34\" fill=\"#170d09\" stroke=\"#d4794e\" stroke-width=\"1.6\"/>\n<text x=\"115.0\" y=\"1054\" font-size=\"11\" text-anchor=\"middle\" fill=\"#e7a684\">exit / log</text>\n<rect x=\"160.0\" y=\"1112\" width=\"224\" height=\"48\" fill=\"#0a1609\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<line x1=\"168.0\" y1=\"1112\" x2=\"168.0\" y2=\"1160\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<line x1=\"376.0\" y1=\"1112\" x2=\"376.0\" y2=\"1160\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<text x=\"272\" y=\"1140\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#93d98a\">oversight:scan</text>\n<rect x=\"151.0\" y=\"1192\" width=\"242\" height=\"82\" fill=\"#0b140a\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"1215\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#54c24c\" filter=\"url(#glow)\">CLEARED<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\"></tspan></text>\n<text x=\"164.0\" y=\"1233\" font-size=\"11\" fill=\"#74ad68\">oversight.py scanned the script</text>\n<text x=\"164.0\" y=\"1247\" font-size=\"11\" fill=\"#74ad68\">against OVERSIGHT_RULE \u2014 no</text>\n<text x=\"164.0\" y=\"1261\" font-size=\"11\" fill=\"#74ad68\">unapproved destructive/dangerous</text>\n<polygon points=\"272.0,1306 351.0,1336.0 272.0,1366 193.0,1336.0\" fill=\"#0c1a0c\" stroke=\"#54c24c\" stroke-width=\"1.8\" filter=\"url(#glow)\"/>\n<text x=\"272\" y=\"1340\" font-size=\"11\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#54c24c\">g_governed</text>\n<text x=\"367\" y=\"1340\" font-size=\"11\" fill=\"#93d98a\">\u22a8 tamper_check_pass \u2227 upstream_recorded</text>\n<line x1=\"193.0\" y1=\"1336.0\" x2=\"175\" y2=\"1336.0\" stroke=\"#d4794e\" stroke-width=\"2\"/>\n<text x=\"184\" y=\"1330\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#d4794e\">\u2717 fail</text>\n<rect x=\"55.0\" y=\"1319\" width=\"120\" height=\"34\" fill=\"#170d09\" stroke=\"#d4794e\" stroke-width=\"1.6\"/>\n<text x=\"115.0\" y=\"1340\" font-size=\"11\" text-anchor=\"middle\" fill=\"#e7a684\">exit / log</text>\n<rect x=\"160.0\" y=\"1398\" width=\"224\" height=\"48\" fill=\"#0a1609\" stroke=\"#54c24c\" stroke-width=\"1.5\" filter=\"url(#glow)\"/>\n<line x1=\"168.0\" y1=\"1398\" x2=\"168.0\" y2=\"1446\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<line x1=\"376.0\" y1=\"1398\" x2=\"376.0\" y2=\"1446\" stroke=\"#54c24c\" stroke-width=\"1.4\"/>\n<text x=\"272\" y=\"1426\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#93d98a\">executor:govern_run</text>\n<rect x=\"151.0\" y=\"1478\" width=\"242\" height=\"82\" fill=\"#0f2410\" stroke=\"#93d98a\" stroke-width=\"2.2\" filter=\"url(#glow)\"/>\n<text x=\"164.0\" y=\"1501\" font-size=\"14\" font-weight=\"700\" letter-spacing=\"1\" fill=\"#93d98a\" filter=\"url(#glow)\">EXECUTED<tspan font-size=\"11\" letter-spacing=\"0\" fill=\"#74ad68\">  \u00b7 terminal</tspan></text>\n<text x=\"164.0\" y=\"1519\" font-size=\"11\" fill=\"#74ad68\">executor.py ran it through the</text>\n<text x=\"164.0\" y=\"1533\" font-size=\"11\" fill=\"#74ad68\">governed channel \u2014</text>\n<text x=\"164.0\" y=\"1547\" font-size=\"11\" fill=\"#74ad68\">tamper-checked, upstream-gated,</text>\n</svg>\n",
+   "blueprint": {
+    "$schema": "lpp/v0.2.0",
+    "id": "pipeline",
+    "name": "cyberware governance pipeline",
+    "description": "The infra's OWN blueprint \u2014 the path every task-ledger takes through the governed runtime: validate -> compose -> compile -> oversee -> execute. The same L++ formalism the skills use, turned on the framework itself (the ouroboros). Each gate's failure route is the stage refusing and logging.",
+    "entry_state": "submitted",
+    "states": {
+     "submitted": {
+      "description": "a task-ledger (skill, perk, vars, record_store) is submitted; nothing has run"
+     },
+     "validated": {
+      "description": "validator.py confirmed the claims are real \u2014 store writable, runtime + binaries reachable, required inputs present"
+     },
+     "composed": {
+      "description": "composer.py model-checked the L++ blueprint (-> TLC) \u2014 no logical deadlock"
+     },
+     "compiled": {
+      "description": "compiler.py turned ledger + manifesto + contracts + snippets into ONE step-wise bash script"
+     },
+     "cleared": {
+      "description": "oversight.py scanned the script against OVERSIGHT_RULE \u2014 no unapproved destructive/dangerous patterns"
+     },
+     "executed": {
+      "description": "executor.py ran it through the governed channel \u2014 tamper-checked, upstream-gated, recorded to the run-ledger"
+     }
+    },
+    "terminal_states": {
+     "executed": {}
+    },
+    "gates": {
+     "g_claims_real": {
+      "type": "expression",
+      "expression": "store_writable /\\ runtime_reachable /\\ inputs_present",
+      "description": "the ledger's claims hold"
+     },
+     "g_no_deadlock": {
+      "type": "expression",
+      "expression": "tlc_no_deadlock \\/ structurally_sound",
+      "description": "the blueprint cannot deadlock"
+     },
+     "g_contract_bound": {
+      "type": "expression",
+      "expression": "sequence_resolved /\\ contracts_present",
+      "description": "every step is contract-bound"
+     },
+     "g_oversight_clear": {
+      "type": "expression",
+      "expression": "no_dangerous_pattern \\/ approved",
+      "description": "the script clears the oversight rules"
+     },
+     "g_governed": {
+      "type": "expression",
+      "expression": "tamper_check_pass /\\ upstream_recorded",
+      "description": "no drift; predecessors recorded"
+     }
+    },
+    "actions": {
+     "a_validate": {
+      "type": "compute",
+      "compute_unit": "validator:check_claims",
+      "description": "probe the runtime, dirs, and required inputs"
+     },
+     "a_compose": {
+      "type": "compute",
+      "compute_unit": "composer:model_check",
+      "description": "compile L++ -> TLA+ -> TLC (structural fallback if no JRE)"
+     },
+     "a_compile": {
+      "type": "compute",
+      "compute_unit": "compiler:build_script",
+      "description": "ledger + manifesto + contracts + snippets -> step-wise bash"
+     },
+     "a_oversee": {
+      "type": "compute",
+      "compute_unit": "oversight:scan",
+      "description": "regex/ast scan the compiled script against OVERSIGHT_RULE"
+     },
+     "a_execute": {
+      "type": "compute",
+      "compute_unit": "executor:govern_run",
+      "description": "THE channel \u2014 .bk tamper-check, upstream gate, run-ledger provenance"
+     }
+    },
+    "transitions": [
+     {
+      "from": "submitted",
+      "to": "validated",
+      "trigger": "VALIDATE",
+      "action": "a_validate",
+      "gate": "g_claims_real"
+     },
+     {
+      "from": "validated",
+      "to": "composed",
+      "trigger": "COMPOSE",
+      "action": "a_compose",
+      "gate": "g_no_deadlock"
+     },
+     {
+      "from": "composed",
+      "to": "compiled",
+      "trigger": "COMPILE",
+      "action": "a_compile",
+      "gate": "g_contract_bound"
+     },
+     {
+      "from": "compiled",
+      "to": "cleared",
+      "trigger": "OVERSEE",
+      "action": "a_oversee",
+      "gate": "g_oversight_clear"
+     },
+     {
+      "from": "cleared",
+      "to": "executed",
+      "trigger": "EXECUTE",
+      "action": "a_execute",
+      "gate": "g_governed"
+     }
+    ],
+    "safety_invariants": [
+     {
+      "name": "governed_execution_only",
+      "expression": "state /= 'executed' \\/ governed_run",
+      "description": "GUARDRAIL: a task reaches 'executed' ONLY through executor.py \u2014 the single governed channel."
+     },
+     {
+      "name": "no_stage_skipped",
+      "expression": "ordered(submitted, validated, composed, compiled, cleared, executed)",
+      "description": "GUARDRAIL: no stage is skipped \u2014 each gate must hold before the next fires."
+     },
+     {
+      "name": "refuse_on_drift",
+      "expression": "state /= 'executed' \\/ tamper_check_pass",
+      "description": "GUARDRAIL: if the compiled script drifted from its .bk snapshot, the executor refuses."
+     },
+     {
+      "name": "record_every_run",
+      "expression": "state /= 'executed' \\/ recorded_to_ledger",
+      "description": "GUARDRAIL: every governed run is appended to the run-ledger \u2014 no out-of-band execution."
+     }
+    ]
+   }
+  }
  },
  {
   "id": "authoring",
