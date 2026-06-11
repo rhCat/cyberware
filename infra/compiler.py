@@ -92,9 +92,14 @@ def main():
         print(f"  (diagram skipped: {e})", file=sys.stderr)
     # a copy of the task-ledger in the run dir, carrying a pointer to the outputs + logs
     contract = load(os.path.join(ROOT, "skills", skill, "perks", perk, "src", "contracts.json"))
+    # resolve EVERY var (not just RECORD_STORE): an output designed for a given dir (e.g. ${TARGET_DIR})
+    # points THERE, not at the run logs — only ${RECORD_STORE} artifacts land under the run dir.
+    subs = {**L.get("vars", {}), "RECORD_STORE": run, "record_store": run}
     outs = []
     for o in contract.get("outputs", {}).values():
-        p = (o.get("path") or "").replace("${RECORD_STORE}", run).replace("${record_store}", run)
+        p = o.get("path") or ""
+        for k, v in subs.items():
+            p = p.replace("${" + k + "}", str(v))
         if p and p not in outs:
             outs.append(p)
     led = {**L, "record_store": run,

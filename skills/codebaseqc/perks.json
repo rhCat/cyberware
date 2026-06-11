@@ -10,6 +10,14 @@
         "cbqc_contract",
         "cbqc_coverage"
       ]
+    },
+    {
+      "id": "setup",
+      "summary": "install a standalone codebaseqc landing script into a dir",
+      "destructive": false,
+      "tools": [
+        "cbqc_setup"
+      ]
     }
   ]
 }
