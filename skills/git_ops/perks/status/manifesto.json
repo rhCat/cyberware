@@ -1,0 +1,21 @@
+{
+  "_perk": "status",
+  "sequence": [
+    "git_status"
+  ],
+  "tools": {
+    "git_status": {
+      "binary": "git",
+      "params": {
+        "REPO_DIR": "${REPO_DIR}"
+      }
+    }
+  },
+  "env": {
+    "REPO_DIR": "${REPO_DIR}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "git"
+  ]
+}

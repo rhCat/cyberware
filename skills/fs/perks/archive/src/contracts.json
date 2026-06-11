@@ -1,0 +1,19 @@
+{
+  "tool": "fs_archive",
+  "inputs": {
+    "SOURCE_DIR": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "fs_archive_out": {
+      "path": "${RECORD_STORE}/archive.tar.gz",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/archive.tar.gz"
+  }
+}

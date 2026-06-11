@@ -1,0 +1,23 @@
+{
+  "_perk": "lint",
+  "sequence": [
+    "py_lint"
+  ],
+  "tools": {
+    "py_lint": {
+      "binary": "python3",
+      "params": {
+        "PROJECT_DIR": "${PROJECT_DIR}",
+        "LINT_TARGET": "${LINT_TARGET}"
+      }
+    }
+  },
+  "env": {
+    "PROJECT_DIR": "${PROJECT_DIR}",
+    "LINT_TARGET": "${LINT_TARGET}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "python3"
+  ]
+}

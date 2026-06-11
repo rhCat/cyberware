@@ -1,0 +1,19 @@
+{
+  "tool": "git_status",
+  "inputs": {
+    "REPO_DIR": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "git_status_out": {
+      "path": "${RECORD_STORE}/git_status.txt",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/git_status.txt"
+  }
+}

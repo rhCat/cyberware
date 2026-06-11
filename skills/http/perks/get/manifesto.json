@@ -1,0 +1,23 @@
+{
+  "_perk": "get",
+  "sequence": [
+    "http_get"
+  ],
+  "tools": {
+    "http_get": {
+      "binary": "curl",
+      "params": {
+        "URL": "${URL}",
+        "HEADER": "${HEADER}"
+      }
+    }
+  },
+  "env": {
+    "URL": "${URL}",
+    "HEADER": "${HEADER}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "curl"
+  ]
+}

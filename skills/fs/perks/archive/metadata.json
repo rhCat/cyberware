@@ -1,0 +1,17 @@
+{
+  "perk": "archive",
+  "skill": "fs",
+  "description": "tar.gz a directory",
+  "rules": [
+    "gzip tarball to record_store",
+    "source unchanged"
+  ],
+  "usage": "Set SOURCE_DIR. Output: archive.tar.gz.",
+  "limitation": "Single dir; no incremental.",
+  "minimal_example": {
+    "perk": "archive",
+    "vars": {
+      "SOURCE_DIR": "/path/to/dir"
+    }
+  }
+}

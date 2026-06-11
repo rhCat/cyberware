@@ -1,0 +1,23 @@
+{
+  "tool": "http_post",
+  "inputs": {
+    "URL": {
+      "type": "string",
+      "required": true
+    },
+    "BODY": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "http_post_out": {
+      "path": "${RECORD_STORE}/response.body",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/response.body"
+  }
+}

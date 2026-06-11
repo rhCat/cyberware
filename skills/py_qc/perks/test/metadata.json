@@ -1,0 +1,17 @@
+{
+  "perk": "test",
+  "skill": "py_qc",
+  "description": "run pytest",
+  "rules": [
+    "report to record_store",
+    "exit reflects pass/fail"
+  ],
+  "usage": "Set PROJECT_DIR (+ TEST_DIR, PYTEST_ARGS). Output: pytest.out.",
+  "limitation": "pytest-based.",
+  "minimal_example": {
+    "perk": "test",
+    "vars": {
+      "PROJECT_DIR": "/path/to/proj"
+    }
+  }
+}

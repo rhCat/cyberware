@@ -1,0 +1,21 @@
+{
+  "skill": "http",
+  "perks": [
+    {
+      "id": "get",
+      "summary": "GET a URL into a response file",
+      "destructive": false,
+      "tools": [
+        "http_get"
+      ]
+    },
+    {
+      "id": "post",
+      "summary": "POST a JSON body to a URL",
+      "destructive": false,
+      "tools": [
+        "http_post"
+      ]
+    }
+  ]
+}

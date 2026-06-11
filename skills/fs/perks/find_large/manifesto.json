@@ -1,0 +1,23 @@
+{
+  "_perk": "find_large",
+  "sequence": [
+    "fs_find_large"
+  ],
+  "tools": {
+    "fs_find_large": {
+      "binary": "find",
+      "params": {
+        "SEARCH_DIR": "${SEARCH_DIR}",
+        "MIN_SIZE": "${MIN_SIZE}"
+      }
+    }
+  },
+  "env": {
+    "SEARCH_DIR": "${SEARCH_DIR}",
+    "MIN_SIZE": "${MIN_SIZE}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "find"
+  ]
+}

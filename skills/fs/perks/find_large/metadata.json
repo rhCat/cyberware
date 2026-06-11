@@ -1,0 +1,17 @@
+{
+  "perk": "find_large",
+  "skill": "fs",
+  "description": "list files over a size threshold (read-only)",
+  "rules": [
+    "read-only",
+    "listing to record_store"
+  ],
+  "usage": "Set SEARCH_DIR (+ MIN_SIZE, default 100M). Output: large_files.txt.",
+  "limitation": "No deletion \u2014 listing only.",
+  "minimal_example": {
+    "perk": "find_large",
+    "vars": {
+      "SEARCH_DIR": "/var/log"
+    }
+  }
+}
