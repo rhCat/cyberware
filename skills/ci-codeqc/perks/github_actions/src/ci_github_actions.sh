@@ -33,7 +33,8 @@ jobs:
       - name: types (mypy)
         run: mypy ${SRC_DIR:-.} || true
       - name: test (pytest)
-        run: pytest ${TEST_DIR:-tests} --cov=${SRC_DIR:-.} || echo "no tests yet"
+        run: |
+          if [ -d ${TEST_DIR:-tests} ]; then pytest ${TEST_DIR:-tests} --cov=${SRC_DIR:-.}; else echo "no ${TEST_DIR:-tests}/ dir — skipping"; fi
 YAML
 cp "$WF" "${RECORD_STORE%/}/codeqc.yml"
 printf '{"tool":"ci_github_actions","status":"ok","action":"%s","workflow":"%s"}\n' "$ACTION" "$WF"
