@@ -78,6 +78,34 @@ def snippet_stub(tool):
             f'printf \'{{"tool":"{tool}","status":"ok","out":"%s"}}\\n\' "$OUT"\n')
 
 
+def py_stub(tool):
+    """Python-core stub — the logic lives here; a thin .sh porter execs it (easy to inspect/lint/test)."""
+    return (f"#!/usr/bin/env python3\n"
+            f'"""{tool} — TODO: the proven pathway. Reads INPUT + RECORD_STORE from env; emits structured JSON."""\n'
+            "from __future__ import annotations\n"
+            "import json\nimport os\nimport sys\n\n\n"
+            "def main() -> int:\n"
+            '    """TODO: implement."""\n'
+            '    inp = os.environ["INPUT"]\n'
+            '    store = os.environ["RECORD_STORE"].rstrip("/")\n'
+            f'    out = os.path.join(store, "{tool}.out")\n'
+            "    # TODO: the real logic using `inp`, writing results to `out`\n"
+            f'    open(out, "w").write("TODO: implement {tool}\\n")\n'
+            f'    print(json.dumps({{"tool": "{tool}", "status": "ok", "out": out}}))\n'
+            "    return 0\n\n\n"
+            'if __name__ == "__main__":\n'
+            "    sys.exit(main())\n")
+
+
+def porter_stub(tool):
+    """A thin .sh that runs the Python core, which reads its inputs from the (exported) environment."""
+    return (f"#!/usr/bin/env bash\n"
+            f"# {tool} — porter: runs the Python core ({tool}.py), which reads its inputs from the environment.\n"
+            "set -euo pipefail\n"
+            'HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n'
+            f'exec python3 "$HERE/{tool}.py"\n')
+
+
 def skill_md(sid, name, perks):
     rows = "\n".join(f"| `{pid}` | `{p['tool']}` | TODO |" for pid, p in perks.items())
     plist = ", ".join(perks)
@@ -135,7 +163,11 @@ def main():
         wj(f"{P}/src/contracts.json", {"tool": tool, "inputs": {"INPUT": {"type": "string", "required": True}},
                                        "outputs": {tool + "_out": {"path": out, "type": "file"}},
                                        "checks": {"exit_zero": True, "output_exists": out}})
-        wsh(f"{P}/src/{tool}.sh", snippet_stub(tool))
+        if binary == "python3":          # python-core: standalone .py + a thin .sh porter (inspect/lint/test the .py directly)
+            wsh(f"{P}/src/{tool}.py", py_stub(tool))
+            wsh(f"{P}/src/{tool}.sh", porter_stub(tool))
+        else:                            # the .sh is the tool itself (psql, curl, tar, git, …)
+            wsh(f"{P}/src/{tool}.sh", snippet_stub(tool))
 
     print(f"scaffolded skills/{sid} · perks: {', '.join(perks)}")
     print("  next: fill the snippets (perks/<perk>/src/<tool>.sh), the vars (manifesto+contracts), SKILL.md")
