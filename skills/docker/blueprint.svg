@@ -1,43 +1,84 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="580" height="810" viewBox="0 0 580 810" font-family="ui-monospace,Menlo,Consolas,monospace">
-<defs><filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><pattern id="px" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#0a0f0a"/><rect width="1" height="1" fill="#39ff14" fill-opacity="0.16"/></pattern><marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 z" fill="#39ff14"/></marker></defs>
-<rect width="580" height="810" fill="#0a0f0a"/>
-<rect width="580" height="810" fill="url(#px)"/>
-<text x="14" y="24" font-size="14" font-weight="700" letter-spacing="3" fill="#39ff14" filter="url(#glow)">DOCKER</text>
-<path d="M135.0,108 L135.0,180" fill="none" stroke="#39ff14" stroke-width="1.6" marker-end="url(#arr)" filter="url(#glow)" opacity="0.92"/>
-<text x="260" y="136" font-size="11" font-weight="700" fill="#aaff7a">PREPARE</text>
-<text x="260" y="149" font-size="9" fill="#4fc23a">▸ validator:check_inputs</text>
-<text x="260" y="161" font-size="9" fill="#4fc23a">⊨ inputs_present ∧ store_writable</text>
-<path d="M135.0,258 L135.0,330" fill="none" stroke="#39ff14" stroke-width="1.6" marker-end="url(#arr)" filter="url(#glow)" opacity="0.92"/>
-<text x="260" y="286" font-size="11" font-weight="700" fill="#aaff7a">OPERATE</text>
-<text x="260" y="299" font-size="9" fill="#4fc23a">▸ perk:sequence</text>
-<text x="260" y="311" font-size="9" fill="#4fc23a">⊨ governed_run</text>
-<path d="M135.0,408 L135.0,480" fill="none" stroke="#39ff14" stroke-width="1.6" marker-end="url(#arr)" filter="url(#glow)" opacity="0.92"/>
-<text x="260" y="436" font-size="11" font-weight="700" fill="#aaff7a">VERIFY</text>
-<text x="260" y="449" font-size="9" fill="#4fc23a">▸ validator:check_contract</text>
-<text x="260" y="461" font-size="9" fill="#4fc23a">⊨ contract_checks_pass</text>
-<path d="M135.0,558 L135.0,630" fill="none" stroke="#39ff14" stroke-width="1.6" marker-end="url(#arr)" filter="url(#glow)" opacity="0.92"/>
-<text x="260" y="586" font-size="11" font-weight="700" fill="#aaff7a">RECORD</text>
-<text x="260" y="599" font-size="9" fill="#4fc23a">▸ executor:record</text>
-<rect x="30" y="30" width="210" height="78" fill="#0e1d0d" stroke="#aaff7a" stroke-width="2" filter="url(#glow)"/>
-<text x="41" y="51" font-size="13" font-weight="700" letter-spacing="1" fill="#aaff7a" filter="url(#glow)">READY<tspan font-size="8" letter-spacing="0" fill="#4fc23a">  ▶ entry</tspan></text>
-<text x="41" y="68" font-size="9.5" fill="#4fc23a">task-ledger submitted, nothing</text>
-<text x="41" y="80" font-size="9.5" fill="#4fc23a">run</text>
-<rect x="30" y="180" width="210" height="78" fill="#0b140a" stroke="#39ff14" stroke-width="1.3" filter="url(#glow)"/>
-<text x="41" y="201" font-size="13" font-weight="700" letter-spacing="1" fill="#39ff14" filter="url(#glow)">PREPARED<tspan font-size="8" letter-spacing="0" fill="#4fc23a"></tspan></text>
-<text x="41" y="218" font-size="9.5" fill="#4fc23a">inputs validated — required</text>
-<text x="41" y="230" font-size="9.5" fill="#4fc23a">vars present, runtime + store</text>
-<text x="41" y="242" font-size="9.5" fill="#4fc23a">ready</text>
-<rect x="30" y="330" width="210" height="78" fill="#0b140a" stroke="#39ff14" stroke-width="1.3" filter="url(#glow)"/>
-<text x="41" y="351" font-size="13" font-weight="700" letter-spacing="1" fill="#39ff14" filter="url(#glow)">OPERATED<tspan font-size="8" letter-spacing="0" fill="#4fc23a"></tspan></text>
-<text x="41" y="368" font-size="9.5" fill="#4fc23a">the chosen perk&#x27;s tool sequence</text>
-<text x="41" y="380" font-size="9.5" fill="#4fc23a">ran — ONLY via executor.py</text>
-<rect x="30" y="480" width="210" height="78" fill="#0b140a" stroke="#39ff14" stroke-width="1.3" filter="url(#glow)"/>
-<text x="41" y="501" font-size="13" font-weight="700" letter-spacing="1" fill="#39ff14" filter="url(#glow)">VERIFIED<tspan font-size="8" letter-spacing="0" fill="#4fc23a"></tspan></text>
-<text x="41" y="518" font-size="9.5" fill="#4fc23a">the perk&#x27;s contract checks</text>
-<text x="41" y="530" font-size="9.5" fill="#4fc23a">passed (exit 0, declared</text>
-<text x="41" y="542" font-size="9.5" fill="#4fc23a">outputs exist)</text>
-<rect x="30" y="630" width="210" height="78" fill="#0f2410" stroke="#aaff7a" stroke-width="2" filter="url(#glow)"/>
-<text x="41" y="651" font-size="13" font-weight="700" letter-spacing="1" fill="#aaff7a" filter="url(#glow)">RECORDED<tspan font-size="8" letter-spacing="0" fill="#4fc23a">  ■ terminal</tspan></text>
-<text x="41" y="668" font-size="9.5" fill="#4fc23a">run metadata + outputs recorded</text>
-<text x="41" y="680" font-size="9.5" fill="#4fc23a">to the run-ledger</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="540" height="1116" viewBox="0 0 540 1116" font-family="ui-monospace,Menlo,Consolas,monospace">
+<defs><filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="1.8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><pattern id="px" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#0a0f0a"/><rect width="1" height="1" fill="#39ff14" fill-opacity="0.16"/></pattern><marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#7dff4d"/></marker></defs>
+<rect width="540" height="1116" fill="#0a0f0a"/>
+<rect width="540" height="1116" fill="url(#px)"/>
+<text x="14" y="26" font-size="14" font-weight="700" letter-spacing="3" fill="#39ff14" filter="url(#glow)">DOCKER</text>
+<line x1="162.0" y1="116" x2="162.0" y2="146" stroke="#39ff14" stroke-width="5" opacity="0.22" filter="url(#glow)"/>
+<line x1="162.0" y1="116" x2="162.0" y2="146" stroke="#7dff4d" stroke-width="1.8" marker-end="url(#arr)"/>
+<text x="174" y="135" font-size="11" font-weight="700" fill="#aaff7a">PREPARE</text>
+<line x1="162.0" y1="202" x2="162.0" y2="232" stroke="#39ff14" stroke-width="5" opacity="0.22" filter="url(#glow)"/>
+<line x1="162.0" y1="202" x2="162.0" y2="232" stroke="#7dff4d" stroke-width="1.8" marker-end="url(#arr)"/>
+<line x1="162.0" y1="278" x2="162.0" y2="308" stroke="#39ff14" stroke-width="5" opacity="0.22" filter="url(#glow)"/>
+<line x1="162.0" y1="278" x2="162.0" y2="308" stroke="#7dff4d" stroke-width="1.8" marker-end="url(#arr)"/>
+<line x1="162.0" y1="378" x2="162.0" y2="408" stroke="#39ff14" stroke-width="5" opacity="0.22" filter="url(#glow)"/>
+<line x1="162.0" y1="378" x2="162.0" y2="408" stroke="#7dff4d" stroke-width="1.8" marker-end="url(#arr)"/>
+<text x="174" y="397" font-size="11" font-weight="700" fill="#aaff7a">OPERATE</text>
+<line x1="162.0" y1="464" x2="162.0" y2="494" stroke="#39ff14" stroke-width="5" opacity="0.22" filter="url(#glow)"/>
+<line x1="162.0" y1="464" x2="162.0" y2="494" stroke="#7dff4d" stroke-width="1.8" marker-end="url(#arr)"/>
+<line x1="162.0" y1="540" x2="162.0" y2="570" stroke="#39ff14" stroke-width="5" opacity="0.22" filter="url(#glow)"/>
+<line x1="162.0" y1="540" x2="162.0" y2="570" stroke="#7dff4d" stroke-width="1.8" marker-end="url(#arr)"/>
+<line x1="162.0" y1="640" x2="162.0" y2="670" stroke="#39ff14" stroke-width="5" opacity="0.22" filter="url(#glow)"/>
+<line x1="162.0" y1="640" x2="162.0" y2="670" stroke="#7dff4d" stroke-width="1.8" marker-end="url(#arr)"/>
+<text x="174" y="659" font-size="11" font-weight="700" fill="#aaff7a">VERIFY</text>
+<line x1="162.0" y1="726" x2="162.0" y2="756" stroke="#39ff14" stroke-width="5" opacity="0.22" filter="url(#glow)"/>
+<line x1="162.0" y1="726" x2="162.0" y2="756" stroke="#7dff4d" stroke-width="1.8" marker-end="url(#arr)"/>
+<line x1="162.0" y1="802" x2="162.0" y2="832" stroke="#39ff14" stroke-width="5" opacity="0.22" filter="url(#glow)"/>
+<line x1="162.0" y1="802" x2="162.0" y2="832" stroke="#7dff4d" stroke-width="1.8" marker-end="url(#arr)"/>
+<line x1="162.0" y1="902" x2="162.0" y2="932" stroke="#39ff14" stroke-width="5" opacity="0.22" filter="url(#glow)"/>
+<line x1="162.0" y1="902" x2="162.0" y2="932" stroke="#7dff4d" stroke-width="1.8" marker-end="url(#arr)"/>
+<text x="174" y="921" font-size="11" font-weight="700" fill="#aaff7a">RECORD</text>
+<line x1="162.0" y1="978" x2="162.0" y2="1008" stroke="#39ff14" stroke-width="5" opacity="0.22" filter="url(#glow)"/>
+<line x1="162.0" y1="978" x2="162.0" y2="1008" stroke="#7dff4d" stroke-width="1.8" marker-end="url(#arr)"/>
+<rect x="48.0" y="46" width="228" height="70" fill="#0e1d0d" stroke="#aaff7a" stroke-width="2" filter="url(#glow)"/>
+<text x="60.0" y="66" font-size="13" font-weight="700" letter-spacing="1" fill="#aaff7a" filter="url(#glow)">READY<tspan font-size="8" letter-spacing="0" fill="#5cc746">  ▶ entry</tspan></text>
+<text x="60.0" y="83" font-size="9.5" fill="#5cc746">task-ledger submitted, nothing</text>
+<text x="60.0" y="95" font-size="9.5" fill="#5cc746">run</text>
+<polygon points="162.0,146 237.0,174.0 162.0,202 87.0,174.0" fill="#0c1a0c" stroke="#39ff14" stroke-width="1.7" filter="url(#glow)"/>
+<text x="162" y="173" font-size="9" text-anchor="middle" fill="#39ff14">g_prepared</text>
+<text x="162" y="183" font-size="7" text-anchor="middle" fill="#5cc746">GATE</text>
+<text x="251" y="177" font-size="10" fill="#aaff7a">⊨ inputs_present ∧ store_writable</text>
+<rect x="56.0" y="232" width="212" height="46" fill="#0a1609" stroke="#39ff14" stroke-width="1.4" filter="url(#glow)"/>
+<line x1="63.0" y1="232" x2="63.0" y2="278" stroke="#39ff14" stroke-width="1.2"/>
+<line x1="261.0" y1="232" x2="261.0" y2="278" stroke="#39ff14" stroke-width="1.2"/>
+<text x="162" y="253" font-size="10" font-weight="600" text-anchor="middle" fill="#aaff7a">validator:check_inputs</text>
+<text x="162" y="265" font-size="7.5" text-anchor="middle" fill="#5cc746">a_prepare · action</text>
+<rect x="48.0" y="308" width="228" height="70" fill="#0b140a" stroke="#39ff14" stroke-width="1.4" filter="url(#glow)"/>
+<text x="60.0" y="328" font-size="13" font-weight="700" letter-spacing="1" fill="#39ff14" filter="url(#glow)">PREPARED<tspan font-size="8" letter-spacing="0" fill="#5cc746"></tspan></text>
+<text x="60.0" y="345" font-size="9.5" fill="#5cc746">inputs validated — required vars</text>
+<text x="60.0" y="357" font-size="9.5" fill="#5cc746">present, runtime + store ready</text>
+<polygon points="162.0,408 237.0,436.0 162.0,464 87.0,436.0" fill="#0c1a0c" stroke="#39ff14" stroke-width="1.7" filter="url(#glow)"/>
+<text x="162" y="435" font-size="9" text-anchor="middle" fill="#39ff14">g_operated</text>
+<text x="162" y="445" font-size="7" text-anchor="middle" fill="#5cc746">GATE</text>
+<text x="251" y="439" font-size="10" fill="#aaff7a">⊨ governed_run</text>
+<rect x="56.0" y="494" width="212" height="46" fill="#0a1609" stroke="#39ff14" stroke-width="1.4" filter="url(#glow)"/>
+<line x1="63.0" y1="494" x2="63.0" y2="540" stroke="#39ff14" stroke-width="1.2"/>
+<line x1="261.0" y1="494" x2="261.0" y2="540" stroke="#39ff14" stroke-width="1.2"/>
+<text x="162" y="515" font-size="10" font-weight="600" text-anchor="middle" fill="#aaff7a">perk:sequence</text>
+<text x="162" y="527" font-size="7.5" text-anchor="middle" fill="#5cc746">a_operate · action</text>
+<rect x="48.0" y="570" width="228" height="70" fill="#0b140a" stroke="#39ff14" stroke-width="1.4" filter="url(#glow)"/>
+<text x="60.0" y="590" font-size="13" font-weight="700" letter-spacing="1" fill="#39ff14" filter="url(#glow)">OPERATED<tspan font-size="8" letter-spacing="0" fill="#5cc746"></tspan></text>
+<text x="60.0" y="607" font-size="9.5" fill="#5cc746">the chosen perk&#x27;s tool sequence</text>
+<text x="60.0" y="619" font-size="9.5" fill="#5cc746">ran — ONLY via executor.py</text>
+<polygon points="162.0,670 237.0,698.0 162.0,726 87.0,698.0" fill="#0c1a0c" stroke="#39ff14" stroke-width="1.7" filter="url(#glow)"/>
+<text x="162" y="697" font-size="9" text-anchor="middle" fill="#39ff14">g_verified</text>
+<text x="162" y="707" font-size="7" text-anchor="middle" fill="#5cc746">GATE</text>
+<text x="251" y="701" font-size="10" fill="#aaff7a">⊨ contract_checks_pass</text>
+<rect x="56.0" y="756" width="212" height="46" fill="#0a1609" stroke="#39ff14" stroke-width="1.4" filter="url(#glow)"/>
+<line x1="63.0" y1="756" x2="63.0" y2="802" stroke="#39ff14" stroke-width="1.2"/>
+<line x1="261.0" y1="756" x2="261.0" y2="802" stroke="#39ff14" stroke-width="1.2"/>
+<text x="162" y="777" font-size="10" font-weight="600" text-anchor="middle" fill="#aaff7a">validator:check_contract</text>
+<text x="162" y="789" font-size="7.5" text-anchor="middle" fill="#5cc746">a_verify · action</text>
+<rect x="48.0" y="832" width="228" height="70" fill="#0b140a" stroke="#39ff14" stroke-width="1.4" filter="url(#glow)"/>
+<text x="60.0" y="852" font-size="13" font-weight="700" letter-spacing="1" fill="#39ff14" filter="url(#glow)">VERIFIED<tspan font-size="8" letter-spacing="0" fill="#5cc746"></tspan></text>
+<text x="60.0" y="869" font-size="9.5" fill="#5cc746">the perk&#x27;s contract checks passed</text>
+<text x="60.0" y="881" font-size="9.5" fill="#5cc746">(exit 0, declared outputs exist)</text>
+<rect x="56.0" y="932" width="212" height="46" fill="#0a1609" stroke="#39ff14" stroke-width="1.4" filter="url(#glow)"/>
+<line x1="63.0" y1="932" x2="63.0" y2="978" stroke="#39ff14" stroke-width="1.2"/>
+<line x1="261.0" y1="932" x2="261.0" y2="978" stroke="#39ff14" stroke-width="1.2"/>
+<text x="162" y="953" font-size="10" font-weight="600" text-anchor="middle" fill="#aaff7a">executor:record</text>
+<text x="162" y="965" font-size="7.5" text-anchor="middle" fill="#5cc746">a_record · action</text>
+<rect x="48.0" y="1008" width="228" height="70" fill="#0f2410" stroke="#aaff7a" stroke-width="2" filter="url(#glow)"/>
+<text x="60.0" y="1028" font-size="13" font-weight="700" letter-spacing="1" fill="#aaff7a" filter="url(#glow)">RECORDED<tspan font-size="8" letter-spacing="0" fill="#5cc746">  ■ terminal</tspan></text>
+<text x="60.0" y="1045" font-size="9.5" fill="#5cc746">run metadata + outputs recorded</text>
+<text x="60.0" y="1057" font-size="9.5" fill="#5cc746">to the run-ledger</text>
 </svg>
