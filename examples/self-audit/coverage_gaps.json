@@ -1,0 +1,33 @@
+{
+  "dimension": "coverage",
+  "uncovered": {
+    "load": "infra/validator.py:18",
+    "skill_dir": "infra/validator.py:19",
+    "is_placeholder": "infra/validator.py:22",
+    "check": "infra/validator.py:26",
+    "main": "infra/validator.py:32",
+    "adjacency": "infra/composer.py:21",
+    "structural": "infra/composer.py:28",
+    "emit_tla": "infra/composer.py:49",
+    "run_tlc": "infra/composer.py:65",
+    "E": "infra/visualize.py:20",
+    "wrap": "infra/visualize.py:24",
+    "depths": "infra/visualize.py:36",
+    "annotated_states": "infra/visualize.py:54",
+    "drawio": "infra/visualize.py:80",
+    "svg": "infra/visualize.py:100",
+    "render": "infra/visualize.py:132",
+    "wj": "infra/scaffold.py:19",
+    "wsh": "infra/scaffold.py:24",
+    "blueprint": "infra/scaffold.py:30",
+    "snippet_stub": "infra/scaffold.py:70",
+    "skill_md": "infra/scaffold.py:81",
+    "sha": "infra/executor.py:24",
+    "now": "infra/executor.py:25",
+    "rules": "infra/executor.py:26",
+    "record_store_of": "infra/executor.py:29"
+  },
+  "public_total": 25,
+  "uncovered_count": 25,
+  "has_tests": false
+}
