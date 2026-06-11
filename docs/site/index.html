@@ -165,8 +165,18 @@ function renderNav() {
 
 function setMode(id) {
   mode = id; renderNav();
-  if (id === "dashboard") { dash.style.display = "grid"; docview.style.display = "none"; render(); }
-  else { dash.style.display = "none"; docview.style.display = "block"; const d = DOCS.find(x => x.id === id); docview.innerHTML = `<div class="doc md">${md(d ? d.body : "")}</div>`; window.scrollTo(0, 0); }
+  if (id === "dashboard") { dash.style.display = "grid"; docview.style.display = "none"; render(); return; }
+  dash.style.display = "none"; docview.style.display = "block";
+  const d = DOCS.find(x => x.id === id);
+  let pre = "";
+  if (d && d.pipeline) {
+    pre = `<h2>The pipeline as a blueprint <span class="muted" style="font-size:13px">· the ouroboros</span></h2>
+      <p class="muted" style="font-size:12.5px">The infra's <b>own</b> L++ blueprint — every task-ledger's path through the governed runtime (validate → compose → compile → oversee → execute), drawn with the same visualizer the skills use. Each gate's <b>✗ fail</b> route is the stage refusing and logging.</p>
+      <div class="card" id="bp">${d.pipeline.svg}</div>
+      <details class="bp" style="margin:10px 0 24px"><summary>pipeline blueprint — L++ source (infra/pipeline.blueprint.json)</summary><pre class="tall">${esc(JSON.stringify(d.pipeline.blueprint, null, 2))}</pre></details>`;
+  }
+  docview.innerHTML = `<div class="doc md">${pre}${md(d ? d.body : "")}</div>`;
+  window.scrollTo(0, 0);
 }
 
 // ── dashboard ──

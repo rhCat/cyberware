@@ -83,6 +83,11 @@ def main() -> int:
               if os.path.isdir(sdir) and (d := skill_data(sdir))]
     docs = [{"id": name, "label": label, "body": read(os.path.join(ROOT, "docs", name + ".md"))}
             for name, label in DOC_TABS]
+    # the infra's OWN blueprint (the governance pipeline) — placed under Architecture (the ouroboros)
+    pipeline_bp = load(os.path.join(ROOT, "infra", "pipeline.blueprint.json"))
+    for d in docs:
+        if d["id"] == "architecture" and pipeline_bp:
+            d["pipeline"] = {"svg": visualize.svg(pipeline_bp), "blueprint": pipeline_bp}
     out = os.path.join(ROOT, "docs", "site", "data.js")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     open(out, "w").write("window.SKILLS = " + json.dumps(skills, indent=1)
