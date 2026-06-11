@@ -1,0 +1,11 @@
+{
+  "_schema": "task-ledger TEMPLATE for cws-addperk \u2014 evaluate a proposed perk.",
+  "skill": "cws-addperk",
+  "perk": "evaluate",
+  "record_store": "<absolute dir for the evaluation>",
+  "vars": {
+    "SKILL": "<target skill id>",
+    "PERK": "<new perk id>",
+    "PERK_DESC": "<what the perk does>"
+  }
+}

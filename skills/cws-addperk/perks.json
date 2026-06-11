@@ -1,0 +1,23 @@
+{
+  "skill": "cws-addperk",
+  "perks": [
+    {
+      "id": "evaluate",
+      "summary": "assess a proposed perk: belongs | exists | generalizable",
+      "destructive": false,
+      "tools": [
+        "addperk_eval"
+      ]
+    },
+    {
+      "id": "apply",
+      "summary": "branch \u2192 formulate + validate \u2192 PR (notify to merge)",
+      "destructive": false,
+      "tools": [
+        "addperk_branch",
+        "addperk_formulate",
+        "addperk_pr"
+      ]
+    }
+  ]
+}

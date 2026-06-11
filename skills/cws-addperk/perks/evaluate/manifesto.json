@@ -1,0 +1,25 @@
+{
+  "_perk": "evaluate",
+  "sequence": [
+    "addperk_eval"
+  ],
+  "tools": {
+    "addperk_eval": {
+      "binary": "python3",
+      "params": {
+        "SKILL": "${SKILL}",
+        "PERK": "${PERK}",
+        "PERK_DESC": "${PERK_DESC}"
+      }
+    }
+  },
+  "env": {
+    "SKILL": "${SKILL}",
+    "PERK": "${PERK}",
+    "PERK_DESC": "${PERK_DESC}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "python3"
+  ]
+}

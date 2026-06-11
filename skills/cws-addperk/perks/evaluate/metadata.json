@@ -1,0 +1,20 @@
+{
+  "perk": "evaluate",
+  "skill": "cws-addperk",
+  "description": "Assess a proposed perk: belongs to the skill? already exists? generalizable?",
+  "rules": [
+    "read-only \u2014 writes no skill",
+    "exit 2 (halt) if it should not be added",
+    "heuristic \u2014 a recommendation, not a proof"
+  ],
+  "usage": "Set SKILL + PERK + PERK_DESC. Output: perk_eval.json.",
+  "limitation": "Keyword/overlap heuristic; the intelligence makes the final call.",
+  "minimal_example": {
+    "perk": "evaluate",
+    "vars": {
+      "SKILL": "git_ops",
+      "PERK": "push",
+      "PERK_DESC": "push the current branch to a remote"
+    }
+  }
+}

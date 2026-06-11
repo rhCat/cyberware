@@ -1,0 +1,22 @@
+{
+  "perk": "apply",
+  "skill": "cws-addperk",
+  "description": "Branch, formulate + validate the perk, and open a PR (notify to merge).",
+  "rules": [
+    "creates a real branch + PR",
+    "merge is NEVER automatic \u2014 the agent merges on your approval",
+    "formulate composes the skill to validate"
+  ],
+  "usage": "Set SKILL + PERK + PERK_DESC + TOOL + BINARY (+ optional BASE). Output: pr.json.",
+  "limitation": "Scaffolds a snippet STUB \u2014 you fill the perk's logic before merge.",
+  "minimal_example": {
+    "perk": "apply",
+    "vars": {
+      "SKILL": "git_ops",
+      "PERK": "push",
+      "PERK_DESC": "push the current branch",
+      "TOOL": "git_push",
+      "BINARY": "bash"
+    }
+  }
+}
