@@ -50,13 +50,20 @@ run, a `.bk` mismatch, a missing upstream step).
 Every tool skill shares one **perk-agnostic lifecycle**:
 
 ```
-ready → prepared → operated → verified → recorded        (recorded = terminal)
+ready → prepared → verified → executed        (executed = terminal)
 ```
 
-with `safety_invariants` that the conductor cannot violate — chiefly **`governed_execution_only`**
-(tools run only through `executor.py`) and the skill's own guardrails (e.g. `no_destructive_without_
-approval`). Perks are *optional* in the blueprint: the blueprint says what to watch and which logs to
-check; a perk supplies the concrete, contract-bound *how*.
+The terminal is **executed**, not "recorded" — recording is part of *executing*: the executor writes
+each step to the run-ledger **as it runs**, not in a separate phase after. `safety_invariants` encode
+this — chiefly **`governed_execution_only`** (a task reaches `executed` only through `executor.py`) and
+**`record_during_execution`**, plus the skill's own guardrails. Perks are *optional* in the blueprint:
+the blueprint says what to watch and which logs to check; a perk supplies the concrete, contract-bound
+*how*. The governance pipeline above is itself captured as a blueprint —
+[`infra/pipeline.blueprint.json`](../infra/pipeline.blueprint.json), rendered at the top of this page.
+
+Blueprints render as flowcharts (`infra/visualize.py` → drawio + SVG): **state** = rectangle,
+**transition** = line, **gate** = diamond (with its `✓ pass` / `✗ fail → exit·log` branches), **action**
+= the predefined-process shape showing its `compute_unit`. The dashboard draws them in a cyberpunk theme.
 
 ## Relationship to the rest
 

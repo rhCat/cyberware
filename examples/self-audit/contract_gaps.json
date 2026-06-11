@@ -58,8 +58,15 @@
       ]
     },
     {
-      "fn": "main",
+      "fn": "build_script",
       "at": "infra/compiler.py:20",
+      "missing": [
+        "return_type"
+      ]
+    },
+    {
+      "fn": "main",
+      "at": "infra/compiler.py:68",
       "missing": [
         "docstring",
         "return_type"
@@ -154,15 +161,14 @@
     },
     {
       "fn": "svg",
-      "at": "infra/visualize.py:100",
+      "at": "infra/visualize.py:133",
       "missing": [
-        "docstring",
         "return_type"
       ]
     },
     {
       "fn": "render",
-      "at": "infra/visualize.py:132",
+      "at": "infra/visualize.py:215",
       "missing": [
         "docstring",
         "return_type"
@@ -170,7 +176,23 @@
     },
     {
       "fn": "main",
+      "at": "infra/visualize.py:224",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "expr_of",
       "at": "infra/visualize.py:141",
+      "missing": [
+        "docstring",
+        "return_type"
+      ]
+    },
+    {
+      "fn": "steps_of",
+      "at": "infra/visualize.py:144",
       "missing": [
         "docstring",
         "return_type"
@@ -201,15 +223,29 @@
     },
     {
       "fn": "snippet_stub",
-      "at": "infra/scaffold.py:70",
+      "at": "infra/scaffold.py:67",
       "missing": [
         "docstring",
         "return_type"
       ]
     },
     {
+      "fn": "py_stub",
+      "at": "infra/scaffold.py:78",
+      "missing": [
+        "return_type"
+      ]
+    },
+    {
+      "fn": "porter_stub",
+      "at": "infra/scaffold.py:97",
+      "missing": [
+        "return_type"
+      ]
+    },
+    {
       "fn": "skill_md",
-      "at": "infra/scaffold.py:81",
+      "at": "infra/scaffold.py:106",
       "missing": [
         "docstring",
         "return_type"
@@ -217,7 +253,7 @@
     },
     {
       "fn": "main",
-      "at": "infra/scaffold.py:95",
+      "at": "infra/scaffold.py:120",
       "missing": [
         "docstring",
         "return_type"
@@ -264,6 +300,6 @@
       ]
     }
   ],
-  "public_total": 33,
-  "gap_count": 33
+  "public_total": 43,
+  "gap_count": 38
 }
