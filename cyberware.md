@@ -101,6 +101,7 @@ SKILL.md       context for you — what it does, what to watch, which logs to ch
 blueprint.json the L++ lifecycle: ready → prepared → verified → executed  (executed = terminal)
 perks.json     the proven pathways (id · summary · tools · destructive?)
 ledger.json    the FORM you fill → task-ledger.json
+index.json     per-file sha256 + skill_sha — the authenticity manifest (python3 -m infra.tool.skill_index)
 perks/<perk>/
   metadata.json   rules · usage · limitation · minimal_example
   manifesto.json  the ${VAR} template: sequence (tool order) · tools · env · requires

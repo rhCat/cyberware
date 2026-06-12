@@ -40,6 +40,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from infra.govern import compiler
 from infra.govern import composer
+from infra.tool import skill_index   # verify the registry matches its committed per-skill authenticity index
 import difflib             # the inconsistency path is a plain text diff — never execute a submitted plan
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -94,6 +95,14 @@ def ensure_monitor_token(cfg):
 # ───────────────────────── governance core ─────────────────────────
 
 _TLC_CACHE = {}                                          # blueprint sha -> (ok, msg); blueprints are static
+_VERIFY_CACHE = {}                                       # skill -> (ok, drift); the registry is static at runtime
+
+
+def verify_skill(skill):
+    """Cached authenticity check: does the server's registry for `skill` match its committed index.json?"""
+    if skill not in _VERIFY_CACHE:
+        _VERIFY_CACHE[skill] = skill_index.verify(skill)
+    return _VERIFY_CACHE[skill]
 _TLC_LOCK = threading.Lock()
 
 
@@ -147,6 +156,13 @@ def govern(ledger, cfg):
     except (OSError, ValueError, KeyError) as e:
         return {"decision": "reject", "problems": [{"id": "registry_error", "detail": str(e)}]}
     destructive = next((p.get("destructive", False) for p in perks if p.get("id") == perk), False)
+
+    # authenticity gate: the server won't bless a registry that doesn't match its committed index
+    ok_idx, drift = verify_skill(skill)
+    if not ok_idx:
+        problems.append({"id": "registry_drift", "detail": drift[:5],
+                         "reason": f"{skill} files do not match index.json — regenerate with "
+                                   f"`python3 -m infra.tool.skill_index --skill {skill}`"})
 
     # 2. required inputs present — checked BY NAME against the declared keys (no values needed)
     present = set(var_keys)
@@ -549,7 +565,7 @@ class Handler(BaseHTTPRequestHandler):
                 "destructive": v.get("destructive", False), "needs_approve": v.get("needs_approve", []),
                 "plan_sha": v.get("plan_sha"), "tlc": v.get("tlc"), "ws": f"ws://{ws_host}/oversight"}
         if v["decision"] == "allow":
-            resp["plan"] = plan                          # the value-free plan: sequence + snippets + wrapper
+            resp["plan"] = plan                          # value-free: sequence + wrapper + src-closure hashes
             resp["session_token"] = token                # present this on the WS and to GET /ledger
         code = {"allow": 200, "push_back": 409, "reject": 403}[v["decision"]]
         return self._json(code, resp)

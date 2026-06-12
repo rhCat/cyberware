@@ -1,0 +1,25 @@
+{
+  "skill": "cws-addperk",
+  "skill_sha": "cc5ffc414eefb84cbc4e7720e1b558129252feb4f27cfd7f2fd41261b57bba1a",
+  "file_count": 18,
+  "files": {
+    "SKILL.md": "c94867e0c5221cd4a1d895176368236ba571aca25e4910473982b93fd625e74a",
+    "blueprint.drawio": "e4b14c7abb06ae3b0f2aafbf24d6f836c8fb2a61db9884ebcef8be2733c3d4db",
+    "blueprint.json": "850f27a667e3de75297da6c8bee5f91d3b906a532e9656b6dc2eb6476529f3c8",
+    "blueprint.svg": "33cf2831bdb041ca130abf30eb979a33c2f2dcbcffa23059569de99cfc5db36e",
+    "ledger.json": "14c69211166962705a0d74c4827d55efef2f9fe0dac10b54579185e3277ecd4c",
+    "perks.json": "32ec46687120dc49384823844654acec19bb7758662d26865209d286210dfb7f",
+    "perks/apply/manifesto.json": "017f57f2701e47a52b914a84029c5c31678a8461162a832550ba70bdc02bc5e3",
+    "perks/apply/metadata.json": "d58a93b256fe874621c1b1b641c5739efc40c413c4492963bfc1a28674ffb59a",
+    "perks/apply/src/addperk_branch.sh": "58bed8eba8beadfd2a7934abda91e3749a4a5d8b9c1deb81198d2ec412f7ac65",
+    "perks/apply/src/addperk_formulate.py": "ee5eb3d0d80a990f42c28bf060600cc444777d39a9be20cfea17ee59f39e0b75",
+    "perks/apply/src/addperk_formulate.sh": "342e3f7465a98c9ebfbd968c75ac58fc51756a3aa2bd0e1a8a0b53e233b73ee5",
+    "perks/apply/src/addperk_pr.sh": "9f17fffb37648f58a1031e6a68c18a56b369f05a1beae8a0193d0074c4ce1a75",
+    "perks/apply/src/contracts.json": "06516a7b084447d0e5017f03c934a3002d76bc7f3e622558bcd5b87747864285",
+    "perks/evaluate/manifesto.json": "d31e03ae6c1f3084227729153f7696bcf61019d0ed891dbcdf344d53ca8a8885",
+    "perks/evaluate/metadata.json": "2f70fc20a2a709aebeff857e4cd3974837113a6a1e1fc3e5b8f9a94eff00baec",
+    "perks/evaluate/src/addperk_eval.py": "0dc194ddccff7ad8d23abf141cc21a6035d16189909b29afeafbb1fad7b0314f",
+    "perks/evaluate/src/addperk_eval.sh": "89ed4227914815f7f86e3b9678e985db1e81f960fdc054a3ab877b7752613381",
+    "perks/evaluate/src/contracts.json": "269aa2bcb4b89b30fe3af34de20443b05bed36d89ce180f8c3c9e15bf2e79d03"
+  }
+}
