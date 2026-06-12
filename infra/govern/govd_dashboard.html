@@ -191,6 +191,11 @@ function detailView(main){
   main.appendChild(tlS.s);
 
   if(d.wrapper){ const pl=sect("Blessed plan (value-free)"); const shas=el("div","keys"); for(const [t,h] of Object.entries(d.snippet_shas||{})) shas.appendChild(el("span",null,t+" "+String(h).slice(0,10))); pl.b.appendChild(shas); pl.s.appendChild(el("pre",null,d.wrapper)); main.appendChild(pl.s); }
+
+  if(d.tlc_log || d.tlc_tla){ const tc=sect("TLC model check — "+(d.tlc||""));
+    if(d.tlc_tla){ tc.b.appendChild(el("div","keys",null)); const a=el("details"); a.appendChild(el("summary",null,"TLA+ spec (task.tla)")); a.appendChild(el("pre",null,d.tlc_tla)); tc.b.appendChild(a); }
+    if(d.tlc_log){ const b=el("details"); b.appendChild(el("summary",null,"TLC output")); b.appendChild(el("pre",null,d.tlc_log)); tc.b.appendChild(b); }
+    main.appendChild(tc.s); }
 }
 
 async function tick(){

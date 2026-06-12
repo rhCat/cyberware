@@ -63,20 +63,24 @@ def emit_tla(bp, name="task"):
 
 
 def run_tlc(tla, name):
+    """Returns (ok, msg, output): ok True/False/None, a one-line verdict, and TLC's FULL stdout+stderr
+    (so a deadlock's error trace is captured, not discarded). The scratch temp dir is always removed."""
     jar = os.environ.get("TLA2TOOLS_JAR")
     if not jar or not os.path.isfile(jar) or not shutil.which("java"):
-        return None, "TLC skipped (set TLA2TOOLS_JAR + java for the abstract check)"
+        return None, "TLC skipped (set TLA2TOOLS_JAR + java for the abstract check)", ""
     d = tempfile.mkdtemp(prefix="cyberware-tlc-")
-    open(os.path.join(d, f"{name}.tla"), "w").write(tla)
-    open(os.path.join(d, f"{name}.cfg"), "w").write("SPECIFICATION Spec\n")
     try:
+        open(os.path.join(d, f"{name}.tla"), "w").write(tla)
+        open(os.path.join(d, f"{name}.cfg"), "w").write("SPECIFICATION Spec\n")
         r = subprocess.run(["java", "-cp", jar, "tlc2.TLC", f"{name}.tla"],
                            cwd=d, capture_output=True, text=True, timeout=120)
         out = r.stdout + r.stderr
         ok = "No error has been found" in out   # TLC's success line; deadlock/violation prints an Error: instead
-        return ok, ("no deadlock (TLC)" if ok else "TLC found a deadlock / error")
+        return ok, ("no deadlock (TLC)" if ok else "TLC found a deadlock / error"), out
     except Exception as e:
-        return None, f"TLC error: {e}"
+        return None, f"TLC error: {e}", str(e)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)    # clean up the scratch dir — no more /tmp/cyberware-tlc-* leak
 
 
 def main():
@@ -97,7 +101,7 @@ def main():
     tla = emit_tla(bp)
     if a.tla_out:
         open(a.tla_out, "w").write(tla)
-    ok, msg = run_tlc(tla, "task")
+    ok, msg, _ = run_tlc(tla, "task")
     print(f"  [tlc] {msg}")
 
     bad = bool(issues) or ok is False
