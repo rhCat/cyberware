@@ -3,7 +3,7 @@
   "skill": "cws-create",
   "description": "Lay down a cyberware skill skeleton (blueprint + perks + contracts + snippet stubs).",
   "rules": [
-    "calls infra/scaffold.py",
+    "calls infra/tool/scaffold.py",
     "creates skills/<NEW_SKILL>/ \u2014 composes out of the box; fill the snippets"
   ],
   "usage": "Set NEW_SKILL + NEW_NAME + PERKS (space-separated <pid>:<tool>[:<binary>]). Output: scaffold.log.",
