@@ -138,6 +138,7 @@ then serve):
 
 ```sh
 D=$(mktemp -d); cp docs/site/index.html "$D"; cp -r skillChip "$D"; mkdir "$D/docs"; cp docs/*.md "$D/docs"; cp cyberware.md "$D"
+cp infra/document/pipeline.blueprint.svg "$D/pipeline.svg"; cp infra/document/pipeline.blueprint.json "$D/pipeline.blueprint.json"
 python3 -c "import os,json; json.dump(sorted(d for d in os.listdir('skillChip') if os.path.exists(f'skillChip/{d}/perks.json')), open('$D/skills.json','w'))"
 python3 -m http.server -d "$D" 8765           # → http://localhost:8765
 ```

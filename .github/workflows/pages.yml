@@ -35,6 +35,8 @@ jobs:
           mkdir -p _site/docs
           cp docs/site/index.html _site/index.html
           cp -r skillChip _site/skillChip
+          cp infra/document/pipeline.blueprint.svg  _site/pipeline.svg
+          cp infra/document/pipeline.blueprint.json _site/pipeline.blueprint.json
           cp cyberware.md _site/cyberware.md
           cp docs/*.md _site/docs/
           python3 -c "import os,json; json.dump(sorted(d for d in os.listdir('skillChip') if os.path.isfile(os.path.join('skillChip',d,'perks.json'))), open('_site/skills.json','w'))"

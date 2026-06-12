@@ -38,6 +38,8 @@ provenance ledger. Like a bank session: the ledger, not the contents of your box
 ```
 GET  /health                          -> {status, mode, host, port, registry, chip_sha, chip, runs}
 GET  /catalog                         -> value-free discovery: skills · perks · var-KEYS · skill_sha · verified
+GET  /flow/run/<run_id>?token=…        -> THIS run's task-blueprint SVG (perk's gated sequence; value-free; monitor-gated)
+GET  /flow/<skill>                     -> the skill's generic lifecycle blueprint.svg (value-free; ungated)
 POST /govern  {skill, perk, var_keys, approve?}
        -> 200 allow      {run_id, decision, plan, plan_sha, session_token, ws}     plan = sequence+wrapper+hashes
           409 push_back  {run_id, decision, needs_approve, ...}                    destructive perk → approve
