@@ -62,7 +62,9 @@ def test_govern_returns_a_value_free_plan(server):
     code, v = claim(base, "fs", "find_large", var_keys=["SEARCH_DIR"])
     assert code == 200 and v["decision"] == "allow"
     plan = v["plan"]
-    assert plan["sequence"] == ["fs_find_large"] and "fs_find_large" in plan["snippets"]
+    assert plan["sequence"] == ["fs_find_large"]
+    assert "fs_find_large.sh" in plan["snippet_shas"] and "snippets" not in plan   # hashes only, no code shipped
+    assert plan.get("skill_sha")                              # the authenticity anchor from index.json
     assert "${VAR}" not in plan["wrapper"]                    # wrapper is structural, not value-bearing
     assert v["plan_sha"] == compiler.plan_sha(plan)           # agent can recompute the pinned hash
     # the server record holds NO values — only keys + the plan hash
@@ -277,6 +279,31 @@ def test_run_detail_endpoint(server):
         assert e.code == 403
     d = json.loads(urllib.request.urlopen(base + "/monitor/run/" + rid + "?token=" + mt).read())
     assert d["run_id"] == rid and "token" not in d and d["seq"] == ["fs_find_large"]
+
+
+def test_codebaseqc_audit_runs_end_to_end_via_govd(server, sample_repo, tmp_path):
+    """Regression: the audit's `.sh` porters exec sibling `.py` cores. The agent now runs from its own
+    registry (which has both), verified against the blessed hashes — so it no longer dies with
+    'can't open … cbqc_usage.py' (exit 2)."""
+    base, store, _ = server
+    out = govd_client.run_governed(base, {
+        "skill": "codebaseqc", "perk": "audit", "record_store": str(tmp_path / "audit"),
+        "vars": {"PROJECT_DIR": str(sample_repo), "SRC_DIR": "src", "TEST_DIR": "tests"}})
+    assert out["decision"] == "allow"
+    assert out["results"][0]["exit"] == 0 and len(out["results"]) >= 2   # core found; chain advanced past step 1
+    oks = [e for e in store.get(out["run_id"])["events"] if e.get("status") == "ok"]
+    assert len(oks) >= 1
+
+
+def test_run_refused_when_local_registry_drifts(server, tmp_path, monkeypatch):
+    """The agent refuses to run if its registry doesn't match govd's blessed hashes — no file shipping."""
+    base, _, _ = server
+    sd = tmp_path / "d"; sd.mkdir(); (sd / "f").write_text("x")
+    fake_reg = tmp_path / "reg"                              # an empty 'registry' missing the snippet
+    out = govd_client.run_governed(base, {"skill": "fs", "perk": "find_large",
+                                          "record_store": str(tmp_path / "o"), "vars": {"SEARCH_DIR": str(sd)}},
+                                   registry=str(fake_reg))
+    assert "registry mismatch" in out.get("error", "")
 
 
 def test_port_rotation_skips_occupied():

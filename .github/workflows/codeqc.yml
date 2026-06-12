@@ -19,6 +19,8 @@ jobs:
           pip install ruff mypy pytest pytest-cov
       - name: lint (ruff)
         run: ruff check infra
+      - name: skill authenticity index
+        run: python3 -m infra.tool.skill_index --check
       - name: types (mypy)
         run: mypy infra || true
       - name: test (pytest)
