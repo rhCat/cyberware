@@ -175,7 +175,7 @@ function setMode(id) {
     pre = `<h2>The pipeline as a blueprint <span class="muted" style="font-size:13px">· the ouroboros</span></h2>
       <p class="muted" style="font-size:12.5px">The infra's <b>own</b> L++ blueprint — every task-ledger's path through the governed runtime (validate → compose → compile → oversee → execute), drawn with the same visualizer the skills use. Each gate's <b>✗ fail</b> route is the stage refusing and logging.</p>
       <div class="card" id="bp">${d.pipeline.svg}</div>
-      <details class="bp" style="margin:10px 0 24px"><summary>pipeline blueprint — L++ source (infra/pipeline.blueprint.json)</summary><pre class="tall">${esc(JSON.stringify(d.pipeline.blueprint, null, 2))}</pre></details>`;
+      <details class="bp" style="margin:10px 0 24px"><summary>pipeline blueprint — L++ source (infra/document/pipeline.blueprint.json)</summary><pre class="tall">${esc(JSON.stringify(d.pipeline.blueprint, null, 2))}</pre></details>`;
   }
   docview.innerHTML = `<div class="doc md">${pre}${md(d ? d.body : "")}</div>`;
   window.scrollTo(0, 0);
@@ -304,6 +304,11 @@ async function boot() {
   DOCS = (await Promise.all(DOCSET.map(async ([id, label, path]) => {
     const body = await getText(path); return body != null ? { id, label, body } : null;
   }))).filter(Boolean);
+  const arch = DOCS.find(d => d.id === "architecture");           // the ouroboros: the infra's OWN L++ blueprint
+  if (arch) {
+    const [svg, bp] = await Promise.all([getText("pipeline.svg"), getJSON("pipeline.blueprint.json")]);
+    if (svg && bp) arch.pipeline = { svg, blueprint: bp };
+  }
   renderNav(); renderList(); if (S.length) openSkill(0);
 }
 boot();
