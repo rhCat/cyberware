@@ -57,6 +57,13 @@
   .ask{padding:40px;text-align:center;color:var(--dim)}
   .ask input{font:13px var(--mono);padding:8px 12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--ink);width:340px;max-width:80vw}
   .ask button{font:13px var(--mono);padding:8px 16px;margin-left:8px;background:var(--accent);border:0;border-radius:6px;color:#04181a;cursor:pointer}
+  .tabs{display:flex;gap:4px;margin:0 0 14px;border-bottom:1px solid var(--line)}
+  .tab{padding:7px 18px;cursor:pointer;color:var(--dim);border:1px solid transparent;border-bottom:0;border-radius:8px 8px 0 0;
+    font-size:10px;text-transform:uppercase;letter-spacing:.12em;user-select:none}
+  .tab:hover{color:var(--ink)}
+  .tab.on{color:var(--accent);background:var(--panel);border-color:var(--line);box-shadow:inset 0 2px 0 var(--accent)}
+  .flow{background:var(--panel2);border-radius:8px;padding:10px;text-align:center;overflow:auto}
+  .flow svg{max-width:100%;height:auto;border-radius:6px}
 </style>
 </head>
 <body>
@@ -72,7 +79,8 @@
 "use strict";
 const qs = new URLSearchParams(location.search);
 let token = qs.get("token") || sessionStorage.getItem("govd_monitor_token") || "";
-const state = { snap:null, selected:null, detail:null };
+const state = { snap:null, selected:null, detail:null, tab:"Run" };
+const flowCache = {};   // skill -> blueprint.svg markup (fetched once; the diagram is static per skill)
 const root = document.getElementById("root");
 const dot = document.getElementById("dot"), stamp = document.getElementById("stamp"), chips = document.getElementById("chips");
 const enc = encodeURIComponent;
@@ -165,9 +173,12 @@ function overview(main, s){
   main.appendChild(fd.s);
 }
 
+const TABS=["Run","Flow","CFG"];
+
 function detailView(main){
   const d=state.detail;
   if(!d){ main.appendChild(el("div","empty","loading run… (or it aged out of memory — check the mounted ledger on disk)")); return; }
+  // fixed header — identity + decision + the run meta, shown above every tab
   const hd=sect(d.skill+" / "+d.perk); const hdEl=hd.s.querySelector(".hd");
   hdEl.appendChild(document.createTextNode("  ")); hdEl.appendChild(badge(d.decision));
   if(d.destructive) hdEl.appendChild(el("span","tag-dest"," destructive"));
@@ -180,22 +191,47 @@ function detailView(main){
   if(d.var_keys&&d.var_keys.length){ const k=el("div","keys"); k.style.marginTop="8px"; for(const x of d.var_keys) k.appendChild(el("span",null,x)); hd.b.appendChild(k); }
   main.appendChild(hd.s);
 
-  const steps=stepStates(d.seq, d.events);
-  if(steps.length){ const ss=sect("Steps"); const p=el("div","pills"); for(const st of steps) p.appendChild(el("span","pill "+st.state, st.n+"·"+st.tool)); ss.b.appendChild(p); main.appendChild(ss.s); }
+  // tab bar
+  if(!TABS.includes(state.tab)) state.tab="Run";
+  const bar=el("div","tabs");
+  for(const t of TABS){ const b=el("div","tab"+(state.tab===t?" on":""),t); b.onclick=()=>{ state.tab=t; render(); }; bar.appendChild(b); }
+  main.appendChild(bar);
 
+  const panel=el("div");
+  ({Run:runTab, Flow:flowTab, CFG:cfgTab}[state.tab]||runTab)(panel, d);
+  main.appendChild(panel);
+}
+
+function runTab(panel, d){
+  const steps=stepStates(d.seq, d.events);
+  if(steps.length){ const ss=sect("Steps"); const p=el("div","pills"); for(const st of steps) p.appendChild(el("span","pill "+st.state, st.n+"·"+st.tool)); ss.b.appendChild(p); panel.appendChild(ss.s); }
   const tlS=sect("Event timeline"); const tl=el("div","tl");
   for(const e of (d.events||[])){ const row2=el("div"); row2.appendChild(el("span","t",fmt(e.ts))); row2.appendChild(el("span","ev ev-"+e.type,e.type));
     let txt="step "+e.step; if(e.type==="step_result")txt+=" · "+(e.status||"")+" (exit "+e.exit+")"; if(e.type==="step_refused")txt+=" · "+(e.reason||""); if(e.type==="granted")txt+=" · plan "+String(e.plan_sha||"").slice(0,12);
     row2.appendChild(el("span",null,txt)); tl.appendChild(row2); }
   if(!(d.events||[]).length) tlS.b.appendChild(el("div","empty","no events recorded for this run")); else tlS.b.appendChild(tl);
-  main.appendChild(tlS.s);
+  panel.appendChild(tlS.s);
+}
 
-  if(d.wrapper){ const pl=sect("Blessed plan (value-free)"); const shas=el("div","keys"); for(const [t,h] of Object.entries(d.snippet_shas||{})) shas.appendChild(el("span",null,t+" "+String(h).slice(0,10))); pl.b.appendChild(shas); pl.s.appendChild(el("pre",null,d.wrapper)); main.appendChild(pl.s); }
+function flowTab(panel, d){
+  const fl=sect("Task blueprint — "+d.skill+" / "+d.perk); const wrap=el("div","flow");
+  const cached=flowCache[d.run_id];                          // keyed by RUN — this is the task-specific blueprint
+  if(cached===undefined){                                    // fetch THIS run's task blueprint once, then cache
+    wrap.appendChild(el("div","empty","loading task blueprint…"));
+    fetch("/flow/run/"+enc(d.run_id)+"?token="+enc(token)).then(r=>r.ok?r.text():Promise.reject()).then(t=>{flowCache[d.run_id]=t; render();}).catch(()=>{flowCache[d.run_id]=""; render();});
+  } else if(cached){ wrap.innerHTML=cached; }                // inline SVG — value-free (var KEYS as ${KEY}, run dir $RUN)
+  else { wrap.appendChild(el("div","empty","no task blueprint for this run")); }
+  fl.b.appendChild(wrap);
+  const steps=stepStates(d.seq, d.events);                   // overlay where THIS run actually went, step by step
+  if(steps.length){ const p=el("div","pills"); p.style.marginTop="10px"; for(const st of steps) p.appendChild(el("span","pill "+st.state, st.n+"·"+st.tool)); fl.b.appendChild(p); }
+  panel.appendChild(fl.s);
+}
 
-  if(d.tlc_log || d.tlc_tla){ const tc=sect("TLC model check — "+(d.tlc||""));
-    if(d.tlc_tla){ tc.b.appendChild(el("div","keys",null)); const a=el("details"); a.appendChild(el("summary",null,"TLA+ spec (task.tla)")); a.appendChild(el("pre",null,d.tlc_tla)); tc.b.appendChild(a); }
-    if(d.tlc_log){ const b=el("details"); b.appendChild(el("summary",null,"TLC output")); b.appendChild(el("pre",null,d.tlc_log)); tc.b.appendChild(b); }
-    main.appendChild(tc.s); }
+function cfgTab(panel, d){
+  if(d.wrapper){ const pl=sect("Blessed plan (value-free)"); const shas=el("div","keys"); for(const [t,h] of Object.entries(d.snippet_shas||{})) shas.appendChild(el("span",null,t+" "+String(h).slice(0,10))); pl.b.appendChild(shas); pl.s.appendChild(el("pre",null,d.wrapper)); panel.appendChild(pl.s); }
+  if(d.tlc_tla){ const a=sect("TLA+ spec (task.tla)"); a.s.appendChild(el("pre",null,d.tlc_tla)); panel.appendChild(a.s); }
+  if(d.tlc_log){ const b=sect("TLC model check — "+(d.tlc||"")); b.s.appendChild(el("pre",null,d.tlc_log)); panel.appendChild(b.s); }
+  if(!d.wrapper && !d.tlc_tla && !d.tlc_log) panel.appendChild(el("div","empty","no plan / model-check artifacts for this run"));
 }
 
 async function tick(){
