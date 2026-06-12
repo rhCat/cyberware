@@ -17,7 +17,7 @@ WORKDIR /app
 
 # the trusted registry + the infra — the server compiles/oversees from ITS OWN copy of these
 COPY infra/ ./infra/
-COPY skills/ ./skills/
+COPY skillChip/ ./skillChip/
 
 # build-time authenticity gate: the image's copy of EVERY skill must match its committed index.json.
 # This catches registry drift at build (e.g. a .dockerignore that strips a pinned file) — fail the build

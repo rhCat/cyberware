@@ -6,10 +6,11 @@ consistent (perks.json ↔ dirs ↔ manifesto ↔ SKILL.md) and carry the real o
 import json
 import os
 
+from infra import registry
 from infra.govern import compiler
 from infra.govern import oversight
 import pytest
-from conftest import ROOT, all_perks
+from conftest import all_perks
 
 PERKS = all_perks()
 PERK_IDS = [f"{s}/{p}" for s, p in PERKS]
@@ -17,9 +18,9 @@ SKILLS = sorted({s for s, _ in PERKS})
 
 
 def _example_vars(sk, pk):
-    meta = json.load(open(f"{ROOT}/skills/{sk}/perks/{pk}/metadata.json"))
+    meta = json.load(open(f"{registry.SKILLCHIP}/{sk}/perks/{pk}/metadata.json"))
     ex = dict(meta.get("minimal_example", {}).get("vars", {}))
-    contract = json.load(open(f"{ROOT}/skills/{sk}/perks/{pk}/src/contracts.json"))
+    contract = json.load(open(f"{registry.SKILLCHIP}/{sk}/perks/{pk}/src/contracts.json"))
     for k, spec in contract.get("inputs", {}).items():
         if spec.get("required") and k not in ex:
             ex[k] = "/tmp/placeholder"
@@ -34,7 +35,7 @@ def test_registry_is_nonempty():
 def test_perk_compiles_to_a_clean_script(sk, pk):
     L = {"skill": sk, "perk": pk, "record_store": "/tmp/rs", "vars": _example_vars(sk, pk)}
     text, seq = compiler.build_script(L)
-    man = json.load(open(f"{ROOT}/skills/{sk}/perks/{pk}/manifesto.json"))
+    man = json.load(open(f"{registry.SKILLCHIP}/{sk}/perks/{pk}/manifesto.json"))
     assert seq == man["sequence"], f"{sk}/{pk}: compiled sequence != manifesto"
     for i in range(1, len(seq) + 1):
         assert f"step{i}()" in text
@@ -45,13 +46,13 @@ def test_perk_compiles_to_a_clean_script(sk, pk):
 
 @pytest.mark.parametrize("sk,pk", PERKS, ids=PERK_IDS)
 def test_perk_declares_an_output_check(sk, pk):
-    c = json.load(open(f"{ROOT}/skills/{sk}/perks/{pk}/src/contracts.json"))
+    c = json.load(open(f"{registry.SKILLCHIP}/{sk}/perks/{pk}/src/contracts.json"))
     assert c.get("checks", {}).get("output_exists"), f"{sk}/{pk}: no output_exists"
 
 
 @pytest.mark.parametrize("sk", SKILLS)
 def test_skill_structure_is_consistent(sk):
-    d = f"{ROOT}/skills/{sk}"
+    d = f"{registry.SKILLCHIP}/{sk}"
     assert os.path.isfile(f"{d}/SKILL.md"), f"{sk}: missing SKILL.md"
     smd = open(f"{d}/SKILL.md").read()
     for p in json.load(open(f"{d}/perks.json"))["perks"]:
@@ -66,6 +67,6 @@ def test_skill_structure_is_consistent(sk):
 @pytest.mark.parametrize("sk", SKILLS)
 def test_skill_blueprint_oversight_invariant_is_real(sk):
     """Across the whole registry, the danger gate must be a checked property, not TRUE."""
-    bp = json.load(open(f"{ROOT}/skills/{sk}/blueprint.json"))
+    bp = json.load(open(f"{registry.SKILLCHIP}/{sk}/blueprint.json"))
     inv = next(i for i in bp["safety_invariants"] if i["name"] == "oversight_clears_script")
     assert inv["expression"] != "TRUE" and "oversight_cleared" in inv["expression"]

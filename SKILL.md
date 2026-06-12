@@ -39,7 +39,7 @@ status for *your* copy of each:
 | `drift` | your copy differs from the governed one | no — reconcile first |
 | `unverified` | a **new** skill govd's image has never seen | no — add it, rebuild the image |
 
-Pick a **`verified`** skill + perk, then read its `skills/<skill>/SKILL.md` and the perk's
+Pick a **`verified`** skill + perk, then read its `skillChip/<skill>/SKILL.md` and the perk's
 `perks/<perk>/metadata.json` (rules · usage · limitation · example) for the inputs. **Discovery + the
 sub-skill is the only reading you do.**
 
@@ -85,7 +85,7 @@ The full provenance is govd's, at `GET $GOVD/ledger/<run_id>?token=…`. Confirm
 
 ## Never
 
-- Run a snippet (`skills/.../src/<tool>.sh`) directly, or hand-write the commands a perk would run.
+- Run a snippet (`skillChip/.../src/<tool>.sh`) directly, or hand-write the commands a perk would run.
 - Put a secret **value** anywhere — ledger, config, or var. Use a `*_FILE` pointer.
 - Edit a blessed plan to skip a step, force order, or slip past a contract.
 - Rely on a `drift` / `unverified` skill. *Governed* means blessed by hash from the image — nothing less.

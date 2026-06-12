@@ -75,11 +75,17 @@ catalog and the agent's local view are built by the **same** `skill_index.catalo
 respective registries, so the two can only differ by a real hash difference — never by drift in the
 catalog code itself.
 
-## Authenticity — the per-skill index
+## Authenticity — the chip manifest + the per-skill index
 
-Each skill carries `skills/<skill>/index.json`: the sha256 of every file + a roll-up `skill_sha`
-(`python3 -m infra.tool.skill_index --all` to generate, `--check` to verify; CI gates on it). It is the
-authenticity reference both sides check against:
+The skills live on the **skillChip** (the cartridge — its own repo, vendored as the `skillChip/`
+submodule), located by `infra/registry.py` (`registry.SKILLCHIP`, default `<repo>/skillChip`, overridable
+with `$CYBERWARE_SKILLCHIP`). The chip is **self-describing**: `skillChip/index.json` is the **chip
+manifest** — every skill with its `skill_sha`, plus a roll-up `chip_sha` — which cyberware retrieves to
+discover + verify the whole chip as a unit before trusting any one skill.
+
+Within it, each skill carries `skillChip/<skill>/index.json`: the sha256 of every file + a roll-up
+`skill_sha` (`python3 -m infra.tool.skill_index --all` to generate, `--check` to verify; CI gates on it).
+It is the file-level authenticity reference both sides check against:
 
 - **govd** won't bless a registry that doesn't match its index (`registry_drift` → reject), and pins the
   perk's closure hashes (from the index) in the plan.

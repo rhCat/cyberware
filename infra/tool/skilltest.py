@@ -26,10 +26,11 @@ DATA pinned in the skill's index, not prose — so the proof can't drift from th
 """
 from __future__ import annotations
 import argparse, json, os, shutil, subprocess, sys, tempfile
+from infra import registry
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-SKILLS = os.path.join(ROOT, "skills")
+SKILLS = os.path.join(registry.SKILLCHIP)
 
 
 def case_path(skill, perk):

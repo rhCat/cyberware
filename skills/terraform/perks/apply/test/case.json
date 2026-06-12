@@ -1,8 +1,0 @@
-{
-  "_perk": "apply",
-  "requires": ["terraform"],
-  "vars": { "TF_DIR": "${FIXTURE}" },
-  "expect": {
-    "outputs": ["apply.log"]
-  }
-}

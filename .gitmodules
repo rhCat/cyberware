@@ -1,0 +1,3 @@
+[submodule "skillChip"]
+	path = skillChip
+	url = git@github.com:rhCat/skillChip.git

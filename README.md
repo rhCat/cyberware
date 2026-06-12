@@ -13,11 +13,13 @@ because glue is what this needs.
 > how to run a skill through the governed channel (validate → compose → compile → oversee → execute),
 > how to grow the registry (`cws-create`, `cws-addperk`), and what you must never do.
 
-## Two sides
+## Two sides — engine + cartridge
+
+cyberware is the **engine**; the skills are the **cartridge** — the [**skillChip**](https://github.com/rhCat/skillChip), a separate repo vendored here as the `skillChip/` **git submodule** (the feed-stock cartridge). The engine reads the chip from `registry.SKILLCHIP` — `<repo>/skillChip` by default, or wherever **`$CYBERWARE_SKILLCHIP`** points; swap the chip and the same engine governs a different feed-stock. The chip is self-describing: `skillChip/index.json` is its manifest (every skill + `skill_sha`, plus a roll-up `chip_sha`).
 
 ```
-USER SIDE — the skill registry              GOVERNANCE SIDE — the infrastructure
-  skills/<skill>/                             infra/
+THE CARTRIDGE — the skillChip (submodule)   THE ENGINE — the governance infrastructure
+  skillChip/<skill>/                          infra/
     SKILL.md      context for intelligence      govern/   validator · composer · compiler · oversight
     perks.json    the proven pathways                     executor · runlog · govd · govd_client
     blueprint.json  the action CFG (L++)                  OVERSIGHT_RULE.json · EXECUTOR_RULE.json
@@ -92,7 +94,7 @@ python3 -m infra.govern.executor   --script /tmp/run.sh --step 1        # govern
 python3 -m infra.tool.scaffold --skill myskill --name "My Skill" --perk fetch:my_fetch:curl --perk store:my_store:python3
 
 # render a blueprint as draw.io XML + self-contained SVG (entry blue, terminal green)
-python3 -m infra.tool.visualize --skill pg_ops               # → skills/pg_ops/blueprint.{drawio,svg}
+python3 -m infra.tool.visualize --skill pg_ops               # → skillChip/pg_ops/blueprint.{drawio,svg}
 python3 -m infra.tool.visualize --ledger task.json -o run    # annotated with the chosen perk's steps
 ```
 
@@ -135,8 +137,8 @@ no baked `data.js`), so it always reflects the current skills. Preview locally (
 then serve):
 
 ```sh
-D=$(mktemp -d); cp docs/site/index.html "$D"; cp -r skills "$D"; mkdir "$D/docs"; cp docs/*.md "$D/docs"; cp cyberware.md "$D"
-python3 -c "import os,json; json.dump(sorted(os.listdir('skills')), open('$D/skills.json','w'))"
+D=$(mktemp -d); cp docs/site/index.html "$D"; cp -r skillChip "$D"; mkdir "$D/docs"; cp docs/*.md "$D/docs"; cp cyberware.md "$D"
+python3 -c "import os,json; json.dump(sorted(d for d in os.listdir('skillChip') if os.path.exists(f'skillChip/{d}/perks.json')), open('$D/skills.json','w'))"
 python3 -m http.server -d "$D" 8765           # → http://localhost:8765
 ```
 

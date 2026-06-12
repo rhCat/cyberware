@@ -1,7 +1,0 @@
-{
-  "_perk": "audit",
-  "vars": { "PROJECT_DIR": "${FIXTURE}" },
-  "expect": {
-    "outputs": ["audit_report.json"]
-  }
-}

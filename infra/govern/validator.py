@@ -12,13 +12,14 @@ inspection — it touches nothing it doesn't own.
 from __future__ import annotations
 import argparse, json, os, shutil, socket, sys
 
+from infra import registry
 from infra.govern.runlog import is_default as is_placeholder, run_dir
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def load(p): return json.load(open(p))
-def skill_dir(skill): return os.path.join(ROOT, "skills", skill)
+def skill_dir(skill): return os.path.join(registry.SKILLCHIP, skill)
 
 
 def check(name, ok, detail="", gating=True):

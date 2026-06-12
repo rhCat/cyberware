@@ -1,9 +1,0 @@
-{
-  "_schema": "task-ledger TEMPLATE for markdown — set perk, fill record_store + the vars the perk declares.",
-  "skill": "markdown",
-  "perk": "toc",
-  "record_store": "<absolute dir for outputs + run-ledger>",
-  "vars": {
-    "MD_FILE": "<absolute path to a .md file>"
-  }
-}

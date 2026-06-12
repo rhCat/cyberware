@@ -8,10 +8,14 @@ channel that *executes*. Blueprints are [L++](https://github.com/rhCat/lpp); Pyt
 
 ## Two sides
 
+cyberware is the **engine**; the skills are a separate **cartridge** — the [**skillChip**](https://github.com/rhCat/skillChip), its own git repo vendored here as the `skillChip/` submodule (the "feed-stock cartridge"). The engine reads every skill from the chip; the chip carries no governance of its own.
+
 | side | what | where |
 |---|---|---|
-| **registry** | the skills — each a self-contained, verifiable **package** (context · lifecycle · pathways · contracts · authenticity · proof) | `skills/<skill>/` |
-| **governance** | the infrastructure that validates · composes · compiles · oversees · executes — and governs/audits as a service | `infra/` |
+| **skillChip** | the cartridge — the skills, each a self-contained, verifiable **package** (context · lifecycle · pathways · contracts · authenticity · proof). A separate repo, vendored as a submodule. | `skillChip/<skill>/` |
+| **governance** | the engine — the infrastructure that validates · composes · compiles · oversees · executes — and governs/audits as a service | `infra/` |
+
+The chip is located by `infra/registry.py` (`registry.SKILLCHIP`): the hardcoded default `<repo>/skillChip`, overridable with **`$CYBERWARE_SKILLCHIP`**. The chip is **self-describing** — `skillChip/index.json` is its **manifest**: every skill with its `skill_sha`, plus a roll-up `chip_sha`, which cyberware retrieves to discover + verify the whole chip as a unit (each skill keeps its own `index.json` for file-level authenticity). Swap the chip — point `$CYBERWARE_SKILLCHIP` elsewhere — and the same engine governs a different feed-stock, unchanged.
 
 `infra/` is a Python package, invoked as `python3 -m infra.<pkg>.<module>`:
 
@@ -24,7 +28,7 @@ channel that *executes*. Blueprints are [L++](https://github.com/rhCat/lpp); Pyt
 ## A skill is a package
 
 A skill is **not a prose description you trust** — it is a self-contained unit you can verify and build
-upon. `skills/<skill>/`:
+upon. `skillChip/<skill>/`:
 
 ```
 SKILL.md            context: what it does, what to watch, which logs to check
@@ -101,9 +105,10 @@ per-run session token gates the WebSocket and the ledger read; a `step_result` i
 
 ## Authenticity — the skill's identity
 
-`index.json` pins the sha256 of every file in a skill plus a roll-up `skill_sha`
-(`infra/tool/skill_index`). It is the reference both planes verify against, so a skill's version is
-checkable **without passing files back and forth** — only hashes cross the wire:
+Each skill's `index.json` pins the sha256 of every file in that skill plus a roll-up `skill_sha`
+(`infra/tool/skill_index`), and the chip's own `skillChip/index.json` manifest rolls those up again into a
+`chip_sha` over the whole cartridge. It is the reference both planes verify against, so a skill's version —
+and the chip as a unit — is checkable **without passing files back and forth**; only hashes cross the wire:
 
 - **build-time gate** — the Docker image runs `skill_index --check --all` right after copying the
   registry, so a drifted index (a stripped file, an un-regenerated hash) **fails the build**.

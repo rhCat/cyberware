@@ -1,6 +1,7 @@
 """Unit: visualize.svg / drawio — diagrams are well-formed and reflect the task."""
 import xml.dom.minidom as minidom
 
+from infra import registry
 from infra.govern import compiler
 from infra.govern import runlog
 from infra.tool import visualize
@@ -8,7 +9,7 @@ from infra.tool import visualize
 
 def _bp():
     import json
-    return json.load(open(str(visualize.ROOT) + "/skills/codebaseqc/blueprint.json"))
+    return json.load(open(registry.SKILLCHIP + "/codebaseqc/blueprint.json"))
 
 
 def test_svg_is_well_formed_xml():

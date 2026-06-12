@@ -15,6 +15,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))   # so `from infra.govern import …` / `from infra.tool import …` resolve
 
+from infra import registry  # noqa: E402
 from infra.govern import runlog  # noqa: E402
 
 TOOL_MODULES = {"scaffold", "visualize", "skill_index"}   # everything else lives under infra.govern
@@ -31,7 +32,7 @@ def run_cli(module: str, *args, **kw):
 def all_perks():
     """Every (skill, perk) pair in the registry — the parametrize source for per-perk tests."""
     out = []
-    for pj in sorted((ROOT / "skills").glob("*/perks.json")):
+    for pj in sorted(Path(registry.SKILLCHIP).glob("*/perks.json")):
         sk = pj.parent.name
         for p in json.loads(pj.read_text())["perks"]:
             out.append((sk, p["id"]))
