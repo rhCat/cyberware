@@ -38,16 +38,30 @@ provenance ledger. Like a bank session: the ledger, not the contents of your box
 ```
 GET  /health                          -> {status, mode, host, port, registry, runs}
 POST /govern  {skill, perk, var_keys, approve?}
-       -> 200 allow      {run_id, decision, plan, plan_sha, session_token, ws}     plan = sequence+snippets+wrapper
+       -> 200 allow      {run_id, decision, plan, plan_sha, session_token, ws}     plan = sequence+wrapper+hashes
           409 push_back  {run_id, decision, needs_approve, ...}                    destructive perk → approve
           403 reject     {run_id, decision, problems, ...}                         (bad key / secret key / missing input)
 GET  /ledger/<run_id>?token=…          -> the server-side provenance chain (requires the run's token)
 ```
 
-The `plan` is value-free: `{skill, perk, sequence, wrapper, snippet_shas, snippets}`. The agent writes the
-wrapper + snippets locally and injects its own vars via the **process environment** at run time, so no value
-is ever written into the script. `plan_sha = sha256(skill, perk, sequence, wrapper, snippet_shas)` — both
-sides compute it identically.
+The `plan` is value-free **and code-free**: `{skill, perk, sequence, wrapper, snippet_shas, skill_sha}`.
+`snippet_shas` is the perk's whole `src/` closure (every `.sh` porter **and** `.py` core) taken from the
+skill's `index.json`; **no file bodies are shipped**. The agent runs the porters+cores from its **own
+registry** (`--registry`, default = the cyberware install it's in) after verifying those files match the
+blessed hashes; it injects its vars via the **process environment**. `plan_sha = sha256(skill, perk,
+sequence, wrapper, snippet_shas, skill_sha)` — both sides compute it identically.
+
+## Authenticity — the per-skill index
+
+Each skill carries `skills/<skill>/index.json`: the sha256 of every file + a roll-up `skill_sha`
+(`python3 -m infra.tool.skill_index --all` to generate, `--check` to verify; CI gates on it). It is the
+authenticity reference both sides check against:
+
+- **govd** won't bless a registry that doesn't match its index (`registry_drift` → reject), and pins the
+  perk's closure hashes (from the index) in the plan.
+- **the agent** verifies its own registry's perk files against those hashes before running; a mismatch
+  refuses the run. So the agent runs *exactly the skill version govd blessed* — and only hashes ever cross
+  the wire, never file bodies. Deploy = the same registry+index on both ends.
 
 ## WebSocket  `/oversight`  (per-run session, status only)
 

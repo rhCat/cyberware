@@ -1,0 +1,26 @@
+{
+  "skill": "codebaseqc",
+  "skill_sha": "43f1870a25d457faf5a775000ea5f8f162a0756e5e28071facfd9a9a421ad200",
+  "file_count": 19,
+  "files": {
+    "SKILL.md": "ce0a07a7e635a4539ca5c949c7f4ad520fdbf2e5cee5ed0d2f023bd60b0a7d91",
+    "blueprint.drawio": "019742af71f7038feafb7810fe0636b3987b45b3565fe2555e694e44cf102e50",
+    "blueprint.json": "3aaa36d359a14ac948434c885ea5e1715b95902329d99f5e719c4204fcf1da80",
+    "blueprint.svg": "a9cc9736d63657ad5e87166aa158ef04e42c8010a3c2486c398aa892d63a3fb2",
+    "ledger.json": "f4ce1915567def6685e26f209339951cdc8ea1703b8cbe358d33c5690c591bb6",
+    "perks.json": "e3c4f9b364baa2f664d1704a9301e21ad6a873e8725052f013f4e2d5560231ae",
+    "perks/audit/manifesto.json": "8020a73cd330772a968ae9507942c207be4c47461506c3d9d6b70b83a5cc2b53",
+    "perks/audit/metadata.json": "c89185356ed9ead8f0d4fdb1cd7c22bfe1810567c8eca427c408feffcb0aea00",
+    "perks/audit/src/cbqc_contract.py": "b2bc43c7ed46597c566abc670ceaeea274cec1799b905ac2020ed3a858b95970",
+    "perks/audit/src/cbqc_contract.sh": "ddf40d58024b87543836c116429511abed56dea8e6bc894c34019c833826d2d9",
+    "perks/audit/src/cbqc_coverage.py": "bd1e5e65313f50c37f9d091c3a5bf3e3d6210081f8dc6bc77e67c6b0c9d79596",
+    "perks/audit/src/cbqc_coverage.sh": "398a3fb334d25f87c2208170f8fbb185d18a1b7d8bbad16e34c26772c734029f",
+    "perks/audit/src/cbqc_usage.py": "5940b5c8ab68348aea46ef0cf0e8f15e69c45e282fcae12b81feb94f446fcbbc",
+    "perks/audit/src/cbqc_usage.sh": "3ce818fa5355b7cd91cf8e7cb2b1882fee1186f9246ae6aef9e3e8c1f86c4ece",
+    "perks/audit/src/contracts.json": "d87d2bd4abb13f284e8320c492671e36cc558580eef3692a9c10211bde0f218a",
+    "perks/setup/manifesto.json": "301983dd9c1e12f2476dee17c701650b2caf7a776235529d7eaf43fb1cd8921e",
+    "perks/setup/metadata.json": "e8466217b371e8485cc319f6486eaa5e259c0d43095ddfe847bc5d40be449172",
+    "perks/setup/src/cbqc_setup.sh": "eff2a43c95747a312c4ba437261c17caa451296a18ed05de02498daf3004d1b5",
+    "perks/setup/src/contracts.json": "5092b158a693c9f6043a8788e668914aab9ad1c258196eb45cb729886872de21"
+  }
+}
