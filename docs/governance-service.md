@@ -37,6 +37,7 @@ provenance ledger. Like a bank session: the ledger, not the contents of your box
 
 ```
 GET  /health                          -> {status, mode, host, port, registry, runs}
+GET  /catalog                         -> value-free discovery: skills · perks · var-KEYS · skill_sha · verified
 POST /govern  {skill, perk, var_keys, approve?}
        -> 200 allow      {run_id, decision, plan, plan_sha, session_token, ws}     plan = sequence+wrapper+hashes
           409 push_back  {run_id, decision, needs_approve, ...}                    destructive perk → approve
@@ -51,6 +52,29 @@ registry** (`--registry`, default = the cyberware install it's in) after verifyi
 blessed hashes; it injects its vars via the **process environment**. `plan_sha = sha256(skill, perk,
 sequence, wrapper, snippet_shas, skill_sha)` — both sides compute it identically.
 
+## Discovery — the catalog (`GET /catalog`)
+
+`/catalog` is **value-free** and **ungated** (like `/health`): an agent points at the server and learns
+what it governs *before* claiming anything. Per skill it returns the **perks**, each perk's var **KEYS**
+(required/optional, names only), the skill's `skill_sha`, and whether govd's own copy is `verified`
+against its index — no values, no run data, no file bodies.
+
+The agent's client cross-references this against its **own** registry by `skill_sha`
+(`./govd-client --discover`, or `discover()` in the client), tagging each local skill:
+
+| status | the agent's copy … | run it governed? |
+|---|---|---|
+| `verified` | matches the hash govd blessed | **yes** |
+| `drift` | differs from the governed copy (or its local index drifted) | no — reconcile |
+| `unverified` | isn't in govd's image at all — a **new** skill | no — add it + rebuild |
+| `server_drift` | exists in govd but govd's own copy fails its index | no — fix the image |
+
+So a skill the agent just authored is **visible but not yet governable** (a claim for it rejects as
+`unknown_skill_perk`) until it's added to the image and the image is rebuilt. Crucially, the server
+catalog and the agent's local view are built by the **same** `skill_index.catalog()` over their
+respective registries, so the two can only differ by a real hash difference — never by drift in the
+catalog code itself.
+
 ## Authenticity — the per-skill index
 
 Each skill carries `skills/<skill>/index.json`: the sha256 of every file + a roll-up `skill_sha`
@@ -62,6 +86,9 @@ authenticity reference both sides check against:
 - **the agent** verifies its own registry's perk files against those hashes before running; a mismatch
   refuses the run. So the agent runs *exactly the skill version govd blessed* — and only hashes ever cross
   the wire, never file bodies. Deploy = the same registry+index on both ends.
+- **the image build** runs `skill_index --check --all` right after copying the registry, so a drifted index
+  (a stripped file, an un-regenerated hash) **fails the build** — the container can never ship a registry
+  that would reject every claim at runtime.
 
 ## WebSocket  `/oversight`  (per-run session, status only)
 
