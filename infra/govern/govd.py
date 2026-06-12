@@ -108,16 +108,17 @@ _TLC_LOCK = threading.Lock()
 
 def tlc_check(bp):
     """The TLA+/TLC deadlock model check, run here in the control plane and cached per blueprint (so TLC
-    runs once per skill). Returns (ok, msg): ok True/False/None — None means TLC is unavailable (no
-    tla2tools/java) and the structural check governs; in the container the jar is present so this is real."""
+    runs once per skill). Returns (ok, msg, tla, output): the verdict plus the TLA+ spec and TLC's FULL log
+    (ok None = TLC unavailable, structural check governs; in the container the jar is present so it's real)."""
     key = hashlib.sha256(json.dumps(bp, sort_keys=True).encode()).hexdigest()
     with _TLC_LOCK:
         if key in _TLC_CACHE:
             return _TLC_CACHE[key]
-    ok, msg = composer.run_tlc(composer.emit_tla(bp), "task")
+    tla = composer.emit_tla(bp)
+    ok, msg, out = composer.run_tlc(tla, "task")
     with _TLC_LOCK:
-        _TLC_CACHE[key] = (ok, msg)
-    return ok, msg
+        _TLC_CACHE[key] = (ok, msg, tla, out)
+    return _TLC_CACHE[key]
 
 
 def govern(ledger, cfg):
@@ -174,7 +175,7 @@ def govern(ledger, cfg):
     #    skipped to structural-only otherwise). A deadlock by either route rejects the claim.
     for s in composer.structural(bp):
         problems.append({"id": "structural", "detail": s})
-    tlc_ok, tlc_msg = tlc_check(bp)
+    tlc_ok, tlc_msg, tlc_tla, tlc_out = tlc_check(bp)
     if tlc_ok is False:
         problems.append({"id": "deadlock_tlc", "detail": tlc_msg})
 
@@ -192,7 +193,8 @@ def govern(ledger, cfg):
     decision = "reject" if problems else ("push_back" if needs_approve else "allow")
     return {"decision": decision, "problems": problems, "destructive": destructive,
             "approved": [a for a in approve if a in (perk, "destructive")],
-            "plan": plan, "plan_sha": psha, "seq": plan["sequence"], "tlc": tlc_msg,
+            "plan": plan, "plan_sha": psha, "seq": plan["sequence"],
+            "tlc": tlc_msg, "tlc_tla": tlc_tla, "tlc_log": tlc_out,   # the model-check spec + full log
             "needs_approve": needs_approve}
 
 
@@ -547,6 +549,7 @@ class Handler(BaseHTTPRequestHandler):
                   "destructive": v.get("destructive", False), "approved": v.get("approved", []),
                   "plan_sha": v.get("plan_sha"), "snippet_shas": (plan or {}).get("snippet_shas", {}),
                   "seq": v.get("seq", []), "wrapper": (plan or {}).get("wrapper", ""), "tlc": v.get("tlc"),
+                  "tlc_tla": v.get("tlc_tla"), "tlc_log": v.get("tlc_log"),   # the model-check spec + full output
                   "problems": v.get("problems", []), "events": []}
         if v["decision"] == "allow":                     # only authorized runs are persisted (bounds growth)
             store.create(run_id, record)
