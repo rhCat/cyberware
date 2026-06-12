@@ -1,0 +1,18 @@
+{
+  "perk": "toc",
+  "skill": "markdown",
+  "description": "generate a GitHub-style table of contents from ATX headings (read-only)",
+  "rules": [
+    "read-only",
+    "skips headings inside fenced code blocks",
+    "table of contents to record_store"
+  ],
+  "usage": "Set MD_FILE (a .md file). Output: toc.md (a nested bullet list of - [text](#slug) links).",
+  "limitation": "ATX headings only (lines starting with #..######); does not parse Setext (underlined) headings.",
+  "minimal_example": {
+    "perk": "toc",
+    "vars": {
+      "MD_FILE": "/tmp/README.md"
+    }
+  }
+}

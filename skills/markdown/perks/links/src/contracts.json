@@ -1,0 +1,19 @@
+{
+  "tool": "md_links",
+  "inputs": {
+    "MD_FILE": {
+      "type": "file",
+      "required": true
+    }
+  },
+  "outputs": {
+    "report": {
+      "path": "${RECORD_STORE}/link_report.json",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/link_report.json"
+  }
+}

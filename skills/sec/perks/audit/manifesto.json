@@ -1,0 +1,19 @@
+{
+  "_perk": "audit",
+  "sequence": [
+    "sec_audit"
+  ],
+  "tools": {
+    "sec_audit": {
+      "binary": "bash",
+      "params": {
+        "PROJECT_DIR": "${PROJECT_DIR}"
+      }
+    }
+  },
+  "env": {
+    "PROJECT_DIR": "${PROJECT_DIR}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": []
+}

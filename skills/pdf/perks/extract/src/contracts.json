@@ -1,0 +1,19 @@
+{
+  "tool": "pdf_extract",
+  "inputs": {
+    "PDF_FILE": {
+      "type": "file",
+      "required": true
+    }
+  },
+  "outputs": {
+    "pdf_extract_out": {
+      "path": "${RECORD_STORE}/extracted.txt",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/extracted.txt"
+  }
+}

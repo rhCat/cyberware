@@ -1,0 +1,23 @@
+{
+  "_perk": "query",
+  "sequence": [
+    "sqlite_query"
+  ],
+  "tools": {
+    "sqlite_query": {
+      "binary": "sqlite3",
+      "params": {
+        "DB_FILE": "${DB_FILE}",
+        "QUERY": "${QUERY}"
+      }
+    }
+  },
+  "env": {
+    "DB_FILE": "${DB_FILE}",
+    "QUERY": "${QUERY}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "sqlite3"
+  ]
+}

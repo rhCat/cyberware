@@ -1,0 +1,18 @@
+{
+  "perk": "info",
+  "skill": "pdf",
+  "description": "read page count + metadata from a PDF (pdfinfo, fallback pypdf) — read-only",
+  "rules": [
+    "read-only — never modifies the source PDF",
+    "metadata to record_store",
+    "best-effort: succeeds even with no pdf tool installed"
+  ],
+  "usage": "Set PDF_FILE. Output: pdf_info.json.",
+  "limitation": "Reports the document's declared metadata + page count; no content analysis.",
+  "minimal_example": {
+    "perk": "info",
+    "vars": {
+      "PDF_FILE": "/tmp/doc.pdf"
+    }
+  }
+}

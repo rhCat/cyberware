@@ -1,0 +1,19 @@
+{
+  "tool": "js_infer",
+  "inputs": {
+    "DATA_FILE": {
+      "type": "file",
+      "required": true
+    }
+  },
+  "outputs": {
+    "schema": {
+      "path": "${RECORD_STORE}/schema.json",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/schema.json"
+  }
+}

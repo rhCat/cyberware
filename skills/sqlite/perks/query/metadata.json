@@ -1,0 +1,18 @@
+{
+  "perk": "query",
+  "skill": "sqlite",
+  "description": "Run a read-only SQL query against a local SQLite database file.",
+  "rules": [
+    "read-only (sqlite3 -readonly)",
+    "always writes query_result.txt (a note if the db file is missing)"
+  ],
+  "usage": "Set DB_FILE + QUERY. Output: query_result.txt.",
+  "limitation": "Read-only; a single query string. No writes — use the exec perk for migrations.",
+  "minimal_example": {
+    "perk": "query",
+    "vars": {
+      "DB_FILE": "/tmp/cw_demo.db",
+      "QUERY": "SELECT 1"
+    }
+  }
+}

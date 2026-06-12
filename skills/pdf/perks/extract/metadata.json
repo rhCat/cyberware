@@ -1,0 +1,18 @@
+{
+  "perk": "extract",
+  "skill": "pdf",
+  "description": "extract text from a PDF (pdftotext, fallback pypdf) — read-only",
+  "rules": [
+    "read-only — never modifies the source PDF",
+    "extracted text to record_store",
+    "best-effort: succeeds even with no extractor installed"
+  ],
+  "usage": "Set PDF_FILE. Output: extracted.txt.",
+  "limitation": "Text layer only — no OCR for scanned/image-only PDFs.",
+  "minimal_example": {
+    "perk": "extract",
+    "vars": {
+      "PDF_FILE": "/tmp/doc.pdf"
+    }
+  }
+}

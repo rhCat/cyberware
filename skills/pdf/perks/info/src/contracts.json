@@ -1,0 +1,19 @@
+{
+  "tool": "pdf_info",
+  "inputs": {
+    "PDF_FILE": {
+      "type": "file",
+      "required": true
+    }
+  },
+  "outputs": {
+    "pdf_info_out": {
+      "path": "${RECORD_STORE}/pdf_info.json",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/pdf_info.json"
+  }
+}

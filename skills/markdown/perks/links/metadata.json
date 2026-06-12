@@ -1,0 +1,18 @@
+{
+  "perk": "links",
+  "skill": "markdown",
+  "description": "find dead relative links in a Markdown file (read-only)",
+  "rules": [
+    "read-only",
+    "relative targets only (skips http/https/mailto and pure #anchors)",
+    "report to record_store"
+  ],
+  "usage": "Set MD_FILE (a .md file). Output: link_report.json with checked/ok counts and the dead links.",
+  "limitation": "Inline [text](target) links only; does not resolve reference-style links or #anchor fragments.",
+  "minimal_example": {
+    "perk": "links",
+    "vars": {
+      "MD_FILE": "/tmp/README.md"
+    }
+  }
+}

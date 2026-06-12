@@ -1,0 +1,25 @@
+{
+  "_perk": "check",
+  "sequence": [
+    "ssh_check"
+  ],
+  "tools": {
+    "ssh_check": {
+      "binary": "ssh",
+      "params": {
+        "SSH_HOST": "${SSH_HOST}",
+        "SSH_USER": "${SSH_USER}",
+        "SSH_KEY_FILE": "${SSH_KEY_FILE}"
+      }
+    }
+  },
+  "env": {
+    "SSH_HOST": "${SSH_HOST}",
+    "SSH_USER": "${SSH_USER}",
+    "SSH_KEY_FILE": "${SSH_KEY_FILE}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "ssh"
+  ]
+}

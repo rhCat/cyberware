@@ -1,0 +1,11 @@
+{
+  "_schema": "task-ledger TEMPLATE for ssh — set perk, fill record_store + the vars the perk declares.",
+  "skill": "ssh",
+  "perk": "check",
+  "record_store": "<absolute dir for outputs + run-ledger>",
+  "vars": {
+    "SSH_HOST": "<host>",
+    "SSH_USER": "<user>",
+    "SSH_KEY_FILE": "<optional: path to private key>"
+  }
+}
