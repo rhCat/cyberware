@@ -17,17 +17,27 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4                  # main repo: the native runner token owns cyberware
+        with:
+          persist-credentials: false                # don't leave a github.token extraheader that shadows the PAT
+      - name: checkout the skillChip cartridge (submodule)
+        env:                                         # PAT scoped read-only to skillChip; falls back for a public chip
+          TOKEN: ${{ secrets.SUBMODULE_PAT || github.token }}
+        run: |
+          AUTH="https://x-access-token:${TOKEN}@github.com/"
+          git -c "url.${AUTH}.insteadOf=git@github.com:" \
+              -c "url.${AUTH}.insteadOf=https://github.com/" \
+              submodule update --init --recursive --depth=1 skillChip
       # No build: the dashboard self-discovers the registry at runtime. Just publish the static page
       # alongside the registry + docs it fetches, with a directory listing of the skills.
       - name: assemble the site
         run: |
           mkdir -p _site/docs
           cp docs/site/index.html _site/index.html
-          cp -r skills _site/skills
+          cp -r skillChip _site/skillChip
           cp cyberware.md _site/cyberware.md
           cp docs/*.md _site/docs/
-          python3 -c "import os,json; json.dump(sorted(d for d in os.listdir('skills') if os.path.isdir(os.path.join('skills',d))), open('_site/skills.json','w'))"
+          python3 -c "import os,json; json.dump(sorted(d for d in os.listdir('skillChip') if os.path.isfile(os.path.join('skillChip',d,'perks.json'))), open('_site/skills.json','w'))"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

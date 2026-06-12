@@ -19,7 +19,7 @@ leave a visible gap (an unrecorded run, a tamper mismatch, a skipped step).
 
 Channel **all** execution through `infra/govern/executor.py`. Never:
 
-- run a snippet (`skills/<skill>/perks/<perk>/src/<tool>.sh`) directly;
+- run a snippet (`skillChip/<skill>/perks/<perk>/src/<tool>.sh`) directly;
 - edit a compiled `run.sh` to slip past a contract — the `.bk` tamper-check snapshots it on first run
   and **refuses** on drift;
 - skip a stage, or run a step whose upstream steps have not run (the executor refuses).
@@ -29,11 +29,11 @@ explicit, logged `--approve`.
 
 ## How to run a skill — the loop
 
-**1. Pick a skill + perk.** Browse `skills/`, or the [dashboard](https://rhcat.github.io/cyberware/).
+**1. Pick a skill + perk.** Browse `skillChip/` (the skill cartridge), or the [dashboard](https://rhcat.github.io/cyberware/).
 Read the skill's `SKILL.md` and the perk's `perks/<perk>/metadata.json` (rules · usage · limitation ·
 minimal_example) to learn the inputs.
 
-**2. Write the task-ledger** — copy `skills/<skill>/ledger.json` → `task-ledger.json` and fill only
+**2. Write the task-ledger** — copy `skillChip/<skill>/ledger.json` → `task-ledger.json` and fill only
 these fields:
 
 ```json
@@ -98,7 +98,8 @@ execution*, not aesthetics. A taste skill stays guidance; it does not become a g
 
 ## Anatomy + conventions
 
-A skill is `skills/<skill>/`:
+Skills live on the **skillChip** — the swappable cartridge, a separate repo vendored as the `skillChip/`
+submodule, located by `$CYBERWARE_SKILLCHIP` (default `<repo>/skillChip`). A skill is `skillChip/<skill>/`:
 
 ```
 SKILL.md       context for you — what it does, what to watch, which logs to check

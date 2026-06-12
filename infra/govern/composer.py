@@ -11,6 +11,7 @@ a reachable terminal) always runs, so the check is meaningful even without a JRE
 """
 from __future__ import annotations
 import argparse, json, os, shutil, subprocess, sys, tempfile
+from infra import registry
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -89,7 +90,7 @@ def main():
     ap.add_argument("--tla-out", default=None)
     a = ap.parse_args()
     L = load(a.ledger)
-    bp = load(os.path.join(ROOT, "skills", L["skill"], "blueprint.json"))
+    bp = load(os.path.join(registry.SKILLCHIP, L["skill"], "blueprint.json"))
     print(f"composer · skill={L['skill']} perk={L['perk']}  ({len(bp['states'])} states, {len(bp['transitions'])} transitions)")
 
     issues = structural(bp)

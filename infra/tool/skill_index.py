@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """skill_index.py — the per-skill authenticity manifest.
 
-Each skill carries `skills/<skill>/index.json`: the sha256 of every file in the skill, plus a roll-up
+Each skill carries `skillChip/<skill>/index.json`: the sha256 of every file in the skill, plus a roll-up
 `skill_sha`. It is the authenticity reference — govd blesses a plan against it, and the agent verifies
 its OWN registry against it before running. Only hashes (never file bodies) cross the wire, so a skill's
 authenticity is checkable without passing files back and forth.
@@ -13,10 +13,11 @@ authenticity is checkable without passing files back and forth.
 from __future__ import annotations
 import argparse, hashlib, json, os, sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(os.path.dirname(HERE))            # infra/tool/ -> repo root
-SKILLS = os.path.join(ROOT, "skills")
+from infra import registry
+
+SKILLS = registry.SKILLCHIP                             # the skillChip — the skill feed-stock cyberware reads
 INDEX = "index.json"
+MANIFEST = registry.CHIP_MANIFEST                       # the chip-level manifest at <skillChip>/index.json
 
 
 def sha256_file(path):
@@ -74,7 +75,8 @@ def verify(skill, skills_dir=None):
 
 def all_skills(skills_dir=None):
     skills_dir = skills_dir or SKILLS
-    return sorted(d for d in os.listdir(skills_dir) if os.path.isdir(os.path.join(skills_dir, d)))
+    return sorted(d for d in os.listdir(skills_dir)                       # a real skill carries a perks.json —
+                  if os.path.isfile(os.path.join(skills_dir, d, "perks.json")))   # skips .git, the manifest, README
 
 
 def skill_sha(skill, skills_dir=None):
@@ -110,11 +112,46 @@ def catalog(skills_dir=None):
     return {"skills": skills, "count": len(skills)}
 
 
+def chip_manifest(skills_dir=None):
+    """The chip-level manifest: every skill + its skill_sha, plus a roll-up chip_sha. cyberware retrieves
+    this one file (`<skillChip>/index.json`) to discover + verify the whole chip as a unit."""
+    skills_dir = skills_dir or SKILLS
+    entries = []
+    for s in all_skills(skills_dir):
+        idx = json.load(open(os.path.join(skills_dir, s, INDEX))) if os.path.isfile(os.path.join(skills_dir, s, INDEX)) else {}
+        entries.append({"skill": s, "skill_sha": idx.get("skill_sha"), "file_count": idx.get("file_count")})
+    roll = hashlib.sha256(json.dumps({e["skill"]: e["skill_sha"] for e in entries}, sort_keys=True).encode()).hexdigest()
+    return {"chip": "skillChip", "count": len(entries), "skills": entries, "chip_sha": roll}
+
+
+def write_manifest(skills_dir=None):
+    skills_dir = skills_dir or SKILLS
+    m = chip_manifest(skills_dir)
+    open(os.path.join(skills_dir, MANIFEST), "w").write(json.dumps(m, indent=2) + "\n")
+    return m
+
+
+def verify_chip(skills_dir=None):
+    """(ok, detail) — does the committed chip manifest match the skills actually on the chip?"""
+    skills_dir = skills_dir or SKILLS
+    mp = os.path.join(skills_dir, MANIFEST)
+    if not os.path.isfile(mp):
+        return False, "no chip manifest (index.json) — run --chip"
+    want, have = json.load(open(mp)), chip_manifest(skills_dir)
+    if want.get("chip_sha") != have["chip_sha"]:
+        w = {e["skill"]: e["skill_sha"] for e in want.get("skills", [])}
+        h = {e["skill"]: e["skill_sha"] for e in have["skills"]}
+        changed = sorted(set(w) ^ set(h)) or [s for s in h if w.get(s) != h[s]]
+        return False, f"chip_sha mismatch (skills changed: {changed[:5]})"
+    return True, "chip authentic"
+
+
 def main():
-    ap = argparse.ArgumentParser(description="generate / check per-skill sha256 authenticity indexes")
+    ap = argparse.ArgumentParser(description="generate / check the skillChip's sha256 authenticity indexes")
     ap.add_argument("--skill")
     ap.add_argument("--all", action="store_true")
-    ap.add_argument("--check", action="store_true", help="verify files match the index (no writes)")
+    ap.add_argument("--chip", action="store_true", help="(re)write just the chip-level manifest (index.json)")
+    ap.add_argument("--check", action="store_true", help="verify files match the indexes + the chip manifest (no writes)")
     a = ap.parse_args()
     skills = [a.skill] if a.skill else all_skills()
 
@@ -124,13 +161,22 @@ def main():
             ok, probs = verify(s)
             print(f"  [{'ok' if ok else 'DRIFT'}] {s}" + ("" if ok else " — " + "; ".join(probs)))
             drift += 0 if ok else 1
-        print(f"skill_index: {'all authentic' if not drift else f'{drift} skill(s) drifted'}")
+        cok, cdetail = verify_chip()
+        print(f"  [{'ok' if cok else 'DRIFT'}] chip manifest — {cdetail}")
+        drift += 0 if cok else 1
+        print(f"skill_index: {'all authentic' if not drift else f'{drift} drift(s)'}")
         sys.exit(1 if drift else 0)
+
+    if a.chip:
+        m = write_manifest()
+        print(f"skill_index: wrote chip manifest — {m['count']} skills · chip_sha {m['chip_sha'][:16]}")
+        return
 
     for s in skills:
         idx = write_index(s)
         print(f"  indexed {s}: {idx['file_count']} files · skill_sha {idx['skill_sha'][:16]}")
-    print(f"skill_index: wrote {len(skills)} index.json")
+    m = write_manifest()                                 # any per-skill change rolls up into the chip manifest
+    print(f"skill_index: wrote {len(skills)} index.json + the chip manifest (chip_sha {m['chip_sha'][:16]})")
 
 
 if __name__ == "__main__":

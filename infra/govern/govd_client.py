@@ -15,6 +15,7 @@ Stdlib only (urllib + a tiny RFC 6455 client), so an agent can drive govd with n
 from __future__ import annotations
 import argparse, base64, collections, hashlib, json, os, socket, subprocess, sys, urllib.error, urllib.request
 
+from infra import registry as _reg   # the agent's `registry` arg = its skillChip; default = the bundled chip
 from infra.govern import compiler
 from infra.govern import runlog
 from infra.tool import skill_index   # the value-free catalog builder — shared with govd, so the two can't drift
@@ -46,7 +47,7 @@ def discover(base_url, registry=None):
     Only names + hashes cross the wire — never a value or a file body."""
     registry = registry or DEFAULT_REGISTRY
     gov = {s["skill"]: s for s in _get_json(base_url.rstrip("/") + "/catalog").get("skills", [])}
-    local = skill_index.catalog(os.path.join(registry, "skills"))
+    local = skill_index.catalog(os.path.join(registry))
     out = []
     for s in local["skills"]:
         name, lsha, g = s["skill"], s.get("skill_sha"), gov.get(s["skill"])
@@ -133,13 +134,13 @@ def _ws_recv(sock):
     return (data or b"").decode(errors="replace")
 
 
-DEFAULT_REGISTRY = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
+DEFAULT_REGISTRY = _reg.SKILLCHIP    # the agent runs skills from its own skillChip (override with --registry)
 
 
 def _verify_registry(registry, plan):
     """The agent's OWN perk src files must match the blessed hashes — no file bodies cross the wire.
     Returns (src_dir, problem|None)."""
-    src = os.path.join(registry, "skills", plan["skill"], "perks", plan["perk"], "src")
+    src = os.path.join(registry, plan["skill"], "perks", plan["perk"], "src")
     for fname, want in (plan.get("snippet_shas") or {}).items():
         fp = os.path.join(src, fname)
         if not os.path.isfile(fp):
@@ -160,7 +161,7 @@ def _prepare(plan, ledger, registry):
     env = dict(os.environ)
     env.update({k: str(v) for k, v in (ledger.get("vars") or {}).items()})
     env["RECORD_STORE"] = run
-    env["SNIP"] = os.path.join(registry, "skills", plan["skill"], "perks", plan["perk"], "src")
+    env["SNIP"] = os.path.join(registry, plan["skill"], "perks", plan["perk"], "src")
     return run, sh, env
 
 
