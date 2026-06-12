@@ -1,0 +1,4 @@
+{
+  "_perk": "run",
+  "skip": "needs a reachable SSH host \u2014 contract test covers compilation"
+}

@@ -1,7 +1,7 @@
 {
   "skill": "http",
-  "skill_sha": "f362b24253ee50e529fabe5a93be8d64d7f633c6b71eff29dee86cb6848c2747",
-  "file_count": 14,
+  "skill_sha": "4521a91581a50e07265b60a9df6be737dd8ee6036ad4ad6bd43b1101bac6e855",
+  "file_count": 16,
   "files": {
     "SKILL.md": "5398ff57e082dbcf93107a793f8c2506075cbd05fe799b3c90381ed9238a3d64",
     "blueprint.drawio": "b67ba8a7adae3d06d4dc2e250f92c9f4e867a7f53555544e3af2285be7a4be46",
@@ -13,9 +13,11 @@
     "perks/get/metadata.json": "0b83c7429e369f81f1a1394a8c6957c717ed3bf1e521488be5022b74c777a882",
     "perks/get/src/contracts.json": "92de85a82f2c36b5fee38d801c4fafa10f49850bfab694a322c38e77a263eca1",
     "perks/get/src/http_get.sh": "e33fbab58f3d9435d6cce90faaa9f8930add774161b2a8880a7b72875a8f7cf3",
+    "perks/get/test/case.json": "9b06dd8b72d22116710daed8051e0847d5f5e74d4a629823f31079a7fb6e5eda",
     "perks/post/manifesto.json": "07ad40d63c075ed9c5c9bfe29c59d77bc3b548396f01fad2c9c63b2116817b40",
     "perks/post/metadata.json": "a1e9714601b5ad79dd32c1efcbea98d6c0164a2a8a070b77bb826b7243cd5cf7",
     "perks/post/src/contracts.json": "9152e86bb43ee57f39a099d445af87665ca22e66ea606a3df7e5a33b8920c52a",
-    "perks/post/src/http_post.sh": "858c4b0f2f4a423d5da96d17cbc525e192df439e8701e4f324e4cf1382d3e627"
+    "perks/post/src/http_post.sh": "858c4b0f2f4a423d5da96d17cbc525e192df439e8701e4f324e4cf1382d3e627",
+    "perks/post/test/case.json": "09d1fb48e990ee28752cc8d2331bb3a0651c31c14a986a675eaf15e548aa67d4"
   }
 }

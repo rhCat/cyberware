@@ -1,0 +1,4 @@
+{
+  "_perk": "scaffold",
+  "skip": "repo-mutating (scaffolds a new skill) \u2014 contract-tested only"
+}

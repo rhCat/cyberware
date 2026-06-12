@@ -1,0 +1,7 @@
+{
+  "_perk": "find_large",
+  "vars": { "SEARCH_DIR": "${FIXTURE}", "MIN_SIZE": "1c" },
+  "expect": {
+    "outputs": ["large_files.txt"]
+  }
+}

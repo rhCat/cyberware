@@ -1,0 +1,7 @@
+{
+  "_perk": "setup",
+  "vars": { "TARGET_DIR": "${FIXTURE}/tools" },
+  "expect": {
+    "outputs": ["${TARGET_DIR}/codebaseqc.sh"]
+  }
+}

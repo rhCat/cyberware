@@ -1,0 +1,8 @@
+{
+  "_perk": "exec",
+  "requires": ["sqlite3"],
+  "vars": { "DB_FILE": "${FIXTURE}/demo.db", "SQL_FILE": "${FIXTURE}/migration.sql" },
+  "expect": {
+    "outputs": ["exec_applied.log"]
+  }
+}

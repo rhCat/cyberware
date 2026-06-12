@@ -1,0 +1,11 @@
+{
+  "_perk": "validate",
+  "vars": {
+    "DATA_FILE": "${FIXTURE}/data.json",
+    "SCHEMA_FILE": "${FIXTURE}/schema.json"
+  },
+  "expect": {
+    "outputs": ["validation.json"],
+    "json": { "validation.json": { "valid": true } }
+  }
+}
