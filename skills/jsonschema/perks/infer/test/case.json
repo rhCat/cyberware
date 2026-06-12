@@ -1,8 +1,0 @@
-{
-  "_perk": "infer",
-  "vars": { "DATA_FILE": "${FIXTURE}/data.json" },
-  "expect": {
-    "outputs": ["schema.json"],
-    "json": { "schema.json": { "type": "object" } }
-  }
-}

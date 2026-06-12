@@ -13,6 +13,7 @@ sequence, so each compiled task shows exactly what it will run.
 from __future__ import annotations
 import argparse, html, json, os
 from collections import deque
+from infra import registry
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -287,14 +288,14 @@ def main():
     perk_steps = None
     if a.ledger:
         L = json.load(open(a.ledger)); skill = L["skill"]
-        man = json.load(open(os.path.join(ROOT, "skills", skill, "perks", L["perk"], "manifesto.json")))
+        man = json.load(open(os.path.join(registry.SKILLCHIP, skill, "perks", L["perk"], "manifesto.json")))
         perk_steps = man.get("sequence")
-        bp = json.load(open(os.path.join(ROOT, "skills", skill, "blueprint.json")))
-        default_base = os.path.join(ROOT, "skills", skill, "blueprint")
+        bp = json.load(open(os.path.join(registry.SKILLCHIP, skill, "blueprint.json")))
+        default_base = os.path.join(registry.SKILLCHIP, skill, "blueprint")
     else:
-        path = a.blueprint or os.path.join(ROOT, "skills", a.skill, "blueprint.json")
+        path = a.blueprint or os.path.join(registry.SKILLCHIP, a.skill, "blueprint.json")
         bp = json.load(open(path))
-        default_base = os.path.join(ROOT, "skills", a.skill, "blueprint") if a.skill else path.rsplit(".", 1)[0]
+        default_base = os.path.join(registry.SKILLCHIP, a.skill, "blueprint") if a.skill else path.rsplit(".", 1)[0]
     base = (a.out or default_base)
     base = base[:-7] if base.endswith(".drawio") else (base[:-4] if base.endswith(".svg") else base)
     fmts = ["drawio", "svg"] if a.format == "both" else [a.format]

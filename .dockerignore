@@ -11,6 +11,6 @@
 tests
 docs/site
 examples
-# NOTE: do NOT exclude skills/**/*.drawio or *.svg — each skill's index.json pins every file in the
+# NOTE: do NOT exclude skillChip/**/*.drawio or *.svg — each skill's index.json pins every file in the
 # skill (blueprint.drawio + blueprint.svg included). Stripping them makes the container's copy fail the
 # authenticity check, so govern would reject every skill. The registry must ship exactly what it pins.

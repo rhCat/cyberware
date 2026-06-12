@@ -25,6 +25,13 @@ This is subset of the cyber alchemistry, same verifiable infrastructure but diff
 
 **Built since this founding spec** (see [architecture.md](architecture.md) for the current map):
 
+- **The registry became a cartridge — the skillChip.** The skill registry is now its own repo,
+  [**skillChip**](https://github.com/rhCat/skillChip) ("the feed-stock cartridge"), vendored here as the
+  `skillChip/` submodule; the directory once called `skills/` is now `skillChip/`. cyberware is the
+  *engine*, the chip is the *cartridge*: the infra locates it via `infra/registry.py`
+  (`registry.SKILLCHIP` — default `<repo>/skillChip`, overridable with `$CYBERWARE_SKILLCHIP`), so pointing
+  at another chip makes the same engine govern a different feed-stock. The chip is **self-describing** —
+  `skillChip/index.json` is its manifest (every skill + `skill_sha`, plus a roll-up `chip_sha`).
 - **The skill became a verifiable package.** Each skill now also pins an `index.json` (per-file sha256 +
   a roll-up `skill_sha` — its authenticity identity) and each perk carries a `test/case.json` that proves
   it through the real governed channel. A skill no longer relies on its `SKILL.md` prose and trust.

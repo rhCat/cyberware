@@ -1,9 +1,0 @@
-{
-  "_perk": "grep",
-  "requires": ["grep"],
-  "vars": { "PATTERN": "def", "SEARCH_DIR": "${FIXTURE}" },
-  "expect": {
-    "outputs": ["matches.txt"],
-    "contains": { "matches.txt": "def used" }
-  }
-}

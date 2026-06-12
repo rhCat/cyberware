@@ -41,6 +41,7 @@ from __future__ import annotations
 import argparse, base64, collections, hashlib, hmac, json, os, re, secrets, sys, threading, time, urllib.parse, uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from infra import registry
 from infra.govern import compiler
 from infra.govern import composer
 from infra.tool import skill_index   # verify the registry matches its committed per-skill authenticity index
@@ -165,7 +166,7 @@ def govern(ledger, cfg):
 
     if not skill or not perk:
         return {"decision": "reject", "problems": [{"id": "missing_skill_or_perk"}]}
-    pdir = os.path.join(ROOT, "skills", skill, "perks", perk)
+    pdir = os.path.join(registry.SKILLCHIP, skill, "perks", perk)
     if not os.path.isdir(pdir):
         return {"decision": "reject", "problems": [{"id": "unknown_skill_perk", "detail": f"{skill}/{perk}"}]}
 
@@ -183,8 +184,8 @@ def govern(ledger, cfg):
 
     try:
         contract = json.load(open(os.path.join(pdir, "src", "contracts.json")))
-        bp = json.load(open(os.path.join(ROOT, "skills", skill, "blueprint.json")))
-        perks = json.load(open(os.path.join(ROOT, "skills", skill, "perks.json")))["perks"]
+        bp = json.load(open(os.path.join(registry.SKILLCHIP, skill, "blueprint.json")))
+        perks = json.load(open(os.path.join(registry.SKILLCHIP, skill, "perks.json")))["perks"]
     except (OSError, ValueError, KeyError) as e:
         return {"decision": "reject", "problems": [{"id": "registry_error", "detail": str(e)}]}
     destructive = next((p.get("destructive", False) for p in perks if p.get("id") == perk), False)
@@ -495,7 +496,7 @@ class Handler(BaseHTTPRequestHandler):
         host, port = self.server.server_address[0], self.server.server_address[1]
         if self.path == "/health":
             return self._json(200, {"status": "ok", "service": "cyberware-govd", "mode": cfg["mode"],
-                                    "host": host, "port": port, "registry": os.path.join(ROOT, "skills"),
+                                    "host": host, "port": port, "registry": os.path.join(registry.SKILLCHIP),
                                     "runs": len(store.runs)})
         path = self.path.split("?", 1)[0]
         if path == "/catalog":
@@ -520,7 +521,7 @@ class Handler(BaseHTTPRequestHandler):
             # never escape the registry. (The dashboard's Flow tab uses /flow/run/<id>; this is a fallback.)
             skill = urllib.parse.unquote(path[len("/flow/"):])
             if skill in set(skill_index.all_skills()):
-                svgp = os.path.join(ROOT, "skills", skill, "blueprint.svg")
+                svgp = os.path.join(registry.SKILLCHIP, skill, "blueprint.svg")
                 if os.path.isfile(svgp):
                     return self._svg(open(svgp, "rb").read())
             return self._json(404, {"error": "no flow diagram", "skill": skill})

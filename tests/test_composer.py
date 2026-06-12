@@ -1,4 +1,5 @@
 """Unit: composer.structural / emit_tla — the deadlock check (the safeguard must actually catch one)."""
+from infra import registry
 from infra.govern import composer
 
 GOOD = {
@@ -43,5 +44,5 @@ def test_emit_tla_has_spec_and_terminal_self_loop():
 def test_real_skill_blueprints_are_all_sound():
     import glob
     import json
-    for p in glob.glob(str(composer.ROOT) + "/skills/*/blueprint.json"):
+    for p in glob.glob(registry.SKILLCHIP + "/*/blueprint.json"):
         assert composer.structural(json.load(open(p))) == [], f"{p} has structural issues"

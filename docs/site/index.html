@@ -269,7 +269,7 @@ const getJSON = (p) => fetch(p, { cache: "no-store" }).then(r => r.ok ? r.json()
 const getText = (p) => fetch(p, { cache: "no-store" }).then(r => r.ok ? r.text() : null).catch(() => null);
 
 async function loadSkill(name) {
-  const base = `skills/${encodeURIComponent(name)}`;
+  const base = `skillChip/${encodeURIComponent(name)}`;
   const [bp, pj, smd, svg, idx] = await Promise.all([
     getJSON(`${base}/blueprint.json`), getJSON(`${base}/perks.json`),
     getText(`${base}/SKILL.md`), getText(`${base}/blueprint.svg`), getJSON(`${base}/index.json`)]);

@@ -1,8 +1,0 @@
-{
-  "_perk": "jq",
-  "requires": ["jq"],
-  "vars": { "JSON_FILE": "${FIXTURE}/in.json", "QUERY": ".items | length" },
-  "expect": {
-    "outputs": ["jq_result.json"]
-  }
-}

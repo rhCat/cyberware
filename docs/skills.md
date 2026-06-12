@@ -1,9 +1,10 @@
 # Skill catalog
 
-Tool skills (operational pathways) — not design/taste skills. Each runs through the governed pipeline
-(`validate → compose → compile → oversight → executor`), ships a `blueprint.{drawio,svg}`, pins every
-file in an `index.json` (authenticity), and carries a per-perk `test/case.json` that proves it through
-the real channel. **22 skills** — discover them at `GET /catalog` or `./govd-client --discover`.
+Tool skills (operational pathways) — not design/taste skills. They live on the **skillChip** (cyberware's
+swappable skill cartridge, a separate repo vendored as the `skillChip/` submodule). Each runs through the
+governed pipeline (`validate → compose → compile → oversight → executor`), ships a `blueprint.{drawio,svg}`,
+pins every file in an `index.json` (authenticity), and carries a per-perk `test/case.json` that proves it
+through the real channel. **22 skills** — discover them at `GET /catalog` or `./govd-client --discover`.
 
 | skill | perks | tools | notes / guard |
 |---|---|---|---|

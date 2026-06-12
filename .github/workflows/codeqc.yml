@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:                                       # pull the skillChip cartridge (submodule)
+          submodules: recursive
+          token: ${{ secrets.SUBMODULE_PAT || github.token }}   # private chip→set SUBMODULE_PAT; public→default
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
