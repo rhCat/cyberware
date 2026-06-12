@@ -40,21 +40,27 @@ def skill_files(skill_dir):
     return out
 
 
-def build_index(skill):
-    files = {rel: sha256_file(ap) for rel, ap in sorted(skill_files(os.path.join(SKILLS, skill)).items())}
+# Every path-taking helper resolves `skills_dir or SKILLS` at CALL time (not as a default arg) so the
+# module-global SKILLS stays monkeypatchable, while callers can point at a different registry explicitly.
+
+def build_index(skill, skills_dir=None):
+    skills_dir = skills_dir or SKILLS
+    files = {rel: sha256_file(ap) for rel, ap in sorted(skill_files(os.path.join(skills_dir, skill)).items())}
     roll = hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
     return {"skill": skill, "skill_sha": roll, "file_count": len(files), "files": files}
 
 
-def write_index(skill):
-    idx = build_index(skill)
-    open(os.path.join(SKILLS, skill, INDEX), "w").write(json.dumps(idx, indent=2) + "\n")
+def write_index(skill, skills_dir=None):
+    skills_dir = skills_dir or SKILLS
+    idx = build_index(skill, skills_dir)
+    open(os.path.join(skills_dir, skill, INDEX), "w").write(json.dumps(idx, indent=2) + "\n")
     return idx
 
 
-def verify(skill):
+def verify(skill, skills_dir=None):
     """(ok, problems) comparing the skill's files on disk to its committed index.json."""
-    sd = os.path.join(SKILLS, skill)
+    skills_dir = skills_dir or SKILLS
+    sd = os.path.join(skills_dir, skill)
     ip = os.path.join(sd, INDEX)
     if not os.path.isfile(ip):
         return False, ["no index.json — run --skill " + skill]
@@ -66,8 +72,42 @@ def verify(skill):
     return (not problems), problems
 
 
-def all_skills():
-    return sorted(d for d in os.listdir(SKILLS) if os.path.isdir(os.path.join(SKILLS, d)))
+def all_skills(skills_dir=None):
+    skills_dir = skills_dir or SKILLS
+    return sorted(d for d in os.listdir(skills_dir) if os.path.isdir(os.path.join(skills_dir, d)))
+
+
+def skill_sha(skill, skills_dir=None):
+    """The committed roll-up hash from index.json (None if the skill has no index yet)."""
+    ip = os.path.join(skills_dir or SKILLS, skill, INDEX)
+    return (json.load(open(ip)) or {}).get("skill_sha") if os.path.isfile(ip) else None
+
+
+def _perk_vars(skills_dir, skill, perk):
+    """The var KEYS a perk declares — required vs optional — read from its contracts.json (names only)."""
+    cp = os.path.join(skills_dir, skill, "perks", perk, "src", "contracts.json")
+    inputs = (json.load(open(cp)) or {}).get("inputs", {}) if os.path.isfile(cp) else {}
+    return {"required": sorted(k for k, s in inputs.items() if (s or {}).get("required")),
+            "optional": sorted(k for k, s in inputs.items() if not (s or {}).get("required"))}
+
+
+def catalog(skills_dir=None):
+    """The value-free discovery catalog of a registry: every skill, its authenticity status + skill_sha,
+    and each perk's id/summary/destructive/var-KEYS. Names + hashes only — never a value. Both govd
+    (/catalog over ITS registry) and the agent (local view of its own registry) build it from HERE, so the
+    two can be compared by skill_sha without anything but metadata crossing the wire."""
+    skills_dir = skills_dir or SKILLS
+    skills = []
+    for s in all_skills(skills_dir):
+        ok, problems = verify(s, skills_dir)
+        pj = os.path.join(skills_dir, s, "perks.json")
+        perks = [{"id": p.get("id"), "summary": p.get("summary", ""),
+                  "destructive": bool(p.get("destructive", False)),
+                  "vars": _perk_vars(skills_dir, s, p.get("id", ""))}
+                 for p in (json.load(open(pj)) or {}).get("perks", [])] if os.path.isfile(pj) else []
+        skills.append({"skill": s, "verified": bool(ok), "skill_sha": skill_sha(s, skills_dir),
+                       "drift": (None if ok else problems[:5]), "perks": perks})
+    return {"skills": skills, "count": len(skills)}
 
 
 def main():

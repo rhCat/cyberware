@@ -57,6 +57,40 @@ def test_health(server):
     assert h["status"] == "ok" and h["service"] == "cyberware-govd"
 
 
+def test_catalog_endpoint_is_ungated_and_matches_the_builder(server):
+    base, _, _ = server
+    from infra.tool import skill_index
+    c = json.loads(urllib.request.urlopen(base + "/catalog").read())   # no token — discovery is ungated
+    assert c == skill_index.catalog()                                  # server serves the shared builder verbatim
+    fs = next(s for s in c["skills"] if s["skill"] == "fs")
+    assert fs["verified"] and {"archive", "find_large"} <= {p["id"] for p in fs["perks"]}
+
+
+def test_discover_tags_verified_unverified_and_drift(server, tmp_path):
+    base, _, _ = server
+    import shutil
+    from infra.tool import skill_index
+    # 1) same registry as the server → every local skill is verified, nothing missing
+    d = govd_client.discover(base)
+    assert set(d["summary"]) == {"verified"} and not d["missing_local"]
+    # 2) a divergent local registry: copy the skills, add a NEW one, tamper an existing one
+    reg = tmp_path / "reg"
+    shutil.copytree(govd.ROOT + "/skills", reg / "skills")
+    src = reg / "skills" / "znew" / "perks" / "noop" / "src"
+    src.mkdir(parents=True)
+    (reg / "skills" / "znew" / "perks.json").write_text(json.dumps(
+        {"skill": "znew", "perks": [{"id": "noop", "summary": "new", "destructive": False, "tools": ["znew_noop"]}]}))
+    (src / "contracts.json").write_text(json.dumps({"tool": "znew_noop", "inputs": {"FOO": {"required": True}}}))
+    skill_index.write_index("znew", str(reg / "skills"))
+    with open(reg / "skills" / "fs" / "SKILL.md", "a") as f:
+        f.write("\n# tampered\n")                                      # files no longer match fs's own index
+    d2 = govd_client.discover(base, registry=str(reg))
+    by = {s["skill"]: s["status"] for s in d2["skills"]}
+    assert by["znew"] == "unverified"     # govd's image has never seen it → not governable
+    assert by["fs"] == "drift"            # local copy diverged from the blessed one
+    assert d2["summary"].get("unverified") == 1 and d2["summary"].get("drift") == 1
+
+
 def test_govern_returns_a_value_free_plan(server):
     base, store, _ = server
     code, v = claim(base, "fs", "find_large", var_keys=["SEARCH_DIR"])
