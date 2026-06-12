@@ -20,3 +20,16 @@ This is subset of the cyber alchemistry, same verifiable infrastructure but diff
     5. Oversight.py: enforce OVERSIGHT_RULE, use ast or regex, or optional pass to a subagent to check, if script does not pass oversight, push back
     6. EXECUTOR_RULE.json: any oversight rules like monitor usgae or so that need to be fiven to executor
     7. Executor.py: This is the tool call through the python, the executor is mainly the oversight by register the run metadata into the general json that would preserve how this task-skill-run had been used and what was latest changes. It would create a .<task-run-script>.bk when first ran and validate if anything changed, if changed would add information/warning to log. And the executor would check if upsream steps had been ran or not. This is the enforcement/governance layer. The agent will channel the work through executor.py only, and we always check if there is rogue use/call in script usage if the step output or sorts had been altered by agent bypassing the governance. It would also take the EXECUTOR_RULE.json that need to be enforced by the execor.
+
+---
+
+**Built since this founding spec** (see [architecture.md](architecture.md) for the current map):
+
+- **The skill became a verifiable package.** Each skill now also pins an `index.json` (per-file sha256 +
+  a roll-up `skill_sha` — its authenticity identity) and each perk carries a `test/case.json` that proves
+  it through the real governed channel. A skill no longer relies on its `SKILL.md` prose and trust.
+- **A service plane — `govd`** ([governance-service.md](governance-service.md)). The same governance,
+  offered as a control/audit service where **no data crosses the boundary**: the agent sends a *claim*
+  (skill, perk, var KEYS), govd blesses a value-free plan from its own registry, the agent runs locally
+  and reports status. Discovery is `GET /catalog`; the agent's registry is checked against the blessed
+  `skill_sha` (verified / drift / unverified). The Docker build gates on `skill_index --check --all`.

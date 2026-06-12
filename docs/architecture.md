@@ -10,10 +10,47 @@ channel that *executes*. Blueprints are [L++](https://github.com/rhCat/lpp); Pyt
 
 | side | what | where |
 |---|---|---|
-| **user** | the skill registry — a skill's context, logic, and proven pathways | `skills/<skill>/` |
-| **governance** | the infrastructure that validates, composes, compiles, oversees, executes | `infra/` |
+| **registry** | the skills — each a self-contained, verifiable **package** (context · lifecycle · pathways · contracts · authenticity · proof) | `skills/<skill>/` |
+| **governance** | the infrastructure that validates · composes · compiles · oversees · executes — and governs/audits as a service | `infra/` |
 
-## The pipeline
+`infra/` is a Python package, invoked as `python3 -m infra.<pkg>.<module>`:
+
+- **`infra/govern/`** — the pipeline (`validator`, `composer`, `compiler`, `oversight`, `executor`,
+  `runlog`) **and the service plane** (`govd`, `govd_client`).
+- **`infra/tool/`** — registry tooling: `visualize` (blueprint → drawio/SVG), `skill_index`
+  (authenticity), `skilltest` (in-skill self-tests), `scaffold` (new skills).
+- **`infra/document/`** — the framework's own formal artifacts (the pipeline blueprint, the rule files).
+
+## A skill is a package
+
+A skill is **not a prose description you trust** — it is a self-contained unit you can verify and build
+upon. `skills/<skill>/`:
+
+```
+SKILL.md            context: what it does, what to watch, which logs to check
+blueprint.json      the L++ lifecycle (ready → prepared → verified → executed)
+perks.json          the proven pathways (id · summary · tools · destructive?)
+ledger.json         the form the agent fills → task-ledger.json
+index.json          per-file sha256 + a roll-up skill_sha — the authenticity manifest
+perks/<perk>/
+  metadata.json       rules · usage · limitation · minimal_example
+  manifesto.json      the ${VAR} template: tool sequence · env · requires
+  src/contracts.json  the tool's I/O + checks
+  src/<tool>.sh       the entry point (a Python core sits behind a thin .sh porter)
+  test/case.json      the perk's OWN governed self-test (+ a fixture/ dir)
+```
+
+Six mechanically-connected blocks, each verifiable rather than asserted: the **blueprint** is
+model-checked (TLC), the **contract** is enforced at execution, the **index** pins every file, the
+**test** proves the perk through the real channel. Add or change any block and the skill's `skill_sha`
+changes — a skill's identity *is* the hash of its parts.
+
+## Two execution planes
+
+The same governance runs two ways, sharing `validator` / `composer` / `compiler` / `oversight` /
+`executor`:
+
+**1 · Local pipeline** (in-process) — the agent runs the stages itself, end to end:
 
 ```
 SKILL.md ─► LLM fills the form → task-ledger.json
@@ -30,7 +67,18 @@ SKILL.md ─► LLM fills the form → task-ledger.json
                                  waivers ledger-recorded), upstream gate, run-ledger provenance, EXECUTOR_RULE
 ```
 
-> This same pipeline is captured as a formal **L++ blueprint** — [`infra/pipeline.blueprint.json`](../infra/pipeline.blueprint.json) — so the framework is described in its own formalism (the **ouroboros**). The dashboard renders it at the top of this page; each gate's `✗ fail` route is the stage refusing and logging.
+**2 · govd — the service plane** (`infra/govern/govd.py`, a control/audit plane). **No data crosses the
+boundary.** The agent sends a **claim** (skill, perk, var **KEYS** — never values, files, or secrets);
+govd checks it against its **own** trusted registry, runs compose + TLC, and blesses a **value-free,
+code-free PLAN** (tool sequence + each snippet's sha256 + a `${VAR}` wrapper), pinning the plan's sha256.
+The agent binds its vars **locally**, runs the porters+cores **from its own registry**, and reports
+**status** over a per-run WebSocket; govd owns the provenance ledger and monitors the plan **hash**.
+Secrets are never plaintext — a `*_FILE` pointer is read at runtime via `cat`. Full detail:
+[`governance-service.md`](governance-service.md).
+
+> This pipeline is itself captured as a formal **L++ blueprint** —
+> [`infra/document/pipeline.blueprint.json`](../infra/document/pipeline.blueprint.json) — so the framework
+> is described in its own formalism (the **ouroboros**); the dashboard renders it.
 
 ## The governance model
 
@@ -47,7 +95,34 @@ SKILL.md ─► LLM fills the form → task-ledger.json
 5. **EXECUTOR_RULE** — timeout and other call-boundary limits.
 
 The runtime *is* the rule: you cannot bypass governance without leaving a visible gap (an unrecorded
-run, a `.bk` mismatch, a missing upstream step).
+run, a `.bk` mismatch, a missing upstream step). govd extends the same idea across a boundary — the
+per-run session token gates the WebSocket and the ledger read; a `step_result` is recorded only after a
+`grant` for that exact step with the blessed `plan_sha`.
+
+## Authenticity — the skill's identity
+
+`index.json` pins the sha256 of every file in a skill plus a roll-up `skill_sha`
+(`infra/tool/skill_index`). It is the reference both planes verify against, so a skill's version is
+checkable **without passing files back and forth** — only hashes cross the wire:
+
+- **build-time gate** — the Docker image runs `skill_index --check --all` right after copying the
+  registry, so a drifted index (a stripped file, an un-regenerated hash) **fails the build**.
+- **govd** won't bless a registry that doesn't match its index, and pins the perk's closure hashes in
+  the plan; **the agent** verifies its own registry against those hashes before running.
+- **discovery** — `GET /catalog` is value-free (skills · perks · var-KEYS · `skill_sha` · verified).
+  The agent's client (`govd_client.discover`) compares its local `skill_sha` to govd's and tags each
+  skill **verified** (matches the blessed image), **drift** (diverged), or **unverified** (a *new* skill
+  the image has never seen — visible but not governable until added and the image rebuilt).
+
+## Self-proof — each skill carries its own test
+
+A perk's `test/case.json` is a **declarative** case — `vars`, a `fixture/` dir, `requires`, and an
+`expect` block (`exit` / `outputs` / `nonempty` / `contains` / `json`) — run through the **same governed
+channel the agent uses** (`infra/tool/skilltest`: compile → executor → assert). Because the `test/` files
+are pinned in `index.json`, the proof is **part of the skill's tamper-evident identity** and cannot drift
+from the tool. `tests/test_skill_selftests.py` discovers every case, runs it, and enforces the invariant
+that **every skill self-proves**; non-hermetic perks (network, live service, repo-mutating) ship a `skip`
+case so the skill still carries — and documents — its proof.
 
 ## The blueprint (L++)
 
@@ -62,15 +137,23 @@ each step to the run-ledger **as it runs**, not in a separate phase after. `safe
 this — chiefly **`governed_execution_only`** (a task reaches `executed` only through `executor.py`) and
 **`record_during_execution`**, plus the skill's own guardrails. Perks are *optional* in the blueprint:
 the blueprint says what to watch and which logs to check; a perk supplies the concrete, contract-bound
-*how*. The governance pipeline above is itself captured as a blueprint —
-[`infra/pipeline.blueprint.json`](../infra/pipeline.blueprint.json), rendered at the top of this page.
+*how*. The governance pipeline above is itself captured as a blueprint.
 
 Blueprints render as flowcharts (`infra/tool/visualize.py` → drawio + SVG): **state** = rectangle,
 **transition** = line, **gate** = diamond (with its `✓ pass` / `✗ fail → exit·log` branches), **action**
-= the predefined-process shape showing its `compute_unit`. The dashboard draws them in a cyberpunk theme.
+= the predefined-process shape showing its `compute_unit`. The dashboard draws them in a cyberpunk theme;
+its Flow tab renders the **task** blueprint — the perk's actual gated sequence, value-free.
+
+## The agent contract
+
+The loadable entry skill is the root [`SKILL.md`](../SKILL.md): the five-step loop an agent follows —
+**discover** what's governed (`/catalog`) → emit the **claim** (its only output; never the commands) →
+govd blesses → **run** the blessed plan from the agent's own registry → **review** the verdict. The
+agent authors no commands; the skill code is the registry's, blessed by hash.
 
 ## Relationship to the rest
 
 cyberware is **not Athenor** (the hosted service that powers the whole Cyberware Alchemistry
 workflow). It is the standalone, local enforcement layer — the same verifiable infrastructure
-(L++ blueprints, contracts, compiled bash, audit ledgers), pointed at general skill execution.
+(L++ blueprints, contracts, compiled bash, audit ledgers, authenticity indexes, in-skill proofs),
+pointed at general skill execution.
