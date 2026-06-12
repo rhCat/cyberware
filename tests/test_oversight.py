@@ -1,5 +1,5 @@
 """Unit: oversight.scan — the OVERSIGHT_RULE deny-list (the shared danger gate)."""
-import oversight
+from infra.govern import oversight
 import pytest
 
 

@@ -8,12 +8,12 @@
 cyberware is a **verifiable governance runtime for skill execution**. You do **not** run commands
 ad-hoc. You write a small JSON form — a **task-ledger** — that names a **skill**, a **perk**, and the
 inputs, and the framework **validates → composes → compiles → oversees → executes** it.
-**`infra/executor.py` is the only channel that runs.** The runtime *is* the rule: bypass it and you
+**`infra/govern/executor.py` is the only channel that runs.** The runtime *is* the rule: bypass it and you
 leave a visible gap (an unrecorded run, a tamper mismatch, a skipped step).
 
 ## The one rule
 
-Channel **all** execution through `infra/executor.py`. Never:
+Channel **all** execution through `infra/govern/executor.py`. Never:
 
 - run a snippet (`skills/<skill>/perks/<perk>/src/<tool>.sh`) directly;
 - edit a compiled `run.sh` to slip past a contract — the `.bk` tamper-check snapshots it on first run
@@ -47,12 +47,12 @@ resolve it yourself with `runlog.py`:
 
 ```sh
 L=task-ledger.json
-RUN=$(python3 infra/runlog.py --ledger "$L")             # the grouped run dir
-python3 infra/validator.py --ledger "$L"                 # claims real?
-python3 infra/composer.py  --ledger "$L"                 # L++ -> TLC: no deadlock
-python3 infra/compiler.py  --ledger "$L"                 # writes $RUN/run.sh (+ run.{drawio,svg})
-python3 infra/oversight.py --script "$RUN/run.sh"        # OVERSIGHT_RULE pre-flight (see what would block)
-python3 infra/executor.py  --script "$RUN/run.sh" --all  # THE governed run (the ONLY channel)
+RUN=$(python3 -m infra.govern.runlog --ledger "$L")             # the grouped run dir
+python3 -m infra.govern.validator --ledger "$L"                 # claims real?
+python3 -m infra.govern.composer  --ledger "$L"                 # L++ -> TLC: no deadlock
+python3 -m infra.govern.compiler  --ledger "$L"                 # writes $RUN/run.sh (+ run.{drawio,svg})
+python3 -m infra.govern.oversight --script "$RUN/run.sh"        # OVERSIGHT_RULE pre-flight (see what would block)
+python3 -m infra.govern.executor  --script "$RUN/run.sh" --all  # THE governed run (the ONLY channel)
 ```
 
 The executor **re-runs the oversight scan in-channel** before any step — skipping the pre-flight
@@ -114,8 +114,20 @@ perks/<perk>/
 - **Recording is part of executing** — each step is written to the run-ledger *as it runs*, which is why
   the lifecycle ends at `executed`, not a separate `recorded`.
 
+## Running it as a service — govd
+
+For a hosted channel, **`infra/govern/govd.py`** is a governance **control/audit plane**: the agent sends a
+**claim** (skill, perk, var **keys** — never values, files, or secrets), and govd blesses a **value-free
+plan** (sequence + snippet sha256s + wrapper) from its **own** trusted registry and pins the plan's
+sha256. The agent binds its own vars **locally** and runs **locally**, holding a **WebSocket** that
+reports **status** only; govd monitors the plan **hash** and owns the provenance ledger. Secrets are never
+plaintext — pass a `*_FILE` pointer read at runtime via `cat`. Destructive perks gate on declared
+approval. `docker build -t cyberware-govd . && docker run -p 5773:5773 cyberware-govd`, or
+`python3 -m infra.govern.govd --mode local`. See [`docs/governance-service.md`](docs/governance-service.md).
+
 ## More
 
 [`docs/architecture.md`](docs/architecture.md) · [`docs/authoring.md`](docs/authoring.md) ·
-[`docs/skills.md`](docs/skills.md) · [`docs/SPEC.md`](docs/SPEC.md) · the live
+[`docs/skills.md`](docs/skills.md) · [`docs/SPEC.md`](docs/SPEC.md) ·
+[`docs/governance-service.md`](docs/governance-service.md) · the live
 [dashboard](https://rhcat.github.io/cyberware/) (blueprints, perk flows, contracts, code).

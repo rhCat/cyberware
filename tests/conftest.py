@@ -5,7 +5,6 @@ and provides fixtures for run dirs, sample repos, ledgers, and the compile→exe
 """
 from __future__ import annotations
 import json
-import os
 import shlex
 import subprocess
 import sys
@@ -14,15 +13,18 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-INFRA = ROOT / "infra"
-sys.path.insert(0, str(INFRA))   # import runlog / oversight / compiler / composer / scaffold / visualize
+sys.path.insert(0, str(ROOT))   # so `from infra.govern import …` / `from infra.tool import …` resolve
 
-import runlog  # noqa: E402
+from infra.govern import runlog  # noqa: E402
+
+TOOL_MODULES = {"scaffold", "visualize", "build_site"}   # everything else lives under infra.govern
 
 
 def run_cli(module: str, *args, **kw):
-    """Invoke an infra CLI exactly as the agent does: python3 infra/<module>.py ..."""
-    return subprocess.run([sys.executable, str(INFRA / f"{module}.py"), *map(str, args)],
+    """Invoke an infra CLI exactly as the agent does: python3 -m infra.<pkg>.<module> ..."""
+    pkg = "tool" if module in TOOL_MODULES else "govern"
+    kw.setdefault("cwd", str(ROOT))
+    return subprocess.run([sys.executable, "-m", f"infra.{pkg}.{module}", *map(str, args)],
                           capture_output=True, text=True, **kw)
 
 

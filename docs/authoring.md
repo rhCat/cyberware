@@ -27,7 +27,7 @@ transformable skills belong here. If it fits, **`cws-create/scaffold`** lays dow
 ## 1. Scaffold
 
 ```sh
-python3 infra/scaffold.py --skill myskill --name "My Skill" \
+python3 -m infra.tool.scaffold --skill myskill --name "My Skill" \
     --perk fetch:my_fetch:curl --perk store:my_store:python3
 #   --perk  <perk_id>:<tool>[:<binary>]
 ```
@@ -95,14 +95,14 @@ exec python3 "$HERE/<tool>.py"
 ## 5. Visualize + run
 
 ```sh
-python3 infra/visualize.py --skill myskill            # → blueprint.{drawio,svg}
+python3 -m infra.tool.visualize --skill myskill            # → blueprint.{drawio,svg}
 # fill ledger.json → task-ledger.json, then:
-RUN=$(python3 infra/runlog.py --ledger task-ledger.json)         # the grouped run dir
-python3 infra/validator.py --ledger task-ledger.json
-python3 infra/composer.py  --ledger task-ledger.json
-python3 infra/compiler.py  --ledger task-ledger.json             # writes $RUN/run.sh (+ run.{drawio,svg})
-python3 infra/oversight.py --script "$RUN/run.sh"
-python3 infra/executor.py  --script "$RUN/run.sh" --all          # the governed run
+RUN=$(python3 -m infra.govern.runlog --ledger task-ledger.json)         # the grouped run dir
+python3 -m infra.govern.validator --ledger task-ledger.json
+python3 -m infra.govern.composer  --ledger task-ledger.json
+python3 -m infra.govern.compiler  --ledger task-ledger.json             # writes $RUN/run.sh (+ run.{drawio,svg})
+python3 -m infra.govern.oversight --script "$RUN/run.sh"
+python3 -m infra.govern.executor  --script "$RUN/run.sh" --all          # the governed run
 ```
 
 With a default `record_store` and no `-o`, the compiler groups every artifact for the run —

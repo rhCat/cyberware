@@ -8,6 +8,7 @@
     "PGPORT": "5432",
     "PGDATABASE": "<db>",
     "PGUSER": "<user>",
+    "PGPASSWORD_FILE": "<absolute path to a pass file, chmod 600 — read via cat at runtime; NEVER the password itself>",
     "QUERY": "<SELECT ...>",
     "LIMIT": "100"
   }

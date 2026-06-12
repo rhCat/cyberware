@@ -9,11 +9,11 @@ through `executor.py`. The compiler touches nothing — it returns a string.
   compiler.py --ledger task-ledger.json [-o run.sh]
 """
 from __future__ import annotations
-import argparse, json, os, re, shlex, sys
+import argparse, hashlib, json, os, re, shlex, sys
 
-from runlog import run_dir
+from infra.govern.runlog import run_dir
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def load(p): return json.load(open(p))
@@ -65,6 +65,61 @@ def build_script(L):
         "",
     ]
     return "\n".join(out), seq
+
+
+def build_plan(skill, perk):
+    """The VALUE-FREE execution plan for a perk — the structure govd blesses and hashes, with NO task
+    data in it. Returns a dict: the tool sequence, the wrapper bash (placeholders, no `export` of values),
+    each snippet's full sha256, and the snippet texts (so a remote agent can assemble the run locally).
+    The agent prepends its own `export` line (its vars, incl. `${SNIP}`/`${RECORD_STORE}`) before running.
+    govd never sees a value; the plan hash is stable regardless of the vars the agent later binds."""
+    pdir = os.path.join(ROOT, "skills", skill, "perks", perk)
+    manifesto = load(os.path.join(pdir, "manifesto.json"))
+    contract = load(os.path.join(pdir, "src", "contracts.json"))
+    seq = manifesto.get("sequence", [])
+    snippets, snippet_shas = {}, {}
+    for tool in seq:
+        body = open(os.path.join(pdir, "src", f"{tool}.sh"), "rb").read()
+        snippets[tool] = body.decode()
+        snippet_shas[tool] = hashlib.sha256(body).hexdigest()
+
+    wrap = [
+        "#!/usr/bin/env bash",
+        f"# cyberware plan · skill={skill} perk={perk} · value-free; the caller exports SNIP/RECORD_STORE/vars",
+        "set -uo pipefail",
+        ': "${SNIP:?SNIP must point at the perk snippet dir}" "${RECORD_STORE:?}"',
+        'mkdir -p "$RECORD_STORE"',
+        "",
+    ]
+    for i, tool in enumerate(seq, 1):
+        wrap.append(f"step{i}() {{   # {tool}")
+        wrap.append(f'  echo "[step {i}] {tool}"')
+        wrap.append(f'  bash "$SNIP/{tool}.sh"')
+        oe = contract.get("checks", {}).get("output_exists")
+        if oe and tool == seq[-1]:
+            wrap.append(f'  test -f "{oe}" || {{ echo "CONTRACT FAIL step {i}: missing {oe}" >&2; exit 3; }}')
+        wrap.append("}")
+        wrap.append("")
+    listing = "\\n".join(f"{i}\\t{t}" for i, t in enumerate(seq, 1))
+    wrap += [
+        'case "${1:-}" in',
+        f'  --list) printf "{listing}\\n" ;;',
+        '  --step) shift; "step${1:?step number}" ;;',
+        "  --all) " + " && ".join(f"step{i}" for i in range(1, len(seq) + 1)) + " ;;",
+        '  *) echo "usage: $0 --list | --step <N> | --all" >&2; exit 2 ;;',
+        "esac",
+        "",
+    ]
+    return {"skill": skill, "perk": perk, "sequence": list(seq),
+            "wrapper": "\n".join(wrap), "snippet_shas": snippet_shas, "snippets": snippets}
+
+
+def plan_sha(plan):
+    """The sha256 of the execution plan — value-free, so govd and the agent compute the same hash.
+    Covers the pathway (skill/perk/sequence), the exact snippet bytes, and the wrapper structure."""
+    canon = json.dumps({k: plan[k] for k in ("skill", "perk", "sequence", "wrapper", "snippet_shas")},
+                       sort_keys=True)
+    return hashlib.sha256(canon.encode()).hexdigest()
 
 
 def task_blueprint(L, run, seq=None):
@@ -141,7 +196,7 @@ def main():
     task_bp_path = os.path.join(run, "task-blueprint.json")
     diagrams = []
     try:
-        import visualize
+        from infra.tool import visualize
         task_bp = task_blueprint(L, run, seq)
         open(task_bp_path, "w").write(json.dumps(task_bp, indent=2) + "\n")
         diagrams = visualize.render(task_bp, seq, base, ["drawio", "svg"])

@@ -2,8 +2,9 @@
   "tool": "data_csv2json",
   "inputs": {
     "CSV_FILE": {
-      "type": "string",
-      "required": true
+      "type": "file",
+      "required": true,
+      "scan_content": false
     }
   },
   "outputs": {

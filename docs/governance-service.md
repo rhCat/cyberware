@@ -1,0 +1,142 @@
+# govd — the governance server
+
+`infra/govern/govd.py` is a **control/audit plane**. It governs the *claim* and records *status*. It never sees
+task data and it never executes.
+
+The agent sends a **claim** — skill, perk, and var **keys** (names only; no values, no file contents, no
+secrets). govd checks the claim against its **own** trusted registry and blesses a **value-free plan**
+(the tool sequence + each snippet's sha256 + a wrapper with `${VAR}` placeholders), pinning the plan's
+sha256. The agent binds its own vars **locally** and runs **locally**; over a per-run WebSocket it reports
+**status** only (step ran, exit, ok/fail). govd monitors the plan **hash**, not the content, and owns the
+provenance ledger. Like a bank session: the ledger, not the contents of your box.
+
+## Principles
+
+- **No data crosses the boundary.** Only the claim (keys) and status. govd reads nothing the agent holds —
+  no values, no files, no command output. The provenance ledger stores var **names** only.
+- **Secrets are never plaintext.** A plaintext-secret key (`PGPASSWORD`, `*_TOKEN`, `*_SECRET`, …) is
+  refused. Pass a **`*_FILE` pointer** (a path to a `chmod 600` pass file); the snippet reads it at runtime
+  with `cat "$X_FILE"` (reading a file as data, never executing it). The secret lives only in that file and
+  the running process — never in a config, a ledger, or the script.
+- **Destructiveness is declared, not sniffed.** A perk marked `destructive:true` (e.g. `pg_ops/migrate`)
+  pushes back until the claim carries `approve:["<perk>"]`. govd never inspects payload to decide this — the
+  proven pathway is what's governed, not the bytes flowing through it.
+- **Oversight monitors the plan sha256.** The per-step gate checks the agent's `plan_sha` against the pinned
+  one. On an inconsistency it investigates by **plain text diff** (`plan_diff`) — read as strings, compared
+  as strings — and **never** executes, sources, or pipes a submitted plan.
+- **Private per-run sessions.** Each `allow` mints a `session_token` that gates the WS and the ledger read.
+  The upstream-order gate is server-owned and can't be forged: a `step_result` is recorded only after a
+  `grant` for that exact step with the blessed `plan_sha`.
+- **Composition runs here, including TLC.** govern() composes the blueprint — a structural reachability
+  check plus the **TLA+/TLC** deadlock model check (`composer`). The Docker image bundles a headless JRE +
+  `tla2tools.jar` (`$TLA2TOOLS_JAR`), so TLC runs for real in-container (not the structural-only fallback);
+  the result (`"no deadlock (TLC)"`) is returned in `/govern` and recorded in the ledger. TLC is cached per
+  blueprint (they're static), so it runs once per skill. A detected deadlock rejects the claim.
+
+## HTTP
+
+```
+GET  /health                          -> {status, mode, host, port, registry, runs}
+POST /govern  {skill, perk, var_keys, approve?}
+       -> 200 allow      {run_id, decision, plan, plan_sha, session_token, ws}     plan = sequence+snippets+wrapper
+          409 push_back  {run_id, decision, needs_approve, ...}                    destructive perk → approve
+          403 reject     {run_id, decision, problems, ...}                         (bad key / secret key / missing input)
+GET  /ledger/<run_id>?token=…          -> the server-side provenance chain (requires the run's token)
+```
+
+The `plan` is value-free: `{skill, perk, sequence, wrapper, snippet_shas, snippets}`. The agent writes the
+wrapper + snippets locally and injects its own vars via the **process environment** at run time, so no value
+is ever written into the script. `plan_sha = sha256(skill, perk, sequence, wrapper, snippet_shas)` — both
+sides compute it identically.
+
+## WebSocket  `/oversight`  (per-run session, status only)
+
+```
+client -> {"type":"hello","run_id":…,"token":…}             <- {"type":"hello_ack","authorized":true|false}
+client -> {"type":"step_request","step","plan_sha"}         <- {"type":"grant"|"refuse","reason"}
+client -> {"type":"step_result","step","plan_sha","status","exit"}   <- {"type":"recorded","index"}
+```
+
+`hello` authenticates with the run's `session_token` and binds the session to that run. `grant` checks the
+`plan_sha` matches the pinned one and every upstream step is recorded `ok`. `step_result` carries **status
+only** — never command output. A refuse for an inconsistent `plan_sha` can include a text `diff` if the
+client supplies its `plan_wrapper` for investigation.
+
+## Monitor dashboard
+
+govd serves a real-time monitoring dashboard at **`/`** (and `/dashboard`). A **left nav lists the runs**;
+selecting one opens a **review panel** for that run — its decision, `plan_sha`, TLC result, var keys, the
+step sequence with states, the **event timeline** (`granted` / `step_result` / `step_refused`), and the
+blessed value-free plan. The **Overview** item shows the aggregate: decision counts, **tool usage**
+(ok / error / granted per tool), **recent decisions** (the `reject`/`push_back` security signal — refused
+secrets, bad keys, destructive perks awaiting approval), and a **live event feed**. It polls
+`GET /monitor/state` (the run list + overview) every 1.5 s and `GET /monitor/run/<run_id>` for the
+selected run; both are **value-free** (names, hashes, status — never values, secrets, or output) and
+monitor-token gated. Runs restored from disk (a prior session) are tagged `restored`.
+
+## Persistent ledger (mount it)
+
+The provenance ledger lives under `record_root` (one dir per run). In the Docker image that's
+**`/data/govd`**, declared as a `VOLUME` — **mount it to keep run records across restarts and review them
+later**:
+
+```sh
+docker run -v cyberware-govd:/data/govd -p 5773:5773 cyberware-govd      # named volume
+docker run -v "$PWD/govd-ledger:/data/govd" -p 5773:5773 cyberware-govd  # host dir
+```
+
+On startup the server **hydrates** from `record_root` — the most-recent run ledgers (up to `MAX_RUNS`) are
+reloaded into the dashboard for review. Set `GOVD_RECORD_ROOT` (or `record_root` in the config) to point
+elsewhere. Only `allow` runs are persisted (the executed ones); refusals are session-only in the feed.
+
+The snapshot endpoint is gated by a **monitor token** (separate from the per-run session tokens). The
+default depends on the mode, so a network-exposed dashboard is never guessable:
+
+- **local mode** → defaults to **`admin`** (friendly for dev): just open `http://127.0.0.1:<port>/?token=admin`.
+- **remote mode** → defaults to a **strong random token** (printed in the boot log; `admin` is rejected).
+- Override either with **`GOVD_MONITOR_TOKEN`** (env) or `monitor_token` in the config.
+
+The boot log prints the ready-to-open URL:
+
+```
+dashboard:  http://127.0.0.1:5773/?token=admin   (default local token 'admin' — set GOVD_MONITOR_TOKEN to change)
+```
+
+In Docker (remote mode) read the token from the container log (`docker logs <name>`) or set
+`GOVD_MONITOR_TOKEN` on `docker run`.
+
+## Run it
+
+The repo ships two launchers (`./govd`, `./govd-client`) that resolve the package from their own location,
+so they run from **any directory** — no `-m` / `cwd` dance. Add the repo to `PATH` (or symlink them into
+`~/bin`) to drop the `./`.
+
+```sh
+# local (dev) — rotates through 5773 / 4773 / 3773 / 6773, first free wins
+./govd --mode local                       # ≡ python3 -m infra.govern.govd --mode local
+
+# remote (the Docker default) — one fixed port, bound 0.0.0.0
+docker build -t cyberware-govd .
+docker run -v cyberware-govd:/data/govd -p 5773:5773 cyberware-govd
+
+# drive it from the agent side (claim → value-free plan → run locally under live status oversight)
+./govd-client --url http://127.0.0.1:5773 --ledger task-ledger.json
+./govd-client --url http://127.0.0.1:5773 --ledger task-ledger.json --fetch-only
+```
+
+The agent's task-ledger keeps the var **values** (and `*_FILE` secret pointers) — those stay on the agent
+side; `fetch` sends only the var **keys** to govd.
+
+## Operational notes
+
+- **Run remote mode over TLS.** Even though no secret value crosses to govd, put a control plane behind TLS.
+- **Bounded under concurrency.** Threaded; the in-memory run table is capped (`MAX_RUNS`, oldest evicted,
+  ledger retained on disk); the WS is a per-run session that can be held open or reconnected per step.
+- **DoS guards.** `/govern` bodies capped (1 MiB), WebSocket frames capped (1 MiB), a read timeout drops
+  stalled connections, only `allow` runs persist. A connection/rate limit in front of govd remains a
+  deployment responsibility.
+- **Cooperative mode.** In local mode govd does not execute — the agent runs the plan and self-reports
+  status. The plan **hash** is monitored; binding the actual run to the blessed plan beyond the hash (e.g.
+  signed attestation of the run environment) is a strict-mode extension.
+- **Frame shape.** govd's WebSocket speaks the simple single-frame, client-masked JSON the bundled client
+  uses; it does not reassemble fragmented frames.

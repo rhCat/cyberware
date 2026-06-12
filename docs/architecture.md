@@ -65,7 +65,7 @@ the blueprint says what to watch and which logs to check; a perk supplies the co
 *how*. The governance pipeline above is itself captured as a blueprint —
 [`infra/pipeline.blueprint.json`](../infra/pipeline.blueprint.json), rendered at the top of this page.
 
-Blueprints render as flowcharts (`infra/visualize.py` → drawio + SVG): **state** = rectangle,
+Blueprints render as flowcharts (`infra/tool/visualize.py` → drawio + SVG): **state** = rectangle,
 **transition** = line, **gate** = diamond (with its `✓ pass` / `✗ fail → exit·log` branches), **action**
 = the predefined-process shape showing its `compute_unit`. The dashboard draws them in a cyberpunk theme.
 
