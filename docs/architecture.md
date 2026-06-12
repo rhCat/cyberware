@@ -80,6 +80,13 @@ The agent binds its vars **locally**, runs the porters+cores **from its own regi
 Secrets are never plaintext — a `*_FILE` pointer is read at runtime via `cat`. Full detail:
 [`governance-service.md`](governance-service.md).
 
+The govd **container boots through `infra/govern/chipfetch.py`** — acquire + validate, *then* exec govd —
+so it serves only a chip that passes the same gate as the build (every skill's `index.json` + the chip
+manifest); a drifted chip **refuses to boot**. The chip is acquired **local** (the baked submodule,
+re-validated) or, with `CLOUD_MODE=1`, **live-cloned** from `CLOUD_SOURCE` at `CLOUD_SOURCE_TAG` (private
+via `CLOUD_SOURCE_TOKEN`, token-safe). `/health` then attests *which* cartridge is governed — `chip_sha`
+plus acquisition provenance (`local`, or `cloud source @ ref`).
+
 > This pipeline is itself captured as a formal **L++ blueprint** —
 > [`infra/document/pipeline.blueprint.json`](../infra/document/pipeline.blueprint.json) — so the framework
 > is described in its own formalism (the **ouroboros**); the dashboard renders it.
@@ -146,8 +153,10 @@ the blueprint says what to watch and which logs to check; a perk supplies the co
 
 Blueprints render as flowcharts (`infra/tool/visualize.py` → drawio + SVG): **state** = rectangle,
 **transition** = line, **gate** = diamond (with its `✓ pass` / `✗ fail → exit·log` branches), **action**
-= the predefined-process shape showing its `compute_unit`. The dashboard draws them in a cyberpunk theme;
-its Flow tab renders the **task** blueprint — the perk's actual gated sequence, value-free.
+= the predefined-process shape showing its `compute_unit`. The **govd monitor dashboard** draws them in a
+cyberpunk theme; its **Flow** tab renders the **task** blueprint — the perk's actual gated sequence,
+value-free (while the [Pages catalog](https://rhcat.github.io/cyberware/) shows the shared lifecycle plus
+each perk's step sequence).
 
 ## The agent contract
 
