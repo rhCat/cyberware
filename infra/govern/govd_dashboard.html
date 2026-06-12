@@ -214,15 +214,15 @@ function runTab(panel, d){
 }
 
 function flowTab(panel, d){
-  const fl=sect("Lifecycle flow — "+d.skill); const wrap=el("div","flow");
-  const cached=flowCache[d.skill];
-  if(cached===undefined){                                   // fetch the skill's blueprint.svg once, then cache
-    wrap.appendChild(el("div","empty","loading flow…"));
-    fetch("/flow/"+enc(d.skill)).then(r=>r.ok?r.text():Promise.reject()).then(t=>{flowCache[d.skill]=t; render();}).catch(()=>{flowCache[d.skill]=""; render();});
-  } else if(cached){ wrap.innerHTML=cached; }               // inline SVG (it's our value-free registry diagram)
-  else { wrap.appendChild(el("div","empty","no flow diagram for this skill")); }
+  const fl=sect("Task blueprint — "+d.skill+" / "+d.perk); const wrap=el("div","flow");
+  const cached=flowCache[d.run_id];                          // keyed by RUN — this is the task-specific blueprint
+  if(cached===undefined){                                    // fetch THIS run's task blueprint once, then cache
+    wrap.appendChild(el("div","empty","loading task blueprint…"));
+    fetch("/flow/run/"+enc(d.run_id)+"?token="+enc(token)).then(r=>r.ok?r.text():Promise.reject()).then(t=>{flowCache[d.run_id]=t; render();}).catch(()=>{flowCache[d.run_id]=""; render();});
+  } else if(cached){ wrap.innerHTML=cached; }                // inline SVG — value-free (var KEYS as ${KEY}, run dir $RUN)
+  else { wrap.appendChild(el("div","empty","no task blueprint for this run")); }
   fl.b.appendChild(wrap);
-  const steps=stepStates(d.seq, d.events);                  // overlay where THIS run went through the lifecycle
+  const steps=stepStates(d.seq, d.events);                   // overlay where THIS run actually went, step by step
   if(steps.length){ const p=el("div","pills"); p.style.marginTop="10px"; for(const st of steps) p.appendChild(el("span","pill "+st.state, st.n+"·"+st.tool)); fl.b.appendChild(p); }
   panel.appendChild(fl.s);
 }
