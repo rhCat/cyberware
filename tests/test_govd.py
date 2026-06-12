@@ -118,6 +118,17 @@ def test_tlc_result_is_cached_per_blueprint():
     govd._TLC_CACHE.clear()
     first = govd.tlc_check(bp)
     assert govd.tlc_check(bp) == first and len(govd._TLC_CACHE) == 1   # runs once, then cached
+    ok, msg, tla, out = first
+    assert "MODULE task" in tla and isinstance(out, str)              # the spec + full log are returned
+
+
+def test_run_record_persists_tlc_spec_and_log(server):
+    """The TLA+ spec + TLC's full output are written into the run record (the mounted ledger), not /tmp."""
+    base, store, _ = server
+    _, v = claim(base, "fs", "find_large", var_keys=["SEARCH_DIR"])
+    rec = store.get(v["run_id"])
+    assert "MODULE task" in (rec.get("tlc_tla") or "")               # the spec is persisted per run
+    assert "tlc_log" in rec                                          # full output ("" when TLC is skipped locally)
 
 
 def test_missing_required_input_is_rejected_by_name(server):
