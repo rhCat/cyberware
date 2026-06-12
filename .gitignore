@@ -13,3 +13,4 @@ cyberware_govd/
 htmlcov/
 coverage.xml
 .mypy_cache/
+.ruff_cache/
