@@ -22,7 +22,7 @@ USER SIDE — the skill registry              GOVERNANCE SIDE — the infrastruc
     perks.json    the proven pathways                     executor · runlog · govd · govd_client
     blueprint.json  the action CFG (L++)                  OVERSIGHT_RULE.json · EXECUTOR_RULE.json
     ledger.json   the form the LLM fills                  govd_config.json · govd_dashboard.html
-    perks/<perk>/                               tool/     scaffold · visualize · build_site
+    perks/<perk>/                               tool/     scaffold · visualize · skill_index
       metadata.json   rules · usage · limits    document/ pipeline.blueprint.{json,drawio,svg}
       manifesto.json  ${VAR} template + seq
       src/contracts.json   I/O + checks
@@ -125,11 +125,14 @@ itself — the ouroboros).
 **[→ live dashboard at rhcat.github.io/cyberware](https://rhcat.github.io/cyberware/)** — a static site
 (auto-deployed by [`.github/workflows/pages.yml`](.github/workflows/pages.yml) on every push) to review
 every skill — blueprint, perk flow, contracts, and snippet code — with the review documents below as
-in-site tabs. Regenerate + serve locally:
+in-site tabs. It is **self-discovering**: the page fetches the real registry at runtime (no build step,
+no baked `data.js`), so it always reflects the current skills. Preview locally (assemble like the deploy,
+then serve):
 
 ```sh
-python3 -m infra.tool.build_site                  # → docs/site/data.js
-python3 -m http.server -d docs/site 8765     # → http://localhost:8765
+D=$(mktemp -d); cp docs/site/index.html "$D"; cp -r skills "$D"; mkdir "$D/docs"; cp docs/*.md "$D/docs"; cp cyberware.md "$D"
+python3 -c "import os,json; json.dump(sorted(os.listdir('skills')), open('$D/skills.json','w'))"
+python3 -m http.server -d "$D" 8765           # → http://localhost:8765
 ```
 
 - [architecture](docs/architecture.md) — the two sides, the pipeline, the governance model

@@ -227,36 +227,15 @@ function overviewHtml(s) {
 }
 
 function blueprintHtml(s) {
-  const sub = (cur.bp === "shared" || s.perks.some(p => p.id === cur.bp)) ? cur.bp : "shared";
-  const subnav = `<span class="subtab ${sub==='shared'?'active':''}" data-bp="shared">shared blueprint</span>` +
-    s.perks.map(p => `<span class="subtab ${sub===p.id?'active':''}" data-bp="${esc(p.id)}">demo: ${esc(p.id)}</span>`).join("");
-  let body;
-  if (sub === "shared") {
-    const stages = STAGES.map(([n, desc], i) =>
-      `<div class="stage"><span class="sn">${i+1}</span><div><b>${n}</b><em>${esc(desc)}</em></div></div>`).join("");
-    body = `
-      <h3>Shared lifecycle</h3>
-      <div class="card" id="bp">${s.svg || '<span class="muted">no diagram</span>'}</div>
-      <p class="muted" style="font-size:12.5px;margin-top:8px">Every skill runs this lifecycle. A task flows through the governed pipeline — pick a <b>demo</b> above to see a concrete one, config to compiled script:</p>
-      <div class="stages">${stages}</div>
-      <div class="lbl">blueprint — L++ source <span class="muted">— blueprint.json</span></div>
-      <pre class="tall">${esc(JSON.stringify(s.blueprint || {}, null, 2))}</pre>`;
-  } else {
-    const p = s.perks.find(x => x.id === sub), d = p.demo || {};
-    body = `
-      <div class="perkhead"><b>demo · ${esc(p.id)}</b><span class="sum">${esc(p.summary)}</span>
-        <span class="badge ${p.destructive?'dx':'ro'}">${p.destructive?'destructive':'read-only'}</span></div>
-      <p class="muted" style="font-size:12.5px">The intelligence fills the <b>task config</b>; it compiles to the <b>script</b> the executor runs — its shape visualized in <b>this task's blueprint</b>: the lifecycle carrying this task's actual settings (perk · vars · run dir), saved to the run dir as <code>task-blueprint.json</code> and the source the run diagrams compile from.</p>
-      <div class="lbl">task config <span class="muted">— task-ledger.json</span></div>
-      <pre>${esc(JSON.stringify(d.ledger || {}, null, 2))}</pre>
-      <div class="lbl">task blueprint <span class="muted">— header = the resolved contract (inputs · types · requires); each gate's abstract predicate (⊨) resolved to this task's concrete check (↳)</span></div>
-      <div class="card" id="bp">${p.svg || ""}</div>
-      <div class="lbl">task blueprint — L++ source <span class="muted">— task-blueprint.json; the <code>task</code> field carries the perk, vars, tools + run dir</span></div>
-      <pre class="tall">${esc(JSON.stringify(d.blueprint || s.blueprint || {}, null, 2))}</pre>
-      <div class="lbl">compiled script <span class="muted">— what the executor runs, step by step</span></div>
-      <pre>${esc(d.compiled || "")}</pre>`;
-  }
-  return `<div class="subnav">${subnav}</div>${body}`;
+  const stages = STAGES.map(([n, desc], i) =>
+    `<div class="stage"><span class="sn">${i+1}</span><div><b>${n}</b><em>${esc(desc)}</em></div></div>`).join("");
+  return `
+    <h3>Shared lifecycle</h3>
+    <div class="card" id="bp">${s.svg || '<span class="muted">no diagram</span>'}</div>
+    <p class="muted" style="font-size:12.5px;margin-top:8px">Every skill runs this lifecycle — a task flows through the governed pipeline (validate → compose → compile → oversee → execute):</p>
+    <div class="stages">${stages}</div>
+    <div class="lbl">blueprint — L++ source <span class="muted">— blueprint.json</span></div>
+    <pre class="tall">${esc(JSON.stringify(s.blueprint || {}, null, 2))}</pre>`;
 }
 
 function perkPanel(p) {
@@ -282,23 +261,52 @@ function perkPanel(p) {
       ${c.checks ? `<div class="kv"><b>checks</b> — ${esc(JSON.stringify(c.checks))}</div>` : ""}
     </div>
     <h3>Code</h3>
-    <div class="card">${snippets || '<span class="muted">no snippet</span>'}</div>
-    <details class="bp"><summary>lifecycle — blueprint annotated with this perk's steps</summary>
-      <div class="card" id="bp">${p.svg || ''}</div></details>`;
+    <div class="card">${snippets || '<span class="muted">no snippet</span>'}</div>`;
 }
 
-function boot() {
-  S = window.SKILLS || []; DOCS = window.DOCS || [];
+// ── self-discovery: fetch the real registry at runtime; no pre-baked data.js, no build step ──
+const getJSON = (p) => fetch(p, { cache: "no-store" }).then(r => r.ok ? r.json() : null).catch(() => null);
+const getText = (p) => fetch(p, { cache: "no-store" }).then(r => r.ok ? r.text() : null).catch(() => null);
+
+async function loadSkill(name) {
+  const base = `skills/${encodeURIComponent(name)}`;
+  const [bp, pj, smd, svg, idx] = await Promise.all([
+    getJSON(`${base}/blueprint.json`), getJSON(`${base}/perks.json`),
+    getText(`${base}/SKILL.md`), getText(`${base}/blueprint.svg`), getJSON(`${base}/index.json`)]);
+  if (!bp) return null;
+  const perks = await Promise.all((pj && pj.perks || []).map(async pm => {
+    const pd = `${base}/perks/${encodeURIComponent(pm.id)}`;
+    const [meta, man, con] = await Promise.all([
+      getJSON(`${pd}/metadata.json`), getJSON(`${pd}/manifesto.json`), getJSON(`${pd}/src/contracts.json`)]);
+    const seq = man && man.sequence || [];
+    const snippets = {};
+    await Promise.all(seq.flatMap(t => [".sh", ".py"].map(async ext => {
+      const code = await getText(`${pd}/src/${t}${ext}`); if (code != null) snippets[t + ext] = code;
+    })));
+    return { id: pm.id, summary: pm.summary || "", destructive: !!pm.destructive, metadata: meta || {},
+      sequence: seq, tools: (man && man.tools) || {}, env: (man && man.env) || {},
+      requires: (man && man.requires) || [], contracts: con || {}, snippets };
+  }));
+  return { id: bp.id, name: bp.name || bp.id, description: bp.description || "",
+    group: String(bp.id).startsWith("cws") ? "cws internals" : "skills",
+    blueprint: bp, svg: svg || "", skill_md: smd || "", index: idx, perks };
+}
+
+const DOCSET = [["operate", "Operate", "cyberware.md"], ["architecture", "Architecture", "docs/architecture.md"],
+  ["authoring", "Authoring", "docs/authoring.md"], ["skills", "Catalog", "docs/skills.md"],
+  ["governance", "Service (govd)", "docs/governance-service.md"]];
+
+async function boot() {
+  const names = await getJSON("skills.json");
+  if (!names) { document.getElementById("detail").innerHTML = '<p class="muted">could not discover the registry (skills.json)</p>'; return; }
+  S = (await Promise.all(names.map(loadSkill))).filter(Boolean)
+    .sort((a, b) => a.group === b.group ? a.id.localeCompare(b.id) : (a.group === "skills" ? -1 : 1));
+  DOCS = (await Promise.all(DOCSET.map(async ([id, label, path]) => {
+    const body = await getText(path); return body != null ? { id, label, body } : null;
+  }))).filter(Boolean);
   renderNav(); renderList(); if (S.length) openSkill(0);
 }
-// load the data with a version query so a deploy is never served stale from cache
-(function () {
-  const el = document.createElement("script");
-  el.src = "data.js?v=" + Date.now();
-  el.onload = boot;
-  el.onerror = () => { document.getElementById("detail").innerHTML = '<p class="muted">failed to load data.js</p>'; };
-  document.head.appendChild(el);
-})();
+boot();
 </script>
 </body>
 </html>

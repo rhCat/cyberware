@@ -18,14 +18,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: build the dashboard data (skills + docs → data.js)
-        run: python3 infra/build_site.py
+      # No build: the dashboard self-discovers the registry at runtime. Just publish the static page
+      # alongside the registry + docs it fetches, with a directory listing of the skills.
+      - name: assemble the site
+        run: |
+          mkdir -p _site/docs
+          cp docs/site/index.html _site/index.html
+          cp -r skills _site/skills
+          cp cyberware.md _site/cyberware.md
+          cp docs/*.md _site/docs/
+          python3 -c "import os,json; json.dump(sorted(d for d in os.listdir('skills') if os.path.isdir(os.path.join('skills',d))), open('_site/skills.json','w'))"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/site
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
