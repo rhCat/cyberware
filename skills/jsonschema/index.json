@@ -1,0 +1,28 @@
+{
+  "skill": "jsonschema",
+  "skill_sha": "2251191913d5d3edbcc661db2f39629c6c2a82f8ab472ea52e2edbadf0cc6aee",
+  "file_count": 21,
+  "files": {
+    "SKILL.md": "599e679e7b103ce1039f5b5a77d1f143b460d28a5975a7c90b21d617577b6bd9",
+    "blueprint.drawio": "58b76cb52641f8181603c6b8b7d1fb650e4e1384725877fcff28a66df17c545d",
+    "blueprint.json": "88f8049bdab4a209a6f627d60eb5f3675117d2328d6128ea94ffe6a57e311f50",
+    "blueprint.svg": "3d50e068c64fbfd934ca34ce7b228c59fe478e323edbd86e368ec39921fd42e5",
+    "ledger.json": "16cbb1b677afb63bdcc267f049655585ee1c4ef300b17ac1f8ffd9b2f4b1a1ff",
+    "perks.json": "5f232533a9a9b7f801b8fe86529432b274998722a7abe498d54ea4aa264cab74",
+    "perks/infer/manifesto.json": "65c0c762c888883a03936ff28bd1ab7a48e2cf67e6a5f0eb971c5fff56b7bccc",
+    "perks/infer/metadata.json": "a9fa7457f7df99c5113c5a17f5d5181477e1c1ab3dccb49d978ad399497068ab",
+    "perks/infer/src/contracts.json": "13a8bba6f37530d46c455064db564c3aab4460f3f7eb642e24275f44753e3499",
+    "perks/infer/src/js_infer.py": "e5352f8c6774167548cb0cb7992036b9fb45696782f07219a932ab17fe31e44d",
+    "perks/infer/src/js_infer.sh": "edf1a89974b96bb264f8d2196dcc014516e4369fe44c990a3e7c02c5db65bcd4",
+    "perks/infer/test/case.json": "9dc7fa6f4fb6edaa65ed1d46c58b0531097fb943e8a6cea855f84a31734a8764",
+    "perks/infer/test/fixture/data.json": "96c942aa641f1537e71d25cc6f9de80edc9817b0b657b1fc7098b0dae5cb9c0e",
+    "perks/validate/manifesto.json": "ad8e71603748755619322117c55884e60259167572c9381c350d30d1dfa14c19",
+    "perks/validate/metadata.json": "5d33d45fccc01f1fe888d489a7328c9cb2fa529ddefe0ecdb4359d7cb2245469",
+    "perks/validate/src/contracts.json": "c3c9c14851351d584b9c4e3f2a4b2433c0077ddf4d19c0d4db6fabd42a1cd5c5",
+    "perks/validate/src/js_validate.py": "f4a705184c01d6d3228c0e43d7835f2964f1aeabb0dd4cf925d8c66ac0343adb",
+    "perks/validate/src/js_validate.sh": "b48a1d9ba8dffe1f13ad4cf13dc8ef9eaab38ed56946d217b189215b31d54c46",
+    "perks/validate/test/case.json": "4f07adbce63009aa2197f712547bdb6e47e3432f8dd18756ed925fd121c9d13a",
+    "perks/validate/test/fixture/data.json": "96c942aa641f1537e71d25cc6f9de80edc9817b0b657b1fc7098b0dae5cb9c0e",
+    "perks/validate/test/fixture/schema.json": "19dce25f788dce266334918bae6b81a44a43b886be9823c441d8bb10a1831d2d"
+  }
+}

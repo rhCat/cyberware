@@ -1,0 +1,23 @@
+{
+  "skill": "ssh",
+  "skill_sha": "6144c7bd5227ee31c662d47aa185ee9b4c43cd0b272c5c4a944ac6c1f974ca6d",
+  "file_count": 16,
+  "files": {
+    "SKILL.md": "aed85d1cc52043ab9c23da7d6d12669562dd2f1bbb2be4f32adaa56c4aca6bde",
+    "blueprint.drawio": "4479ce9af0cada29088a29aa9d99fc73d439ed4d75d0f36226f474219d47dc37",
+    "blueprint.json": "ea77d0b2df0df61c0e51d6c76d18e2b3fd1f19f1345cd65c56e336387fe57924",
+    "blueprint.svg": "1ca860e3672b7ea26bc18e8056fe1b0ba93eef00e9210dcd145226d2cb62bd6e",
+    "ledger.json": "ba1e9034d6c1fd0fcf2a4af1eb4000f862a43465149561298d049d87b6f24daa",
+    "perks.json": "f649e746d402d86637a5bd8778deb2e9d3e96b6935cbc2b796f29c22b3680720",
+    "perks/check/manifesto.json": "f9c4185c0c577776886644b9763dca9c3ed56e79acaeb1441f86cf4b05a7f7ca",
+    "perks/check/metadata.json": "4937773177b96de75df933a6a8fdcedfd9ad99b0ef378df500b3b639ee013bd8",
+    "perks/check/src/contracts.json": "a342627764a6afdfafd18a6047713ec4326c79ab264a8b9f125b6bc4f4773935",
+    "perks/check/src/ssh_check.sh": "450c26452ebf7399c8ba737daa170d50176ea33b57eb7701b634adc6fa94283e",
+    "perks/check/test/case.json": "8d24fb274132a17c5511ebcb67c9a0a6c52ed08d3bbbe935d28b3f00a0a59fa2",
+    "perks/run/manifesto.json": "1e594b33090cd3478833789fdcc07e010580ccd802b3c51e20f4b3a89486eebe",
+    "perks/run/metadata.json": "f5c50cf30462510f36fbfeee5312496ad59f97508f5ed05ef100a7ab16a1db85",
+    "perks/run/src/contracts.json": "520760763506542406e3e840f226333fcba0703bee64ce9180cc3294989dd4f5",
+    "perks/run/src/ssh_run.sh": "ab118927af68e5811ab8c9bc491ccccb0e9b2beda68c62ac481bba2e4d9b7972",
+    "perks/run/test/case.json": "0b4bceadfeac14fa03478c81a29414818787599029aaa5ea6ea64cc04fc88aaf"
+  }
+}

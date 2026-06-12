@@ -1,0 +1,2 @@
+CREATE TABLE t(id INTEGER PRIMARY KEY, v TEXT);
+INSERT INTO t(v) VALUES ('x'), ('y');

@@ -1,0 +1,19 @@
+{
+  "perk": "validate",
+  "skill": "jsonschema",
+  "description": "validate a JSON file against a JSON Schema (jsonschema, fallback builtin)",
+  "rules": [
+    "read-only — loads and checks, never edits",
+    "report to record_store",
+    "prefers jsonschema (Draft7), falls back to a minimal builtin validator"
+  ],
+  "usage": "Set DATA_FILE + SCHEMA_FILE. Output: validation.json.",
+  "limitation": "The builtin fallback covers only top-level type, required keys, and properties[k].type.",
+  "minimal_example": {
+    "perk": "validate",
+    "vars": {
+      "DATA_FILE": "/tmp/data.json",
+      "SCHEMA_FILE": "/tmp/schema.json"
+    }
+  }
+}

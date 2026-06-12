@@ -1,0 +1,7 @@
+{
+  "_perk": "extract",
+  "vars": { "PDF_FILE": "${FIXTURE}/doc.pdf" },
+  "expect": {
+    "outputs": ["extracted.txt"]
+  }
+}

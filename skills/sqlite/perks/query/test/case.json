@@ -1,0 +1,12 @@
+{
+  "_perk": "query",
+  "requires": ["sqlite3"],
+  "setup": [
+    "sqlite3 demo.db \"CREATE TABLE t(id INTEGER, name TEXT); INSERT INTO t VALUES (1,'alpha'),(2,'beta');\""
+  ],
+  "vars": { "DB_FILE": "${FIXTURE}/demo.db", "QUERY": "SELECT count(*) AS n FROM t" },
+  "expect": {
+    "outputs": ["query_result.txt"],
+    "contains": { "query_result.txt": "2" }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "perk": "check",
+  "skill": "ssh",
+  "description": "Non-interactive SSH connectivity probe — reports whether the host is reachable (read-only).",
+  "rules": [
+    "read-only — runs the no-op `true` remotely, changes nothing on the host",
+    "BatchMode=yes — never prompts; a missing key or auth failure is reported, not hung on",
+    "the private key is an optional *_FILE pointer passed to ssh -i, never an inline secret",
+    "always writes ssh_check.json (reachable true|false) even when the host is down"
+  ],
+  "usage": "Set SSH_HOST + SSH_USER (and SSH_KEY_FILE for key auth). Output: ssh_check.json.",
+  "limitation": "Probes reachability + auth only; runs no real command and inspects no remote state.",
+  "minimal_example": {
+    "perk": "check",
+    "vars": {
+      "SSH_HOST": "example.com",
+      "SSH_USER": "deploy"
+    }
+  }
+}

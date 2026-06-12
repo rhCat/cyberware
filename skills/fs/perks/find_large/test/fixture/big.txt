@@ -1,0 +1,4 @@
+This fixture file is intentionally a few hundred bytes long so that the
+find_large perk, with a 1-byte threshold, reliably lists it as a "large" file.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis.

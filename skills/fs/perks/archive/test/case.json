@@ -1,0 +1,7 @@
+{
+  "_perk": "archive",
+  "vars": { "SOURCE_DIR": "${FIXTURE}" },
+  "expect": {
+    "nonempty": ["archive.tar.gz"]
+  }
+}

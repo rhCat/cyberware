@@ -1,0 +1,25 @@
+{
+  "skill": "terraform",
+  "skill_sha": "7979c37679360803ad6ad32dfcdf95011367ead7eccce827bb78f20e4d71c857",
+  "file_count": 18,
+  "files": {
+    "SKILL.md": "ba8a5e88f50943c995440cb589d827ff95ad141819c9f2a3389de9a993cb0940",
+    "blueprint.drawio": "8c8e096e60719b46bf52d61557b490ddd5a89e0467f83a0cd455cb406aa5b56c",
+    "blueprint.json": "9faa52243b24099420358b2b255c279ed3fe89abec3a0ad046577cec5948a2e1",
+    "blueprint.svg": "aab12034072fcdf5d2ba06883a1cf577b839193a887a360aafe65b1987d0a53e",
+    "ledger.json": "1d23a249aed7f9f61e4f10be03ba5e1f864764d843244fc9bf8bed1f4195e23d",
+    "perks.json": "e06ed96df31bbd774ecc291ff68659bf2a4b16d87cf2faa7c87a6dad5faa82a1",
+    "perks/apply/manifesto.json": "4376b2020350c430f85e0effb53bbde24daa8199d0329a618d141b5d8b71ff20",
+    "perks/apply/metadata.json": "e3aef39828c3c33148bf00b2811c938259e3441a1504f66e285f3b4efdb3c661",
+    "perks/apply/src/contracts.json": "79ee75d3b7f21753135198c5d256c2f8366f6e40a382c9d0729cec7c88929315",
+    "perks/apply/src/tf_apply.sh": "d8741dad1bf90de4c9a383ec2784a6c153e185ea6de64a3d1226fcd73ea22e40",
+    "perks/apply/test/case.json": "8b59a83d4b9ad17f7ef3707da1390b617c02ae094fc124b77887c4a3ff238731",
+    "perks/apply/test/fixture/main.tf": "a5c86d7d93fc737d8ecddd07c1efd4b12f292debec9f98b5538228bb65de53f9",
+    "perks/plan/manifesto.json": "4dff8f5d71187f25af887c82a616d13409ec927ace232be025cd23c6ae9328a6",
+    "perks/plan/metadata.json": "db5166155ca83be043355b88abcc074a1273757ff0627a09463ec860b0921efa",
+    "perks/plan/src/contracts.json": "68885267377f2c923b5bf4e27a7578c1563c5d179f76c70edbbac1b543ca1569",
+    "perks/plan/src/tf_plan.sh": "be6b495d26bdefcd1e03399dac5e63290af5f6616c86ccb1d67b83521b6c1e38",
+    "perks/plan/test/case.json": "7729a60c0603687d160aa2fcb96e192cd55bddc70ffbe5f6486c4b99f2ef90c6",
+    "perks/plan/test/fixture/main.tf": "a5c86d7d93fc737d8ecddd07c1efd4b12f292debec9f98b5538228bb65de53f9"
+  }
+}

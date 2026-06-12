@@ -1,0 +1,24 @@
+{
+  "skill": "sqlite",
+  "skill_sha": "7754e5d9a4daf5cbd029fd707eede1871d7454f7fc6b4a52c2882da741769908",
+  "file_count": 17,
+  "files": {
+    "SKILL.md": "5b07e5d45e0171a5d50920bbaed2b363a405bbd3835b2da11c5a077d47649b01",
+    "blueprint.drawio": "7a23c0c6d9c8efbeee79b5e5e74d4c0f20d2817d1fecb3c2aca054a5da972ef5",
+    "blueprint.json": "5a243da063e75abb3b82505771b36dfe1b324009a8e3d006e122ffabd363a1d1",
+    "blueprint.svg": "078a7ebb179343ac40d946777dd79842987aa2aa4d34630198ee260b8ce1e691",
+    "ledger.json": "68cd51fbb0b3951a1d6b709c779c65cb583d3354c25af1f9f575341c723e749d",
+    "perks.json": "2bede9ca2d6fbe84ada0967c0113490659c5fb1912786eb2c57cd390ecd8cc08",
+    "perks/exec/manifesto.json": "d1fa2028e4e56601f4e96b4a59cecab9fa1f08db70e45928580000fa82f07298",
+    "perks/exec/metadata.json": "87d564075e253bfcf87439c98546f05bada14d22d4356209ac6101d3a3447825",
+    "perks/exec/src/contracts.json": "d7ae62c31b38e150a3a2be5348865509fe83bd788afe0585bd1ba27ea2fd08b6",
+    "perks/exec/src/sqlite_exec.sh": "cdb603a8f5f771a1ce101d530a3924e4c6c31a3c55fc18f8364e98c7d6275593",
+    "perks/exec/test/case.json": "8b4268be6fd4ff2b7128e81753267a33f7386e8606bbe295fc604820bf45a782",
+    "perks/exec/test/fixture/migration.sql": "c95d9be1fb2f5058ef7f132abbad51cb7ab3fbf7e76e498964086b93f7b5080f",
+    "perks/query/manifesto.json": "b409b5f839988e43d0d8893ec36eb8b80bf5e28f00943772be11b4853d22b1da",
+    "perks/query/metadata.json": "bdd381204cc44433fac42c18d653400fe87790364a150a622870b1c14d2b65be",
+    "perks/query/src/contracts.json": "b74fa91ba3d1d86052a7476bdaa796461e48b7134489865e6c510eefdb63a31b",
+    "perks/query/src/sqlite_query.sh": "fdde33047627bbd4239b014589b4d65f2cde9d4f0a5cf74f172fef639f9a1686",
+    "perks/query/test/case.json": "9f285ca9c8063e5567208aecc1ce3fe4ec93d3d28eb7ed4b0d7220d1edd57bed"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "_perk": "tag",
+  "requires": ["git"],
+  "setup": [
+    "git init -q .",
+    "git config user.email t@t",
+    "git config user.name t",
+    "git config commit.gpgsign false",
+    "echo hello > f.txt",
+    "git add -A",
+    "git commit -q -m init"
+  ],
+  "vars": { "REPO_DIR": "${FIXTURE}", "VERSION": "v0.0.1" },
+  "expect": {
+    "outputs": ["release_tag.json"],
+    "contains": { "release_tag.json": "v0.0.1" }
+  }
+}

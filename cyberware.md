@@ -111,11 +111,14 @@ perks/<perk>/
   manifesto.json  the ${VAR} template: sequence (tool order) · tools · env · requires
   src/contracts.json   the tool's I/O + checks
   src/<tool>.sh        the entry point (bash-core logic here; other-language core = standalone file + thin porter)
+  test/case.json       the perk's OWN governed self-test (vars · fixture · expect) — pinned in index.json
 ```
 
 - **The `.sh` is the entry point.** Bash-core logic lives in it; for Python (etc.) keep the core a
   standalone `<tool>.py` behind a thin `.sh` porter — never bury logic in a `<<'PY'` heredoc.
 - **Structured JSON output is the contract surface** — the executor records its hash for tamper-evidence.
+- **The skill proves itself.** Each perk ships `test/case.json` — a declarative case run through the real
+  governed channel (`python3 -m infra.tool.skilltest`), pinned in the index, so the proof can't drift.
 - **Recording is part of executing** — each step is written to the run-ledger *as it runs*, which is why
   the lifecycle ends at `executed`, not a separate `recorded`.
 

@@ -1,0 +1,21 @@
+{
+  "_perk": "plan",
+  "sequence": [
+    "tf_plan"
+  ],
+  "tools": {
+    "tf_plan": {
+      "binary": "terraform",
+      "params": {
+        "TF_DIR": "${TF_DIR}"
+      }
+    }
+  },
+  "env": {
+    "TF_DIR": "${TF_DIR}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "terraform"
+  ]
+}

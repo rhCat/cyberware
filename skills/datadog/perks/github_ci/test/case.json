@@ -1,0 +1,8 @@
+{
+  "_perk": "github_ci",
+  "vars": { "PROJECT_DIR": "${FIXTURE}", "SERVICE": "app", "TEST_CMD": "pytest" },
+  "expect": {
+    "outputs": ["${PROJECT_DIR}/.github/workflows/datadog-ci.yml"],
+    "contains": { "${PROJECT_DIR}/.github/workflows/datadog-ci.yml": ["name: datadog-ci", "DD_SERVICE: \"app\""] }
+  }
+}

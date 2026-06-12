@@ -1,0 +1,18 @@
+{
+  "perk": "audit",
+  "skill": "sec",
+  "description": "best-effort dependency vuln audit (pip-audit / npm audit, read-only)",
+  "rules": [
+    "read-only — never installs or modifies dependencies",
+    "best-effort — auditors are optional, absence is a clean no-op",
+    "JSON report to record_store (always written)"
+  ],
+  "usage": "Set PROJECT_DIR. Output: audit_report.json (always written, with a note when no auditor/manifest is found).",
+  "limitation": "Only pip-audit (requirements*.txt) and npm audit (package.json); both must be on PATH to run.",
+  "minimal_example": {
+    "perk": "audit",
+    "vars": {
+      "PROJECT_DIR": "."
+    }
+  }
+}

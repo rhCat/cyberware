@@ -1,0 +1,9 @@
+{
+  "_schema": "task-ledger TEMPLATE for pdf — set perk, fill record_store + the vars the perk declares.",
+  "skill": "pdf",
+  "perk": "extract",
+  "record_store": "<absolute dir for outputs + run-ledger>",
+  "vars": {
+    "PDF_FILE": "<absolute path to a .pdf>"
+  }
+}

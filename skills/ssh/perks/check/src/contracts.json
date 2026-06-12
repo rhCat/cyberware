@@ -1,0 +1,27 @@
+{
+  "tool": "ssh_check",
+  "inputs": {
+    "SSH_HOST": {
+      "type": "string",
+      "required": true
+    },
+    "SSH_USER": {
+      "type": "string",
+      "required": true
+    },
+    "SSH_KEY_FILE": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "outputs": {
+    "ssh_check_out": {
+      "path": "${RECORD_STORE}/ssh_check.json",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/ssh_check.json"
+  }
+}

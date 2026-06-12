@@ -1,0 +1,23 @@
+{
+  "tool": "sqlite_query",
+  "inputs": {
+    "DB_FILE": {
+      "type": "string",
+      "required": true
+    },
+    "QUERY": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "query_result": {
+      "path": "${RECORD_STORE}/query_result.txt",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/query_result.txt"
+  }
+}

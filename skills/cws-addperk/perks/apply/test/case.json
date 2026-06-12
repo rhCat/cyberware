@@ -1,0 +1,4 @@
+{
+  "_perk": "apply",
+  "skip": "repo-mutating (branches + opens a PR) \u2014 contract-tested only"
+}

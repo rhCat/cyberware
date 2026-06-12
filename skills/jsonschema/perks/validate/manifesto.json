@@ -1,0 +1,23 @@
+{
+  "_perk": "validate",
+  "sequence": [
+    "js_validate"
+  ],
+  "tools": {
+    "js_validate": {
+      "binary": "python3",
+      "params": {
+        "DATA_FILE": "${DATA_FILE}",
+        "SCHEMA_FILE": "${SCHEMA_FILE}"
+      }
+    }
+  },
+  "env": {
+    "DATA_FILE": "${DATA_FILE}",
+    "SCHEMA_FILE": "${SCHEMA_FILE}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "python3"
+  ]
+}

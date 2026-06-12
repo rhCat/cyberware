@@ -1,0 +1,27 @@
+{
+  "skill": "pdf",
+  "skill_sha": "c97ce2679c434d76b7f1dcc3a1ef76cfba74b05267daee736cbaa9474601ef41",
+  "file_count": 20,
+  "files": {
+    "SKILL.md": "09ce1ebece5082ff0f6d63b5047c45f9084974c404684db3165fe181ef102248",
+    "blueprint.drawio": "c23b11ae71e3c24a38494e5d1fe41502acdcf52b41abed6dc17ac4969c516bc8",
+    "blueprint.json": "29c74476ceafccb8d5637c4525a89d60bcf56183789b9c1e399a94bdf7252e55",
+    "blueprint.svg": "c6846aa0982ae6b166e39f364abb118951e945a05dd2b891941b8434640a6cfd",
+    "ledger.json": "734bcc486db3a05cdbb0937b5a86c123391a9a7862003d2b734294d7dc9099de",
+    "perks.json": "d3237d967512dba9c196433247a9dbc0e3c0009bd2e95245daf1935b431d6f15",
+    "perks/extract/manifesto.json": "443b90f22819052f5dd87bfd9daa4687915ab28a03e3d53e8a9e7e028053004a",
+    "perks/extract/metadata.json": "d306dd62a93846263b826c13c5513bde4a72b75dd1ffca7d36341cdb2f573e37",
+    "perks/extract/src/contracts.json": "e16b351926b25ba14d6f4a254ecf58052f87877b299c372bb591b7d4c92d81bf",
+    "perks/extract/src/pdf_extract.py": "d89240975b26860ddf8283511c5265a7fb3ededc2201be38ca2d2776fc715450",
+    "perks/extract/src/pdf_extract.sh": "d4b654ee0b4cb925fa1d1bd5eff9b75eaf74111aa33a5ae3173f5fc49732a1b4",
+    "perks/extract/test/case.json": "8eb33122b250374f687821950caabc46be13e885ee55c632cbc59b7bdb2c6f72",
+    "perks/extract/test/fixture/doc.pdf": "a7f9c9df5861ca601f2d3f56a6ec6b4abcf4aa07762b871e13a36b61a62ee2b2",
+    "perks/info/manifesto.json": "71c365f5d43d1e4031ff23de08a749a4cbc56aafca76b9a32f076425a46c921d",
+    "perks/info/metadata.json": "fbed68191ecb0bb67e92584167c3e1786c721f27b7f669fd50519ff6747952a2",
+    "perks/info/src/contracts.json": "c9c068aa34086bfc5091046992666177702e8f8850ec27455e276aab69ace5fe",
+    "perks/info/src/pdf_info.py": "e4ee2f021802b30f152adacc2a348f56a81d16820b0f53cb7742af36f8e18779",
+    "perks/info/src/pdf_info.sh": "f0bb5461b824c9c42353befc277336d75fb1059e119a3607db9e818ada558b4f",
+    "perks/info/test/case.json": "47e9eb16f4d86721ed0b48483f31af74a10dfa80620b8e566003a4e45a084367",
+    "perks/info/test/fixture/doc.pdf": "a7f9c9df5861ca601f2d3f56a6ec6b4abcf4aa07762b871e13a36b61a62ee2b2"
+  }
+}

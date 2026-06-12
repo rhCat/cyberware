@@ -1,0 +1,17 @@
+{
+  "_perk": "status",
+  "requires": ["git"],
+  "setup": [
+    "git init -q .",
+    "git config user.email t@t",
+    "git config user.name t",
+    "git config commit.gpgsign false",
+    "echo hello > f.txt",
+    "git add -A",
+    "git commit -q -m init"
+  ],
+  "vars": { "REPO_DIR": "${FIXTURE}" },
+  "expect": {
+    "outputs": ["git_status.txt"]
+  }
+}

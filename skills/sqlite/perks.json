@@ -1,0 +1,21 @@
+{
+  "skill": "sqlite",
+  "perks": [
+    {
+      "id": "query",
+      "summary": "run a read-only SQL query against a local SQLite db",
+      "destructive": false,
+      "tools": [
+        "sqlite_query"
+      ]
+    },
+    {
+      "id": "exec",
+      "summary": "apply a .sql migration script to a local SQLite db",
+      "destructive": true,
+      "tools": [
+        "sqlite_exec"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "perk": "apply",
+  "skill": "terraform",
+  "description": "apply a Terraform module (-auto-approve, destructive)",
+  "rules": [
+    "destructive — mutates real infrastructure",
+    "runs apply -auto-approve -input=false",
+    "full apply log to record_store"
+  ],
+  "usage": "Set TF_DIR (the module dir). Output: apply.log.",
+  "limitation": "Destructive: applies changes to live infrastructure. Gated by destructive: true.",
+  "minimal_example": {
+    "perk": "apply",
+    "vars": {
+      "TF_DIR": "."
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "skill": "markdown",
+  "perks": [
+    {
+      "id": "toc",
+      "summary": "generate a GitHub-style table of contents from ATX headings (read-only)",
+      "destructive": false,
+      "tools": [
+        "md_toc"
+      ]
+    },
+    {
+      "id": "links",
+      "summary": "find dead relative links in a Markdown file (read-only)",
+      "destructive": false,
+      "tools": [
+        "md_links"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "_schema": "task-ledger TEMPLATE for sqlite — set perk, fill record_store + the vars the perk declares.",
+  "skill": "sqlite",
+  "perk": "query",
+  "record_store": "<absolute dir for outputs + run-ledger>",
+  "vars": {
+    "DB_FILE": "<absolute path to the .db/.sqlite file>",
+    "QUERY": "<SELECT ...>"
+  }
+}

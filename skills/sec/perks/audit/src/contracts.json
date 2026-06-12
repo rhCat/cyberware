@@ -1,0 +1,19 @@
+{
+  "tool": "sec_audit",
+  "inputs": {
+    "PROJECT_DIR": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "sec_audit_out": {
+      "path": "${RECORD_STORE}/audit_report.json",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/audit_report.json"
+  }
+}

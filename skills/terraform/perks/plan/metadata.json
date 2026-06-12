@@ -1,0 +1,18 @@
+{
+  "perk": "plan",
+  "skill": "terraform",
+  "description": "init + validate + plan a Terraform module (read-only, no backend)",
+  "rules": [
+    "read-only",
+    "init runs with -backend=false (no remote state)",
+    "plan + validate output to record_store"
+  ],
+  "usage": "Set TF_DIR (the module dir). Output: plan.txt.",
+  "limitation": "Read-only: never applies. Plan only — no remote backend is initialised.",
+  "minimal_example": {
+    "perk": "plan",
+    "vars": {
+      "TF_DIR": "."
+    }
+  }
+}

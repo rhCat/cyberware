@@ -1,0 +1,19 @@
+{
+  "_perk": "snapshot",
+  "requires": ["git"],
+  "setup": [
+    "git init -q .",
+    "git config user.email t@t",
+    "git config user.name t",
+    "git config commit.gpgsign false",
+    "echo hello > f.txt",
+    "git add -A",
+    "git commit -q -m init",
+    "echo change > new.txt"
+  ],
+  "vars": { "REPO_DIR": "${FIXTURE}", "MESSAGE": "test snapshot" },
+  "expect": {
+    "outputs": ["git_snapshot.json"],
+    "json": { "git_snapshot.json": { "status": "ok" } }
+  }
+}
