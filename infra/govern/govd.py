@@ -20,7 +20,7 @@ Principles enforced here:
     ledger is server-owned; the upstream-order gate can't be forged.
 
 HTTP:
-  GET  /health                        -> mode, port, registry, run count
+  GET  /health                        -> mode, port, registry, chip_sha + acquisition provenance, run count
   GET  /catalog                       -> value-free discovery: skills · perks · var-KEYS · skill_sha · verified
   GET  /flow/run/<run_id>             -> THIS run's task-blueprint SVG (perk's gated sequence; value-free; monitor-gated)
   GET  /flow/<skill>                  -> the skill's generic lifecycle blueprint.svg (value-free; fallback)
@@ -118,6 +118,22 @@ def catalog_snapshot():
     if "c" not in _CATALOG_CACHE:
         _CATALOG_CACHE["c"] = skill_index.catalog()
     return _CATALOG_CACHE["c"]
+
+
+def chip_sha():
+    """The chip's identity — the roll-up sha from the chip manifest (cached; the chip is static at runtime)."""
+    if "sha" not in _CATALOG_CACHE:
+        mp = os.path.join(registry.SKILLCHIP, registry.CHIP_MANIFEST)
+        _CATALOG_CACHE["sha"] = json.load(open(mp)).get("chip_sha") if os.path.isfile(mp) else None
+    return _CATALOG_CACHE["sha"]
+
+
+def chip_provenance():
+    """How this chip was acquired (chipfetch hands it over: local baked, or cloud source@ref#commit)."""
+    try:
+        return json.loads(os.environ.get("GOVD_CHIP_PROVENANCE") or "null")
+    except ValueError:
+        return None
 
 
 def task_flow_svg(rec):
@@ -496,7 +512,8 @@ class Handler(BaseHTTPRequestHandler):
         host, port = self.server.server_address[0], self.server.server_address[1]
         if self.path == "/health":
             return self._json(200, {"status": "ok", "service": "cyberware-govd", "mode": cfg["mode"],
-                                    "host": host, "port": port, "registry": os.path.join(registry.SKILLCHIP),
+                                    "host": host, "port": port, "registry": registry.SKILLCHIP,
+                                    "chip_sha": chip_sha(), "chip": chip_provenance(),
                                     "runs": len(store.runs)})
         path = self.path.split("?", 1)[0]
         if path == "/catalog":
@@ -750,7 +767,11 @@ def serve(cfg):
     httpd.cfg, httpd.store = cfg, store
     dash_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
     print(f"govd · {cfg['mode']} · http://{host}:{port}  ·  ws://{host}:{port}/oversight")
-    print(f"  registry={os.path.join(ROOT, 'skills')}   record_root={store.root}")
+    prov = chip_provenance()
+    src = (f"cloud {prov.get('source')} @ {prov.get('ref')} ({str(prov.get('commit'))[:12]})"
+           if (prov or {}).get("mode") == "cloud" else "local (baked)")
+    print(f"  skillChip={registry.SKILLCHIP}   chip_sha={(chip_sha() or '?')[:16]}   source={src}")
+    print(f"  record_root={store.root}")
     print(f"  dashboard:  http://{dash_host}:{port}/?token={cfg['monitor_token']}"
           + ("   (default local token 'admin' — set GOVD_MONITOR_TOKEN to change)"
              if cfg["monitor_token"] == "admin" else ""))

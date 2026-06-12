@@ -56,6 +56,7 @@ def test_health(server):
     base, _, _ = server
     h = json.loads(urllib.request.urlopen(base + "/health").read())
     assert h["status"] == "ok" and h["service"] == "cyberware-govd"
+    assert h["chip_sha"] == json.load(open(registry.manifest_path()))["chip_sha"]   # attests WHICH cartridge
 
 
 def test_catalog_endpoint_is_ungated_and_matches_the_builder(server):
