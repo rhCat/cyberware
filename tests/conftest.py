@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT))   # so `from infra.govern import …` / `from infr
 
 from infra.govern import runlog  # noqa: E402
 
-TOOL_MODULES = {"scaffold", "visualize", "build_site"}   # everything else lives under infra.govern
+TOOL_MODULES = {"scaffold", "visualize", "skill_index"}   # everything else lives under infra.govern
 
 
 def run_cli(module: str, *args, **kw):
