@@ -9,10 +9,17 @@ jobs:
   codeqc:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:                                       # pull the skillChip cartridge (submodule)
-          submodules: recursive
-          token: ${{ secrets.SUBMODULE_PAT || github.token }}   # private chip→set SUBMODULE_PAT; public→default
+      - uses: actions/checkout@v4                  # main repo: the native runner token owns cyberware
+        with:
+          persist-credentials: false                # don't leave a github.token extraheader that shadows the PAT
+      - name: checkout the skillChip cartridge (submodule)
+        env:                                         # PAT scoped read-only to skillChip; falls back for a public chip
+          TOKEN: ${{ secrets.SUBMODULE_PAT || github.token }}
+        run: |
+          AUTH="https://x-access-token:${TOKEN}@github.com/"
+          git -c "url.${AUTH}.insteadOf=git@github.com:" \
+              -c "url.${AUTH}.insteadOf=https://github.com/" \
+              submodule update --init --recursive --depth=1 skillChip
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
