@@ -13,7 +13,7 @@ Stdlib only (urllib + a tiny RFC 6455 client), so an agent can drive govd with n
   python3 infra/govd_client.py --url http://127.0.0.1:5773 --ledger task-ledger.json [--approve <id>]
 """
 from __future__ import annotations
-import argparse, base64, json, os, socket, subprocess, sys, urllib.error, urllib.request
+import argparse, base64, hashlib, json, os, socket, subprocess, sys, urllib.error, urllib.request
 
 from infra.govern import compiler
 from infra.govern import runlog
@@ -97,35 +97,53 @@ def _ws_recv(sock):
     return (data or b"").decode(errors="replace")
 
 
-def _assemble(plan, ledger):
-    """Write the value-free plan to disk LOCALLY (wrapper verbatim + snippets) and build the env the
-    agent injects at run time — its OWN vars (values + *_FILE secret pointers), which govd never saw.
-    run.sh is the blessed wrapper byte-for-byte (its hash matches); no value is ever written into it."""
+DEFAULT_REGISTRY = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
+
+
+def _verify_registry(registry, plan):
+    """The agent's OWN perk src files must match the blessed hashes — no file bodies cross the wire.
+    Returns (src_dir, problem|None)."""
+    src = os.path.join(registry, "skills", plan["skill"], "perks", plan["perk"], "src")
+    for fname, want in (plan.get("snippet_shas") or {}).items():
+        fp = os.path.join(src, fname)
+        if not os.path.isfile(fp):
+            return src, f"missing {fname}"
+        if hashlib.sha256(open(fp, "rb").read()).hexdigest() != want:
+            return src, f"{fname} does not match the blessed hash"
+    return src, None
+
+
+def _prepare(plan, ledger, registry):
+    """Write the blessed wrapper to the run dir and point SNIP at the agent's OWN registry src (porters +
+    cores). Vars (values + *_FILE secret pointers) go via the ENV, never into the script."""
     run = runlog.run_dir(ledger)
-    snipdir = os.path.join(run, "snip")
-    os.makedirs(snipdir, exist_ok=True)
-    for tool, text in plan["snippets"].items():
-        sp = os.path.join(snipdir, f"{tool}.sh")
-        open(sp, "w").write(text)
+    os.makedirs(run, exist_ok=True)
     sh = os.path.join(run, "run.sh")
     open(sh, "w").write(plan["wrapper"])
     os.chmod(sh, 0o755)
     env = dict(os.environ)
-    env.update({k: str(v) for k, v in (ledger.get("vars") or {}).items()})   # vars via ENV, not the script
-    env["RECORD_STORE"], env["SNIP"] = run, snipdir
+    env.update({k: str(v) for k, v in (ledger.get("vars") or {}).items()})
+    env["RECORD_STORE"] = run
+    env["SNIP"] = os.path.join(registry, "skills", plan["skill"], "perks", plan["perk"], "src")
     return run, sh, env
 
 
-def run_governed(base_url, ledger, approve=()):
-    """Fetch the value-free plan, assemble it locally, and run it step by step while govd monitors the
-    plan hash and records status. No value, secret, or output ever crosses to govd."""
+def run_governed(base_url, ledger, approve=(), registry=None):
+    """Fetch the value-free plan, verify the agent's OWN registry matches the blessed hashes, then run the
+    porters+cores FROM that registry while govd monitors the plan hash and records status. No value,
+    secret, output, OR code crosses to govd."""
     verdict = fetch(base_url, ledger, approve)
     if verdict.get("decision") != "allow":
         return verdict                                  # push_back (e.g. destructive: approve) / reject
 
     plan = verdict["plan"]
     psha = compiler.plan_sha(plan)                      # the same hash govd pinned — computed locally
-    run, sh, env = _assemble(plan, ledger)
+    registry = registry or DEFAULT_REGISTRY
+    _, problem = _verify_registry(registry, plan)       # authenticity: my files == govd's blessed hashes
+    if problem:
+        return {"run_id": verdict["run_id"], "decision": "allow",
+                "error": f"registry mismatch ({registry}): {problem}"}
+    run, sh, env = _prepare(plan, ledger, registry)
 
     ws_host, ws_port = verdict["ws"].split("://", 1)[1].split("/", 1)[0].rsplit(":", 1)
     sock = _ws_connect(ws_host, int(ws_port))
@@ -167,10 +185,13 @@ def main():
     ap.add_argument("--url", default="http://127.0.0.1:5773")
     ap.add_argument("--ledger", required=True)
     ap.add_argument("--approve", action="append", default=[])
-    ap.add_argument("--fetch-only", action="store_true", help="just get the verdict/script, do not execute")
+    ap.add_argument("--registry", default=None,
+                    help="where the skill code lives (default: this cyberware install); verified vs the blessed hashes")
+    ap.add_argument("--fetch-only", action="store_true", help="just get the verdict/plan, do not execute")
     a = ap.parse_args()
     ledger = json.load(open(a.ledger))
-    out = fetch(a.url, ledger, a.approve) if a.fetch_only else run_governed(a.url, ledger, a.approve)
+    out = (fetch(a.url, ledger, a.approve) if a.fetch_only
+           else run_governed(a.url, ledger, a.approve, registry=a.registry))
     print(json.dumps(out, indent=2))
     sys.exit(0 if out.get("decision") in ("allow", None) else 2)
 

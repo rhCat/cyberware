@@ -68,20 +68,20 @@ def build_script(L):
 
 
 def build_plan(skill, perk):
-    """The VALUE-FREE execution plan for a perk — the structure govd blesses and hashes, with NO task
-    data in it. Returns a dict: the tool sequence, the wrapper bash (placeholders, no `export` of values),
-    each snippet's full sha256, and the snippet texts (so a remote agent can assemble the run locally).
-    The agent prepends its own `export` line (its vars, incl. `${SNIP}`/`${RECORD_STORE}`) before running.
-    govd never sees a value; the plan hash is stable regardless of the vars the agent later binds."""
+    """The VALUE-FREE execution plan for a perk — the structure govd blesses, with NO task data and NO
+    code. Returns: the tool sequence, the wrapper bash (placeholders, no `export` of values), and the
+    perk's whole src closure sha256 (every file — `.sh` porters AND `.py` cores) taken from the skill's
+    authenticity `index.json`, plus the roll-up `skill_sha`. No file bodies are shipped: the agent runs
+    from its OWN registry (`SNIP`) after verifying its files against these hashes."""
     pdir = os.path.join(ROOT, "skills", skill, "perks", perk)
     manifesto = load(os.path.join(pdir, "manifesto.json"))
     contract = load(os.path.join(pdir, "src", "contracts.json"))
     seq = manifesto.get("sequence", [])
-    snippets, snippet_shas = {}, {}
-    for tool in seq:
-        body = open(os.path.join(pdir, "src", f"{tool}.sh"), "rb").read()
-        snippets[tool] = body.decode()
-        snippet_shas[tool] = hashlib.sha256(body).hexdigest()
+    # the perk's executable closure hashes come from the skill's committed authenticity index
+    idx = load(os.path.join(ROOT, "skills", skill, "index.json"))
+    prefix = f"perks/{perk}/src/"
+    snippet_shas = {rel[len(prefix):]: h for rel, h in sorted(idx.get("files", {}).items())
+                    if rel.startswith(prefix) and rel != prefix + "contracts.json"}
 
     wrap = [
         "#!/usr/bin/env bash",
@@ -110,14 +110,16 @@ def build_plan(skill, perk):
         "esac",
         "",
     ]
-    return {"skill": skill, "perk": perk, "sequence": list(seq),
-            "wrapper": "\n".join(wrap), "snippet_shas": snippet_shas, "snippets": snippets}
+    return {"skill": skill, "perk": perk, "sequence": list(seq), "wrapper": "\n".join(wrap),
+            "snippet_shas": snippet_shas, "skill_sha": idx.get("skill_sha", "")}
 
 
 def plan_sha(plan):
     """The sha256 of the execution plan — value-free, so govd and the agent compute the same hash.
-    Covers the pathway (skill/perk/sequence), the exact snippet bytes, and the wrapper structure."""
-    canon = json.dumps({k: plan[k] for k in ("skill", "perk", "sequence", "wrapper", "snippet_shas")},
+    Covers the pathway (skill/perk/sequence), the perk's src-closure hashes + the skill roll-up, and the
+    wrapper structure."""
+    canon = json.dumps({k: plan.get(k) for k in
+                        ("skill", "perk", "sequence", "wrapper", "snippet_shas", "skill_sha")},
                        sort_keys=True)
     return hashlib.sha256(canon.encode()).hexdigest()
 

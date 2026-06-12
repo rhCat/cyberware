@@ -1,0 +1,17 @@
+{
+  "skill": "ci-codeqc",
+  "skill_sha": "7ed2862ce86ed3c09da9cc1f578b2aa767cf9035135d76057ed0bbafe1eec970",
+  "file_count": 10,
+  "files": {
+    "SKILL.md": "3e513d857ff86a59022a12e62c2a040cb84651f7934acce9327eb36d353c53cd",
+    "blueprint.drawio": "f60420d84cf188aaa37920aa9598f1678efe4ef3af9c233cb1de63b7eb05e5fe",
+    "blueprint.json": "4a2a563aaabb72e1589b006cbddbfa5b0cafdd538bf7e676d024a01806200b2f",
+    "blueprint.svg": "8e5e079f4da4908c0b186306a7f7d7174e43ab22606a4c6cb345924028735371",
+    "ledger.json": "fd0d2045439231752a8534fd1b60beef20422573b07e40bd964a4b2e98f6d489",
+    "perks.json": "86d2ddd6fb252e0f0e6487d43141cc8651a28da2242fed9cb0e78b416bb633fe",
+    "perks/github_actions/manifesto.json": "711e7e02bf87fca2016393277c1ccd06bca90eb904539efb68741e6698f4fb3f",
+    "perks/github_actions/metadata.json": "9f8e3b4320369ea956f713283caca4f741ea678c8d9addfae30000b56b3b5673",
+    "perks/github_actions/src/ci_github_actions.sh": "08ed2da64f6b40c7f1997f5707e1044b51722cf5b53b1ff5a5755b3893c22afa",
+    "perks/github_actions/src/contracts.json": "ac15bda0feb31402592ddad1281b80429cd4f3649634595bad38f5f13ed2c763"
+  }
+}
