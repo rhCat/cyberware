@@ -1,0 +1,25 @@
+{
+  "skill": "sec",
+  "skill_sha": "d9d561f33079ff686c414d6e3b53af60d0c631ff598274f4a50ba76ca459e640",
+  "file_count": 18,
+  "files": {
+    "SKILL.md": "04ad418d624808068b1a92825ade396b11765d5366ef4aadbabb680beae2b8df",
+    "blueprint.drawio": "f117eaad3e6819d6e244988e4de2ea7f2673ed51e046d14f9771ceacf0229dde",
+    "blueprint.json": "c98532e5f6615b55488d687e4229205df40b779ee1e87e044f94439c59f41f20",
+    "blueprint.svg": "5839cd4154dc98d906dfbe73aed51f2dd1c478014f6bbd4d1280c790add17e7e",
+    "ledger.json": "b1fcbb81e3dce8984cdcc0c005582e6007a120aaf82dbb639458e93e518bc7ab",
+    "perks.json": "abe1368d3e30494c2c3cae23c4f118b0e932a356c3b1081b060cb7c2b67b6abd",
+    "perks/audit/manifesto.json": "29a04264e3c1a40e42759c3869fc324bdfc4626fea34a8fb3009b92ef0dee4a1",
+    "perks/audit/metadata.json": "050baa6511b8f58309e307303488e4e750fa0dbee0767d3726e77ad6c0a02070",
+    "perks/audit/src/contracts.json": "872511ed5fd8f950c543ce4e6e47edbc98c4ba03174325d6d57efa4ee91dba4f",
+    "perks/audit/src/sec_audit.sh": "1fe55222f1adb835bb5c52445dd6149f30c801d1d2051dd5e727f7d9840fb25d",
+    "perks/audit/test/case.json": "c621aa4634fefdab4cdd96a813df55a13c474e9295f1eeb110e90a5099b238c1",
+    "perks/audit/test/fixture/README.txt": "3f3a6f852c3781308130f041512da864ef55d10a3423b7c808a113811cdf1f05",
+    "perks/secrets/manifesto.json": "3a992ef7a467cd274c88426b2bb101b41554fa3799074a21a6049829127dfac2",
+    "perks/secrets/metadata.json": "df32f6481dcc020517e084d04c4b98c1aad039b8811f91c76c01bbb1e8ecafa8",
+    "perks/secrets/src/contracts.json": "950a67cc6f868b2fea58e081f770f19803a2ed273287c5f6278eef8cdcca8830",
+    "perks/secrets/src/sec_secrets.sh": "fcb8bcaf664d3fec0c4872451e1e73ef79a2f28dbd6a72c7419a7ebed0cffe82",
+    "perks/secrets/test/case.json": "472b3aa03b1f3940fd9fe3adff67f1c6813e7b57ef041475fe20bc5b17799cb3",
+    "perks/secrets/test/fixture/cfg.txt": "7c2e96757ecfe8df48dd660d0c7314a47ab68be4fde46c879dbe395b390c6a54"
+  }
+}

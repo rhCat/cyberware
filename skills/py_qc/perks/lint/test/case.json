@@ -1,0 +1,12 @@
+{
+  "_perk": "lint",
+  "requires": ["ruff"],
+  "setup": [
+    "mkdir -p src",
+    "printf 'def f():\\n    return 1\\n' > src/a.py"
+  ],
+  "vars": { "PROJECT_DIR": "${FIXTURE}", "LINT_TARGET": "src" },
+  "expect": {
+    "outputs": ["lint.out"]
+  }
+}

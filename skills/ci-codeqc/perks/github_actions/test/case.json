@@ -1,0 +1,8 @@
+{
+  "_perk": "github_actions",
+  "vars": { "PROJECT_DIR": "${FIXTURE}", "SRC_DIR": "src" },
+  "expect": {
+    "outputs": ["${PROJECT_DIR}/.github/workflows/codeqc.yml"],
+    "contains": { "${PROJECT_DIR}/.github/workflows/codeqc.yml": "name: code-qc" }
+  }
+}

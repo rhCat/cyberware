@@ -1,0 +1,8 @@
+{
+  "_perk": "evaluate",
+  "vars": { "SKILL_NAME": "pg-backup", "SKILL_DESC": "run pg_dump to back up a database" },
+  "expect": {
+    "outputs": ["evaluation.json"],
+    "json": { "evaluation.json": { "status": "ok", "verdict": "execution", "onboard": true } }
+  }
+}

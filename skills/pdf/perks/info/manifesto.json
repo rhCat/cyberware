@@ -1,0 +1,19 @@
+{
+  "_perk": "info",
+  "sequence": [
+    "pdf_info"
+  ],
+  "tools": {
+    "pdf_info": {
+      "binary": "python3",
+      "params": {
+        "PDF_FILE": "${PDF_FILE}"
+      }
+    }
+  },
+  "env": {
+    "PDF_FILE": "${PDF_FILE}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": []
+}

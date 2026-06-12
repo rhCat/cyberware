@@ -1,0 +1,27 @@
+{
+  "_perk": "run",
+  "sequence": [
+    "ssh_run"
+  ],
+  "tools": {
+    "ssh_run": {
+      "binary": "ssh",
+      "params": {
+        "SSH_HOST": "${SSH_HOST}",
+        "SSH_USER": "${SSH_USER}",
+        "COMMAND": "${COMMAND}",
+        "SSH_KEY_FILE": "${SSH_KEY_FILE}"
+      }
+    }
+  },
+  "env": {
+    "SSH_HOST": "${SSH_HOST}",
+    "SSH_USER": "${SSH_USER}",
+    "COMMAND": "${COMMAND}",
+    "SSH_KEY_FILE": "${SSH_KEY_FILE}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "ssh"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "_perk": "toc",
+  "vars": { "MD_FILE": "${FIXTURE}/doc.md" },
+  "expect": {
+    "outputs": ["toc.md"],
+    "contains": { "toc.md": "#setup" }
+  }
+}

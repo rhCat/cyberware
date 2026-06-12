@@ -1,7 +1,9 @@
 # Skill catalog
 
 Tool skills (operational pathways) — not design/taste skills. Each runs through the governed pipeline
-(`validate → compose → compile → oversight → executor`) and ships a `blueprint.{drawio,svg}`.
+(`validate → compose → compile → oversight → executor`), ships a `blueprint.{drawio,svg}`, pins every
+file in an `index.json` (authenticity), and carries a per-perk `test/case.json` that proves it through
+the real channel. **22 skills** — discover them at `GET /catalog` or `./govd-client --discover`.
 
 | skill | perks | tools | notes / guard |
 |---|---|---|---|
@@ -18,6 +20,13 @@ Tool skills (operational pathways) — not design/taste skills. Each runs throug
 | **data** | `csv2json` · `jq` | python3 · jq | CSV → JSON array (python core); jq query over a JSON file. |
 | **search** | `grep` · `loc` | ripgrep/grep · find | pattern search (rg, fallback grep); line counts by extension. Read-only. |
 | **release** | `tag` | git | annotated git tag at HEAD; no-op if it exists. No force, no push (push stays gated). |
+| **sec** | `secrets` · `audit` | grep · python3 | scan a tree for leaked secrets (findings carry file/line/rule, never the value) · best-effort dependency-vuln audit. Read-only. |
+| **sqlite** | `query` · `exec` | sqlite3 | local SQLite; `query` read-only, `exec` applies a migration (destructive → approve). |
+| **terraform** | `plan` · `apply` | terraform | IaC; `plan` (init/validate/plan) read-only, `apply` destructive → approve. |
+| **pdf** | `extract` · `info` | pdftotext/pypdf | extract text · read metadata (Python core; degrades to a note if no extractor). Read-only. |
+| **jsonschema** | `validate` · `infer` | python3 | validate JSON against a schema · infer a schema from a sample (stdlib). Read-only. |
+| **markdown** | `toc` · `links` | python3 | table of contents from headings · dead relative-link finder. Read-only. |
+| **ssh** | `check` · `run` | ssh | connectivity check (read-only) · vetted remote command (destructive → approve; key via `*_FILE`). |
 | **cws-create** | `evaluate` · `scaffold` | python3 · scaffold.py | **the on-ramp** — classify a candidate skill (execution / design / transformable / unclear) and, if it fits, scaffold it into cyberware format. |
 | **cws-addperk** | `evaluate` · `apply` | python3 · git · gh | add a perk to an existing skill, governed — evaluate (exists / generalizable / scope), then branch → formulate + validate → open a PR (merge through the agent). |
 
@@ -36,5 +45,8 @@ vars. The registry is meant to grow: tools are the unit, perks are the proven pa
 ## Self-audit
 
 `examples/self-audit/` holds the framework's own `codebaseqc` report — cyberware QC'd by cyberware.
-It honestly shows the open gaps (e.g., no return-type hints yet). The infra is now covered by a real
-`tests/` suite (unit + integration + per-skill), gated in CI — see [Tests](../README.md#tests).
+It honestly shows the open gaps (e.g., no return-type hints yet). The infra is covered by a real
+`tests/` suite (unit + integration + per-perk contract), gated in CI; and **every skill carries its own
+governed self-test** (`perks/<perk>/test/case.json`, run through the real channel by
+`infra.tool.skilltest` and discovered by `tests/test_skill_selftests.py`) — see [Tests](../README.md#tests)
+and [authoring.md](authoring.md#6-prove-it--the-in-skill-self-test).

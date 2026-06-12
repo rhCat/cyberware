@@ -1,0 +1,21 @@
+{
+  "skill": "sec",
+  "perks": [
+    {
+      "id": "secrets",
+      "summary": "scan a tree for likely leaked secrets (grep, read-only)",
+      "destructive": false,
+      "tools": [
+        "sec_secrets"
+      ]
+    },
+    {
+      "id": "audit",
+      "summary": "best-effort dependency vuln audit (pip-audit / npm audit, read-only)",
+      "destructive": false,
+      "tools": [
+        "sec_audit"
+      ]
+    }
+  ]
+}

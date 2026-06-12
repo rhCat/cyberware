@@ -1,0 +1,8 @@
+{
+  "_perk": "csv2json",
+  "vars": { "CSV_FILE": "${FIXTURE}/d.csv" },
+  "expect": {
+    "outputs": ["data.json"],
+    "contains": { "data.json": "alice" }
+  }
+}

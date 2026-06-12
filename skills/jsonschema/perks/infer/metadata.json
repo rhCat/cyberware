@@ -1,0 +1,18 @@
+{
+  "perk": "infer",
+  "skill": "jsonschema",
+  "description": "infer a JSON Schema from a JSON sample (read-only)",
+  "rules": [
+    "read-only — loads and infers, never edits",
+    "schema to record_store",
+    "objects -> properties + required (all keys); arrays -> items; scalars -> type"
+  ],
+  "usage": "Set DATA_FILE. Output: schema.json.",
+  "limitation": "Structural inference from one sample; arrays typed from the first element only.",
+  "minimal_example": {
+    "perk": "infer",
+    "vars": {
+      "DATA_FILE": "/tmp/data.json"
+    }
+  }
+}

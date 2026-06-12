@@ -1,0 +1,9 @@
+{
+  "_schema": "task-ledger TEMPLATE for sec — set perk, fill record_store + the vars the perk declares.",
+  "skill": "sec",
+  "perk": "secrets",
+  "record_store": "<absolute dir for outputs + run-ledger>",
+  "vars": {
+    "SEARCH_DIR": "<search_dir>"
+  }
+}

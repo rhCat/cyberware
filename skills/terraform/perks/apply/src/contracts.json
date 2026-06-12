@@ -1,0 +1,19 @@
+{
+  "tool": "tf_apply",
+  "inputs": {
+    "TF_DIR": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "applied_log": {
+      "path": "${RECORD_STORE}/apply.log",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/apply.log"
+  }
+}

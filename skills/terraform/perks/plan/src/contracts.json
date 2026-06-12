@@ -1,0 +1,19 @@
+{
+  "tool": "tf_plan",
+  "inputs": {
+    "TF_DIR": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "tf_plan_out": {
+      "path": "${RECORD_STORE}/plan.txt",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/plan.txt"
+  }
+}

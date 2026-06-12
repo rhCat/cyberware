@@ -1,0 +1,13 @@
+{
+  "_perk": "test",
+  "requires": ["python3"],
+  "setup": [
+    "mkdir -p tests",
+    "printf 'def test_ok():\\n    assert 1 == 1\\n' > tests/test_ok.py"
+  ],
+  "vars": { "PROJECT_DIR": "${FIXTURE}", "TEST_DIR": "tests" },
+  "expect": {
+    "outputs": ["pytest.out"],
+    "contains": { "pytest.out": "passed" }
+  }
+}

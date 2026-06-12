@@ -1,0 +1,23 @@
+{
+  "tool": "js_validate",
+  "inputs": {
+    "DATA_FILE": {
+      "type": "file",
+      "required": true
+    },
+    "SCHEMA_FILE": {
+      "type": "file",
+      "required": true
+    }
+  },
+  "outputs": {
+    "validation": {
+      "path": "${RECORD_STORE}/validation.json",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/validation.json"
+  }
+}

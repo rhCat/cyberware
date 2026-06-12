@@ -1,0 +1,28 @@
+{
+  "skill": "markdown",
+  "skill_sha": "761a37e6d06567edd58a894f5e48bff6aeb3b20aa0c236f3a8ac27d12f5df267",
+  "file_count": 21,
+  "files": {
+    "SKILL.md": "df6abc5140e4df48f07eee4878eb44a0493fc1173d7956d9449e3186e53526c7",
+    "blueprint.drawio": "d3ead31084a6adbf6eda6b892204fa214564a2a5db3b039b59a1f0dd0adccbdc",
+    "blueprint.json": "63110feb5cbb770a79b74822e5192c9cc79c2aa6dfa1b031ab2f89313f7a4b79",
+    "blueprint.svg": "bf099b6e1d042b43746b551c76863e1ff3eb6f9f66254cdc29ce83ae634f2f44",
+    "ledger.json": "79c09bc85a3cb24b15fb6b5753fc5a6c6d87ee06f30e66df5e7dd41a4d28a6d5",
+    "perks.json": "b39ccebaf2213f6f5a2b26ef007795d8e459a3834e4bcf5863bf297ef2754766",
+    "perks/links/manifesto.json": "63c760359a57bab58693de67734968b43cefac4b5b5a762803aca4172f958a1e",
+    "perks/links/metadata.json": "6b4c2ab3a43da64a7e8bf598855b29909e5649f09fa807b4b15c8fece8083c34",
+    "perks/links/src/contracts.json": "44989e596ab123942a458457effeb9889e2f8a402f9b9c5c3a53a88b13a23648",
+    "perks/links/src/md_links.py": "b3df10284e58e64388d0c818da61e33e7a945e6f925490cb3a09a0cd0ea68b7e",
+    "perks/links/src/md_links.sh": "5f2fe816af72f87a928a515238c802fb6166ef0b44599c3f3fd122a4753dac8e",
+    "perks/links/test/case.json": "df60f937feed98f2fe4782ae83c81e218071284c98cc42ce20eac1505ffe64c9",
+    "perks/links/test/fixture/doc.md": "5375d64638fb6682d80c4d67ee970d2a086c1087f542d0298f4c28fe176e5c5e",
+    "perks/links/test/fixture/target.md": "22b6070bf4d93d322922b2db8979a655c657a9db6dcc2398f04ba63b7006f64b",
+    "perks/toc/manifesto.json": "4528cee8c9b75a4e58ad457c97793a542ff17dd7379e24e45792e1640aba3887",
+    "perks/toc/metadata.json": "84589d595afe69cb95dfd9c0d37eae701ab5e0d589a2b867e3fcd0f09d00aff0",
+    "perks/toc/src/contracts.json": "5b114143773147d30c71e9cbaf12ed54468f600a6af3932326032b1da3b0dea5",
+    "perks/toc/src/md_toc.py": "dc4d2ad4b686514e268d8a420bbc400b430a32c2cbe989915e32d98be264ed89",
+    "perks/toc/src/md_toc.sh": "cdf5bf62ad51b60762579516510c138bb38fac0a6d4e2ae1df8b24ea664169c2",
+    "perks/toc/test/case.json": "82fcae62aa6bbf794a15e9028ec0abf4b77d5ccc55f3e41561c623f1648f236a",
+    "perks/toc/test/fixture/doc.md": "76dffef4eca0634e06d6401c14cebc25d3b483d80b05ea18315036534cb54a05"
+  }
+}

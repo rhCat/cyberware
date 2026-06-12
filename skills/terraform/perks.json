@@ -1,0 +1,21 @@
+{
+  "skill": "terraform",
+  "perks": [
+    {
+      "id": "plan",
+      "summary": "init + validate + plan a Terraform module (read-only, no backend)",
+      "destructive": false,
+      "tools": [
+        "tf_plan"
+      ]
+    },
+    {
+      "id": "apply",
+      "summary": "apply a Terraform module (-auto-approve, destructive)",
+      "destructive": true,
+      "tools": [
+        "tf_apply"
+      ]
+    }
+  ]
+}

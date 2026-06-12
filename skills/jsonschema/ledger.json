@@ -1,0 +1,10 @@
+{
+  "_schema": "task-ledger TEMPLATE for jsonschema — set perk, fill record_store + the vars the perk declares.",
+  "skill": "jsonschema",
+  "perk": "validate",
+  "record_store": "<absolute dir for outputs + run-ledger>",
+  "vars": {
+    "DATA_FILE": "<absolute path to the JSON data file>",
+    "SCHEMA_FILE": "<absolute path to the JSON Schema file>"
+  }
+}

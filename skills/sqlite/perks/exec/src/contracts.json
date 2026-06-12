@@ -1,0 +1,23 @@
+{
+  "tool": "sqlite_exec",
+  "inputs": {
+    "DB_FILE": {
+      "type": "string",
+      "required": true
+    },
+    "SQL_FILE": {
+      "type": "file",
+      "required": true
+    }
+  },
+  "outputs": {
+    "applied_log": {
+      "path": "${RECORD_STORE}/exec_applied.log",
+      "type": "file"
+    }
+  },
+  "checks": {
+    "exit_zero": true,
+    "output_exists": "${RECORD_STORE}/exec_applied.log"
+  }
+}
