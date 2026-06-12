@@ -1,0 +1,4 @@
+{
+  "_perk": "get",
+  "skip": "network-dependent \u2014 not run in CI to avoid flakiness"
+}

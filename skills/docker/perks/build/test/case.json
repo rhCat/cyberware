@@ -1,0 +1,4 @@
+{
+  "_perk": "build",
+  "skip": "needs a docker daemon \u2014 contract test covers compilation"
+}

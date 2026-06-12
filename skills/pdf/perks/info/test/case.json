@@ -1,0 +1,7 @@
+{
+  "_perk": "info",
+  "vars": { "PDF_FILE": "${FIXTURE}/doc.pdf" },
+  "expect": {
+    "outputs": ["pdf_info.json"]
+  }
+}

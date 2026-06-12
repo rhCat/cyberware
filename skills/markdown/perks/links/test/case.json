@@ -1,0 +1,8 @@
+{
+  "_perk": "links",
+  "vars": { "MD_FILE": "${FIXTURE}/doc.md" },
+  "expect": {
+    "outputs": ["link_report.json"],
+    "json": { "link_report.json": { "checked": 2, "ok": 1, "dead": [ { "target": "nope.md" } ] } }
+  }
+}

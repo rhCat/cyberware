@@ -1,0 +1,16 @@
+{
+  "_perk": "audit",
+  "setup": [
+    "mkdir -p src tests",
+    "printf 'def used():\\n    return 1\\n\\n\\ndef unused():\\n    return 2\\n' > src/a.py",
+    "printf \"import os, sys\\nsys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))\\nfrom a import used\\n\\n\\ndef test_used():\\n    assert used() == 1\\n\" > tests/test_a.py"
+  ],
+  "vars": { "PROJECT_DIR": "${FIXTURE}", "SRC_DIR": "src", "TEST_DIR": "tests" },
+  "expect": {
+    "outputs": ["coverage_gaps.json", "usage_gaps.json"],
+    "json": {
+      "usage_gaps.json": { "dimension": "usage", "defined": 2, "unused_count": 2 },
+      "coverage_gaps.json": { "dimension": "coverage", "has_tests": true, "uncovered_count": 1 }
+    }
+  }
+}

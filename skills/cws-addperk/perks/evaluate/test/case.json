@@ -1,0 +1,8 @@
+{
+  "_perk": "evaluate",
+  "vars": { "SKILL": "git_ops", "PERK": "push", "PERK_DESC": "push the branch to a remote" },
+  "expect": {
+    "outputs": ["perk_eval.json"],
+    "json": { "perk_eval.json": { "status": "ok", "perk": "push", "exists": false, "generalizable": true, "proceed": true, "verdict": "ok" } }
+  }
+}

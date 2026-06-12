@@ -1,7 +1,7 @@
 {
   "skill": "pg_ops",
-  "skill_sha": "eed0051b9e2edf0f2cb4c4f7860dbd96f278db5552a151fc6c668f158d7343ee",
-  "file_count": 14,
+  "skill_sha": "1be23f3e2fe534e9227110acf86fbca8bc7345dfd0816358cf128c97865b8a80",
+  "file_count": 16,
   "files": {
     "SKILL.md": "1dad29216eabf36b0e2feabd79f48cb111cb36d1086083c03e78bbcbeae0656d",
     "blueprint.drawio": "a389f5c27753766f51b631e7114372029c97e6e8959491045031687f9bf3ac1e",
@@ -13,9 +13,11 @@
     "perks/migrate/metadata.json": "ad25ecc293a09bece78817bf63b07eafd2a2984a2259024fe40efa7f5f3fa6c5",
     "perks/migrate/src/contracts.json": "73d06d3e1776d521796cebf94fc149f9515674ad85541db5a8ec64e4c318e8ec",
     "perks/migrate/src/psql_migrate.sh": "70bccf6bd72761649bf97a6cc65c3850007dfd1fcef0ed15e21febc5c1f89c55",
+    "perks/migrate/test/case.json": "6f47d5808a4e64a5a16f82ec104a0c527270e6be286d222642940c0451b33dc0",
     "perks/select/manifesto.json": "6dc4d306e2de1bb2a7337f8615d82f99a745e0e56008f43cb2454dcafb0ba34e",
     "perks/select/metadata.json": "7073a9cc27dba463d8c8bbff7925f41568785f95b4769b7e6a679554f81524f4",
     "perks/select/src/contracts.json": "fc08ed2565a990166e5adfbc40dae3471104300e7bb433133f4190a739da6e8a",
-    "perks/select/src/psql_select.sh": "ce91454b5944aa445841f1b79b8be50de73ff9aa3de14dbb0ffc053054794a98"
+    "perks/select/src/psql_select.sh": "ce91454b5944aa445841f1b79b8be50de73ff9aa3de14dbb0ffc053054794a98",
+    "perks/select/test/case.json": "d16bf20eb525c18f3fcdb9bf83575b4ff3fe3be08a9bd143149d8ecba877b0a0"
   }
 }

@@ -1,0 +1,4 @@
+{
+  "_perk": "select",
+  "skip": "needs a live Postgres \u2014 contract test covers compilation"
+}

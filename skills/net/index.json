@@ -1,7 +1,7 @@
 {
   "skill": "net",
-  "skill_sha": "8d8209e2812490531d5e8340da81fb96cc67ae530d0db7025fdcb459205acc53",
-  "file_count": 15,
+  "skill_sha": "c930aeb3954350f586e1d59a09f4395cc4a89b85f02b6053193dfa79e32cbcd7",
+  "file_count": 17,
   "files": {
     "SKILL.md": "854dec6cf519ff8b6fb755b44cd44c1b25b057b9f3d1fa3fbdf57d80c99b8373",
     "blueprint.drawio": "64a2b454bdf27e96de9fe36b8e0681ce2a6fd339b6abf17cc1d51bf8d4c968d4",
@@ -14,9 +14,11 @@
     "perks/dns/src/contracts.json": "6680b5f9e3a1d79f5278a6936c1fec898ac409a9882274000162e40ec7a5e8d7",
     "perks/dns/src/net_dns.py": "40bb79ad413fba99fbfcec0d53677d8be5792ffa0ae15e29140fecbe2c7c55f1",
     "perks/dns/src/net_dns.sh": "0a695ca48b2a7a301602f805aa999206377186f85350b1947add3dd66b1cc9aa",
+    "perks/dns/test/case.json": "a1db0d592b974b66e5d9987628bf227b7736c0a97348007171347708a76f6cc3",
     "perks/healthcheck/manifesto.json": "9d1421fe61d2de7d80225c22b8ef0175795de674d6049173d4730904eed87f44",
     "perks/healthcheck/metadata.json": "e3dced8687da4e60954f2c2e5dd5e5ba0ff51792beb9edf09994a4c46f27a493",
     "perks/healthcheck/src/contracts.json": "523014b0350481db70da0165f239abc9d5dd09395052f81fa33d2f20d0e8644b",
-    "perks/healthcheck/src/net_healthcheck.sh": "eb3ed8f986d9994db6d906acf5954d93a00e99c0d949d0a54c3917b3016e839a"
+    "perks/healthcheck/src/net_healthcheck.sh": "eb3ed8f986d9994db6d906acf5954d93a00e99c0d949d0a54c3917b3016e839a",
+    "perks/healthcheck/test/case.json": "1e3b652bd04bdc67024952e3340a43378ef4356abafbc52fb019f719cdeaf472"
   }
 }
