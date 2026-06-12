@@ -13,10 +13,11 @@ Stdlib only (urllib + a tiny RFC 6455 client), so an agent can drive govd with n
   python3 infra/govd_client.py --url http://127.0.0.1:5773 --ledger task-ledger.json [--approve <id>]
 """
 from __future__ import annotations
-import argparse, base64, hashlib, json, os, socket, subprocess, sys, urllib.error, urllib.request
+import argparse, base64, collections, hashlib, json, os, socket, subprocess, sys, urllib.error, urllib.request
 
 from infra.govern import compiler
 from infra.govern import runlog
+from infra.tool import skill_index   # the value-free catalog builder — shared with govd, so the two can't drift
 
 
 def _post_json(url, obj):
@@ -27,6 +28,41 @@ def _post_json(url, obj):
             return r.getcode(), json.loads(r.read())
     except urllib.error.HTTPError as e:               # 409 push_back / 403 reject still carry a JSON verdict
         return e.code, json.loads(e.read())
+
+
+def _get_json(url):
+    with urllib.request.urlopen(url) as r:
+        return json.loads(r.read())
+
+
+def discover(base_url, registry=None):
+    """Step 2 — discovery. Read what govd governs (GET /catalog), then compare it to the agent's OWN
+    registry by skill_sha. Every skill is tagged:
+      * 'verified'   — govd governs it AND the agent's copy matches the blessed hash (run it governed);
+      * 'drift'      — the agent's copy differs from govd's blessed one (reconcile before claiming);
+      * 'unverified' — the agent has it but govd's image does NOT: a NEW skill, not yet governed. Add it to
+                       the image (rebuild) before relying on it — claims for it reject as unknown_skill_perk;
+      * 'server_drift' — govd's OWN copy fails its index; don't trust its blessing until the image is fixed.
+    Only names + hashes cross the wire — never a value or a file body."""
+    registry = registry or DEFAULT_REGISTRY
+    gov = {s["skill"]: s for s in _get_json(base_url.rstrip("/") + "/catalog").get("skills", [])}
+    local = skill_index.catalog(os.path.join(registry, "skills"))
+    out = []
+    for s in local["skills"]:
+        name, lsha, g = s["skill"], s.get("skill_sha"), gov.get(s["skill"])
+        if not g:
+            status = "unverified"                       # new — govd's image has never seen this skill
+        elif not g.get("verified"):
+            status = "server_drift"                     # govd's own copy fails its index — blessing untrustworthy
+        elif g.get("skill_sha") == lsha and s.get("verified"):
+            status = "verified"                         # governed AND my copy matches the blessed hash
+        else:
+            status = "drift"                            # my copy differs from the governed one (or my index drifted)
+        out.append({"skill": name, "status": status, "skill_sha": lsha,
+                    "governed_sha": (g or {}).get("skill_sha"), "perks": s["perks"]})
+    summary = collections.Counter(r["status"] for r in out)
+    return {"governed_by": base_url.rstrip("/"), "registry": registry, "skills": out,
+            "missing_local": sorted(set(gov) - {s["skill"] for s in local["skills"]}), "summary": dict(summary)}
 
 
 def fetch(base_url, ledger, approve=()):
@@ -181,14 +217,22 @@ def run_governed(base_url, ledger, approve=(), registry=None):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="drive govd: fetch a governed script and run it under live oversight")
+    ap = argparse.ArgumentParser(description="drive govd: discover the catalog, then fetch + run a governed script")
     ap.add_argument("--url", default="http://127.0.0.1:5773")
-    ap.add_argument("--ledger", required=True)
+    ap.add_argument("--ledger", help="the task-ledger (required unless --discover)")
     ap.add_argument("--approve", action="append", default=[])
     ap.add_argument("--registry", default=None,
                     help="where the skill code lives (default: this cyberware install); verified vs the blessed hashes")
+    ap.add_argument("--discover", action="store_true",
+                    help="step 2: list what govd governs + tag each local skill verified/drift/unverified (no claim)")
     ap.add_argument("--fetch-only", action="store_true", help="just get the verdict/plan, do not execute")
     a = ap.parse_args()
+    if a.discover:
+        out = discover(a.url, registry=a.registry)
+        print(json.dumps(out, indent=2))
+        sys.exit(0)
+    if not a.ledger:
+        ap.error("--ledger is required (unless --discover)")
     ledger = json.load(open(a.ledger))
     out = (fetch(a.url, ledger, a.approve) if a.fetch_only
            else run_governed(a.url, ledger, a.approve, registry=a.registry))
