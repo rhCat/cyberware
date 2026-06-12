@@ -66,6 +66,19 @@ def test_catalog_endpoint_is_ungated_and_matches_the_builder(server):
     assert fs["verified"] and {"archive", "find_large"} <= {p["id"] for p in fs["perks"]}
 
 
+def test_flow_endpoint_serves_the_blueprint_svg(server):
+    base, _, _ = server
+    r = urllib.request.urlopen(base + "/flow/fs")                  # ungated, value-free registry diagram
+    assert r.headers.get("Content-Type") == "image/svg+xml"
+    body = r.read().decode()
+    assert body.lstrip().startswith("<svg") and "</svg>" in body
+    try:
+        urllib.request.urlopen(base + "/flow/not_a_skill")         # only exact known skills are served
+        assert False, "expected 404 for an unknown skill"
+    except urllib.error.HTTPError as e:
+        assert e.code == 404
+
+
 def test_discover_tags_verified_unverified_and_drift(server, tmp_path):
     base, _, _ = server
     import shutil
