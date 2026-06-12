@@ -22,6 +22,7 @@ Principles enforced here:
 HTTP:
   GET  /health                        -> mode, port, registry, run count
   GET  /catalog                       -> value-free discovery: skills · perks · var-KEYS · skill_sha · verified
+  GET  /flow/<skill>                  -> the skill's blueprint.svg (lifecycle diagram; value-free, for the dashboard)
   POST /govern  {skill,perk,var_keys,approve?}
                   -> 200 allow      {run_id, decision, plan, plan_sha, session_token, ws}   (plan = value-free)
                      409 push_back  {run_id, decision, needs_approve, ...}                   (destructive: approve)
@@ -482,6 +483,16 @@ class Handler(BaseHTTPRequestHandler):
             # value-free discovery (names · perks · var-KEYS · skill_sha · verified) — ungated like /health,
             # so an agent can ask "what do you govern?" before it claims. No values, no run data.
             return self._json(200, catalog_snapshot())
+        if path.startswith("/flow/"):
+            # the skill's lifecycle diagram (blueprint.svg) for the dashboard Flow tab — a value-free
+            # registry artifact, ungated like /catalog. Path-safe: only an EXACT known skill name is
+            # served, so the path can never escape the registry.
+            skill = urllib.parse.unquote(path[len("/flow/"):])
+            if skill in set(skill_index.all_skills()):
+                svgp = os.path.join(ROOT, "skills", skill, "blueprint.svg")
+                if os.path.isfile(svgp):
+                    return self._svg(open(svgp, "rb").read())
+            return self._json(404, {"error": "no flow diagram", "skill": skill})
         if path in ("/", "/dashboard"):
             return self._dashboard()
         if path == "/monitor/state":
@@ -528,6 +539,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(500, {"error": "dashboard asset missing"})
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _svg(self, body):
+        self.send_response(200)
+        self.send_header("Content-Type", "image/svg+xml")
+        self.send_header("Cache-Control", "max-age=300")     # the lifecycle diagram is static per skill
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
