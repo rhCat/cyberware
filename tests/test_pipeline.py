@@ -1,7 +1,7 @@
 """Integration: the whole pipeline end to end (validate → compose → compile → oversight → execute)."""
 import json
 
-import runlog
+from infra.govern import runlog
 from conftest import run_cli
 
 

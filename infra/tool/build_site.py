@@ -12,10 +12,10 @@ import glob
 import json
 import os
 
-import visualize
-import compiler
+from infra.tool import visualize
+from infra.govern import compiler
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def load(p: str) -> dict:
@@ -88,7 +88,7 @@ def main() -> int:
     docs += [{"id": name, "label": label, "body": read(os.path.join(ROOT, "docs", name + ".md"))}
              for name, label in DOC_TABS]
     # the infra's OWN blueprint (the governance pipeline) — placed under Architecture (the ouroboros)
-    pipeline_bp = load(os.path.join(ROOT, "infra", "pipeline.blueprint.json"))
+    pipeline_bp = load(os.path.join(ROOT, "infra", "document", "pipeline.blueprint.json"))
     for d in docs:
         if d["id"] == "architecture" and pipeline_bp:
             d["pipeline"] = {"svg": visualize.svg(pipeline_bp), "blueprint": pipeline_bp}

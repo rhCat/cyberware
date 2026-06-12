@@ -1,6 +1,6 @@
 """Unit: compiler.build_script + compiler.task_blueprint."""
-import compiler
-import runlog
+from infra.govern import compiler
+from infra.govern import runlog
 
 
 def test_build_script_emits_step_per_tool_and_dispatcher():

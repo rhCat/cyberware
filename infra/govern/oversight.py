@@ -11,8 +11,8 @@ opt-in hook to hand the script to an LLM reviewer; the regex pass is authoritati
 from __future__ import annotations
 import argparse, json, os, re, sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RULES_PATH = os.path.join(ROOT, "infra", "OVERSIGHT_RULE.json")
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+RULES_PATH = os.path.join(ROOT, "infra", "govern", "OVERSIGHT_RULE.json")
 
 
 def scan(script_text, approve=(), rules_path=RULES_PATH):
@@ -28,7 +28,7 @@ def scan(script_text, approve=(), rules_path=RULES_PATH):
 def main():
     ap = argparse.ArgumentParser(description="enforce OVERSIGHT_RULE over a compiled script")
     ap.add_argument("--script", required=True)
-    ap.add_argument("--rules", default=os.path.join(ROOT, "infra", "OVERSIGHT_RULE.json"))
+    ap.add_argument("--rules", default=os.path.join(ROOT, "infra", "govern", "OVERSIGHT_RULE.json"))
     ap.add_argument("--approve", action="append", default=[], help="rule id to waive (approvable rules only)")
     ap.add_argument("--subagent", action="store_true", help="opt-in LLM review hook")
     a = ap.parse_args()

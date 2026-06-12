@@ -2,7 +2,7 @@
 import os
 
 import pytest
-import runlog
+from infra.govern import runlog
 
 
 @pytest.mark.parametrize("val", ["", "   ", "<default>", "${record_store}", None, 5])

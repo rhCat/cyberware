@@ -1,9 +1,9 @@
 """Unit: visualize.svg / drawio — diagrams are well-formed and reflect the task."""
 import xml.dom.minidom as minidom
 
-import compiler
-import runlog
-import visualize
+from infra.govern import compiler
+from infra.govern import runlog
+from infra.tool import visualize
 
 
 def _bp():

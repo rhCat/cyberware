@@ -12,7 +12,7 @@ a reachable terminal) always runs, so the check is meaningful even without a JRE
 from __future__ import annotations
 import argparse, json, os, shutil, subprocess, sys, tempfile
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def load(p): return json.load(open(p))
