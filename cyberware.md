@@ -2,6 +2,10 @@
 
 > **This is the governing document.** If you are an agent (an LLM) using cyberware, read this first.
 > It tells you how to run skills through the governed channel — and what you must never do.
+>
+> Driving govd **as a service**? The compact agent contract — *discover → claim → run the blessed plan →
+> read the verdict*, where your only output is the claim — is [`SKILL.md`](SKILL.md). This document is the
+> full reference behind it (including the govd-less local pipeline).
 
 ## The model — you propose, the framework governs
 
@@ -124,7 +128,12 @@ sha256. The agent binds its own vars **locally** and runs **locally**, holding a
 reports **status** only; govd monitors the plan **hash** and owns the provenance ledger. Secrets are never
 plaintext — pass a `*_FILE` pointer read at runtime via `cat`. Destructive perks gate on declared
 approval. `docker build -t cyberware-govd . && docker run -p 5773:5773 cyberware-govd`, or
-`python3 -m infra.govern.govd --mode local`. See [`docs/governance-service.md`](docs/governance-service.md).
+`python3 -m infra.govern.govd --mode local`.
+
+The agent's entry contract for this loop is [`SKILL.md`](SKILL.md): **discover** what govd governs
+(`GET /catalog` / `./govd-client --discover`, which also tags each of the agent's own skills
+`verified` / `drift` / `unverified`), emit the **claim**, run the blessed plan, read the verdict. See
+[`docs/governance-service.md`](docs/governance-service.md) for the HTTP/WS/authenticity internals.
 
 ## More
 

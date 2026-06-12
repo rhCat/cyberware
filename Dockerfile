@@ -19,6 +19,11 @@ WORKDIR /app
 COPY infra/ ./infra/
 COPY skills/ ./skills/
 
+# build-time authenticity gate: the image's copy of EVERY skill must match its committed index.json.
+# This catches registry drift at build (e.g. a .dockerignore that strips a pinned file) — fail the build
+# fast rather than ship a govd that would reject every claim. Exits 1 on any drift.
+RUN python3 -m infra.tool.skill_index --check --all
+
 ENV GOVD_CONFIG=/app/infra/govern/govd_config.json \
     GOVD_RECORD_ROOT=/data/govd \
     PYTHONUNBUFFERED=1

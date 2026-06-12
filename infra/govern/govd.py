@@ -21,6 +21,7 @@ Principles enforced here:
 
 HTTP:
   GET  /health                        -> mode, port, registry, run count
+  GET  /catalog                       -> value-free discovery: skills · perks · var-KEYS · skill_sha · verified
   POST /govern  {skill,perk,var_keys,approve?}
                   -> 200 allow      {run_id, decision, plan, plan_sha, session_token, ws}   (plan = value-free)
                      409 push_back  {run_id, decision, needs_approve, ...}                   (destructive: approve)
@@ -96,6 +97,7 @@ def ensure_monitor_token(cfg):
 
 _TLC_CACHE = {}                                          # blueprint sha -> (ok, msg); blueprints are static
 _VERIFY_CACHE = {}                                       # skill -> (ok, drift); the registry is static at runtime
+_CATALOG_CACHE = {}                                      # the value-free discovery catalog; registry static
 
 
 def verify_skill(skill):
@@ -103,6 +105,15 @@ def verify_skill(skill):
     if skill not in _VERIFY_CACHE:
         _VERIFY_CACHE[skill] = skill_index.verify(skill)
     return _VERIFY_CACHE[skill]
+
+
+def catalog_snapshot():
+    """The value-free discovery catalog of govd's OWN registry (skills · perks · var-KEYS · skill_sha ·
+    verified), cached because the registry is static at runtime. This is what an agent reads to discover
+    what's governed — and to learn which of its OWN skills are blessed (sha match) vs new (unverified)."""
+    if "c" not in _CATALOG_CACHE:
+        _CATALOG_CACHE["c"] = skill_index.catalog()
+    return _CATALOG_CACHE["c"]
 _TLC_LOCK = threading.Lock()
 
 
@@ -467,6 +478,10 @@ class Handler(BaseHTTPRequestHandler):
                                     "host": host, "port": port, "registry": os.path.join(ROOT, "skills"),
                                     "runs": len(store.runs)})
         path = self.path.split("?", 1)[0]
+        if path == "/catalog":
+            # value-free discovery (names · perks · var-KEYS · skill_sha · verified) — ungated like /health,
+            # so an agent can ask "what do you govern?" before it claims. No values, no run data.
+            return self._json(200, catalog_snapshot())
         if path in ("/", "/dashboard"):
             return self._dashboard()
         if path == "/monitor/state":
