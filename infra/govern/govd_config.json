@@ -1,0 +1,13 @@
+{
+  "_schema": "govd deployment config. mode=local rotates through the local ports; mode=remote binds one fixed port (the Docker default). advertise_host (optional) overrides the host handed to clients for the WS.",
+  "mode": "local",
+  "local": {
+    "host": "127.0.0.1",
+    "ports": [5773, 4773, 3773, 6773]
+  },
+  "remote": {
+    "host": "0.0.0.0",
+    "port": 5773
+  },
+  "record_root": "~/cyberware_govd"
+}

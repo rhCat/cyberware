@@ -1,5 +1,5 @@
 """Unit: composer.structural / emit_tla — the deadlock check (the safeguard must actually catch one)."""
-import composer
+from infra.govern import composer
 
 GOOD = {
     "entry_state": "a",

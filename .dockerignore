@@ -1,0 +1,15 @@
+.git
+.github
+.mypy_cache
+.pytest_cache
+.coverage
+.coverage.*
+**/__pycache__
+*.pyc
+*.bk
+.*.bk
+tests
+docs/site
+examples
+**/*.drawio
+**/*.svg

@@ -14,7 +14,7 @@ from __future__ import annotations
 import argparse, html, json, os
 from collections import deque
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def E(t):  # XML/HTML escape

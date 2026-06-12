@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# govd-client — drive govd from anywhere: fetch a governed plan and run it under live oversight.
+#   ./govd-client --url http://127.0.0.1:5773 --ledger task-ledger.json
+#   ./govd-client --url http://127.0.0.1:5773 --ledger task-ledger.json --fetch-only
+# Add the repo to PATH (or symlink this into ~/bin) to run `govd-client …` from anywhere.
+set -euo pipefail
+SRC="${BASH_SOURCE[0]}"
+while [ -h "$SRC" ]; do                                   # follow symlinks (portable; no readlink -f)
+  D="$(cd -P "$(dirname "$SRC")" && pwd)"; SRC="$(readlink "$SRC")"; [[ $SRC != /* ]] && SRC="$D/$SRC"
+done
+ROOT="$(cd -P "$(dirname "$SRC")" && pwd)"
+exec env PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}" python3 -m infra.govern.govd_client "$@"

@@ -18,13 +18,13 @@ because glue is what this needs.
 ```
 USER SIDE — the skill registry              GOVERNANCE SIDE — the infrastructure
   skills/<skill>/                             infra/
-    SKILL.md      context for intelligence      validator.py   claims in the ledger are real
-    perks.json    the proven pathways           composer.py    L++ → TLC (no logical deadlock)
-    blueprint.json  the action CFG (L++)        compiler.py    ledger+contracts+snippets → bash
-    ledger.json   the form the LLM fills        oversight.py   enforce OVERSIGHT_RULE (push back)
-    perks/<perk>/                               executor.py    the ONLY way to run — governs + audits
-      metadata.json   rules · usage · limits    OVERSIGHT_RULE.json   no drop table/schema, …
-      manifesto.json  ${VAR} template + seq     EXECUTOR_RULE.json    monitor-usage rules for the executor
+    SKILL.md      context for intelligence      govern/   validator · composer · compiler · oversight
+    perks.json    the proven pathways                     executor · runlog · govd · govd_client
+    blueprint.json  the action CFG (L++)                  OVERSIGHT_RULE.json · EXECUTOR_RULE.json
+    ledger.json   the form the LLM fills                  govd_config.json · govd_dashboard.html
+    perks/<perk>/                               tool/     scaffold · visualize · build_site
+      metadata.json   rules · usage · limits    document/ pipeline.blueprint.{json,drawio,svg}
+      manifesto.json  ${VAR} template + seq
       src/contracts.json   I/O + checks
       src/<tool>           the snippet
 ```
@@ -76,22 +76,22 @@ and refuses. That is the enforcement layer — the runtime *is* the rule.
 
 ```sh
 L=examples/pg_ops.select.task-ledger.json
-python3 infra/validator.py  --ledger $L                          # claims real?
-python3 infra/composer.py   --ledger $L                          # L++ → TLC, no deadlock
-python3 infra/compiler.py   --ledger $L -o /tmp/run.sh           # → the step-wise bash
-python3 infra/oversight.py  --script /tmp/run.sh                 # OVERSIGHT_RULE
-python3 infra/executor.py   --script /tmp/run.sh --step 1        # governed run (the ONLY channel)
+python3 -m infra.govern.validator  --ledger $L                          # claims real?
+python3 -m infra.govern.composer   --ledger $L                          # L++ → TLC, no deadlock
+python3 -m infra.govern.compiler   --ledger $L -o /tmp/run.sh           # → the step-wise bash
+python3 -m infra.govern.oversight  --script /tmp/run.sh                 # OVERSIGHT_RULE
+python3 -m infra.govern.executor   --script /tmp/run.sh --step 1        # governed run (the ONLY channel)
 ```
 
 ## Authoring + visualizing
 
 ```sh
 # scaffold a new skill skeleton — composes out of the box; fill the snippets + vars
-python3 infra/scaffold.py --skill myskill --name "My Skill" --perk fetch:my_fetch:curl --perk store:my_store:python3
+python3 -m infra.tool.scaffold --skill myskill --name "My Skill" --perk fetch:my_fetch:curl --perk store:my_store:python3
 
 # render a blueprint as draw.io XML + self-contained SVG (entry blue, terminal green)
-python3 infra/visualize.py --skill pg_ops               # → skills/pg_ops/blueprint.{drawio,svg}
-python3 infra/visualize.py --ledger task.json -o run    # annotated with the chosen perk's steps
+python3 -m infra.tool.visualize --skill pg_ops               # → skills/pg_ops/blueprint.{drawio,svg}
+python3 -m infra.tool.visualize --ledger task.json -o run    # annotated with the chosen perk's steps
 ```
 
 **Every `compiler.py` run also drops `<script>.drawio` + `<script>.svg` beside the compiled bash**,
@@ -128,7 +128,7 @@ every skill — blueprint, perk flow, contracts, and snippet code — with the r
 in-site tabs. Regenerate + serve locally:
 
 ```sh
-python3 infra/build_site.py                  # → docs/site/data.js
+python3 -m infra.tool.build_site                  # → docs/site/data.js
 python3 -m http.server -d docs/site 8765     # → http://localhost:8765
 ```
 

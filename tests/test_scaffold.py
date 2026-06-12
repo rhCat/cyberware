@@ -1,6 +1,6 @@
 """Unit: scaffold.blueprint + stubs — a freshly scaffolded skill must compose and carry the REAL invariant."""
-import composer
-import scaffold
+from infra.govern import composer
+from infra.tool import scaffold
 
 
 def test_blueprint_is_the_standard_lifecycle():

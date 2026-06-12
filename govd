@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# govd — launch the cyberware governance server from anywhere (resolves the repo, no -m / cwd dance).
+#   ./govd --mode local
+#   ./govd --mode remote --port 5773
+# Add the repo to PATH (or symlink this into ~/bin) to run `govd …` from anywhere.
+set -euo pipefail
+SRC="${BASH_SOURCE[0]}"
+while [ -h "$SRC" ]; do                                   # follow symlinks (portable; no readlink -f)
+  D="$(cd -P "$(dirname "$SRC")" && pwd)"; SRC="$(readlink "$SRC")"; [[ $SRC != /* ]] && SRC="$D/$SRC"
+done
+ROOT="$(cd -P "$(dirname "$SRC")" && pwd)"
+exec env PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}" python3 -m infra.govern.govd "$@"
