@@ -1,0 +1,22 @@
+{
+  "perk": "run",
+  "skill": "ssh",
+  "description": "Run a vetted command on a remote host over SSH (destructive); capture all output to a log.",
+  "rules": [
+    "destructive — executes COMMAND on the remote host; effects are whatever the command does",
+    "BatchMode=yes — never prompts; an auth/connect failure fails the step rather than hanging",
+    "the private key is an optional *_FILE pointer passed to ssh -i, never an inline secret",
+    "dangerous COMMAND literals are still blocked at oversight unless explicitly approved",
+    "always writes ssh_output.log (stdout+stderr) even when the command or connection fails"
+  ],
+  "usage": "Set SSH_HOST + SSH_USER + COMMAND (and SSH_KEY_FILE for key auth). Output: ssh_output.log.",
+  "limitation": "Runs a single command non-interactively; no TTY, no agent forwarding, no interactive prompts.",
+  "minimal_example": {
+    "perk": "run",
+    "vars": {
+      "SSH_HOST": "example.com",
+      "SSH_USER": "deploy",
+      "COMMAND": "uptime"
+    }
+  }
+}

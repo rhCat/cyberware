@@ -1,0 +1,21 @@
+{
+  "skill": "jsonschema",
+  "perks": [
+    {
+      "id": "validate",
+      "summary": "validate a JSON file against a JSON Schema (jsonschema, fallback builtin)",
+      "destructive": false,
+      "tools": [
+        "js_validate"
+      ]
+    },
+    {
+      "id": "infer",
+      "summary": "infer a JSON Schema from a JSON sample (read-only)",
+      "destructive": false,
+      "tools": [
+        "js_infer"
+      ]
+    }
+  ]
+}

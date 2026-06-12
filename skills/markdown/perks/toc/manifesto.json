@@ -1,0 +1,21 @@
+{
+  "_perk": "toc",
+  "sequence": [
+    "md_toc"
+  ],
+  "tools": {
+    "md_toc": {
+      "binary": "python3",
+      "params": {
+        "MD_FILE": "${MD_FILE}"
+      }
+    }
+  },
+  "env": {
+    "MD_FILE": "${MD_FILE}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "python3"
+  ]
+}

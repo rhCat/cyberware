@@ -1,0 +1,9 @@
+{
+  "_schema": "task-ledger TEMPLATE for terraform — set perk, fill record_store + the vars the perk declares.",
+  "skill": "terraform",
+  "perk": "plan",
+  "record_store": "<absolute dir for outputs + run-ledger>",
+  "vars": {
+    "TF_DIR": "<terraform module dir>"
+  }
+}

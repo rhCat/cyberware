@@ -1,0 +1,21 @@
+{
+  "skill": "ssh",
+  "perks": [
+    {
+      "id": "check",
+      "summary": "non-interactive SSH connectivity probe (read-only)",
+      "destructive": false,
+      "tools": [
+        "ssh_check"
+      ]
+    },
+    {
+      "id": "run",
+      "summary": "run a vetted command on a remote host over SSH (destructive)",
+      "destructive": true,
+      "tools": [
+        "ssh_run"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "perk": "exec",
+  "skill": "sqlite",
+  "description": "Apply a .sql migration script to a local SQLite database in a single pass (destructive).",
+  "rules": [
+    "destructive — declared via \"destructive\": true",
+    "the SQL comes from SQL_FILE at runtime",
+    "SQL_FILE must exist (errors to the applied log + non-zero exit if missing)"
+  ],
+  "usage": "Set DB_FILE + SQL_FILE (a .sql path). Applied in one pass; structured output reports the applied log.",
+  "limitation": "Applies whatever the .sql file contains; no transaction wrapping is imposed by the tool.",
+  "minimal_example": {
+    "perk": "exec",
+    "vars": {
+      "DB_FILE": "/tmp/cw_demo.db",
+      "SQL_FILE": "/tmp/migration.sql"
+    }
+  }
+}

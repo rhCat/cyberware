@@ -1,0 +1,21 @@
+{
+  "_perk": "apply",
+  "sequence": [
+    "tf_apply"
+  ],
+  "tools": {
+    "tf_apply": {
+      "binary": "terraform",
+      "params": {
+        "TF_DIR": "${TF_DIR}"
+      }
+    }
+  },
+  "env": {
+    "TF_DIR": "${TF_DIR}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "terraform"
+  ]
+}

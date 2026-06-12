@@ -1,0 +1,21 @@
+{
+  "skill": "pdf",
+  "perks": [
+    {
+      "id": "extract",
+      "summary": "extract text from a PDF (pdftotext, fallback pypdf) — read-only",
+      "destructive": false,
+      "tools": [
+        "pdf_extract"
+      ]
+    },
+    {
+      "id": "info",
+      "summary": "read page count + metadata from a PDF (pdfinfo, fallback pypdf) — read-only",
+      "destructive": false,
+      "tools": [
+        "pdf_info"
+      ]
+    }
+  ]
+}

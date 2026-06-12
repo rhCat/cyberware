@@ -1,0 +1,23 @@
+{
+  "_perk": "exec",
+  "sequence": [
+    "sqlite_exec"
+  ],
+  "tools": {
+    "sqlite_exec": {
+      "binary": "sqlite3",
+      "params": {
+        "DB_FILE": "${DB_FILE}",
+        "SQL_FILE": "${SQL_FILE}"
+      }
+    }
+  },
+  "env": {
+    "DB_FILE": "${DB_FILE}",
+    "SQL_FILE": "${SQL_FILE}",
+    "RECORD_STORE": "${record_store}"
+  },
+  "requires": [
+    "sqlite3"
+  ]
+}
