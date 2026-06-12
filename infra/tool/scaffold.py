@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """scaffold.py — generate a new skill skeleton in the registry.
 
-Creates `skills/<id>/` with the standard perk-agnostic L++ lifecycle blueprint, `perks.json`,
+Creates `skillChip/<id>/` with the standard perk-agnostic L++ lifecycle blueprint, `perks.json`,
 `ledger.json`, `SKILL.md`, and per perk a `metadata.json` / `manifesto.json` / `src/contracts.json`
 plus a snippet STUB (the structured-JSON output pattern + a TODO). The skeleton already validates +
 composes out of the box; you fill in each perk's vars and the proven-pathway snippet.
@@ -12,6 +12,7 @@ composes out of the box; you fill in each perk's vars and the proven-pathway sni
 """
 from __future__ import annotations
 import argparse, json, os, stat, sys
+from infra import registry
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -126,9 +127,9 @@ def main():
     ap.add_argument("--force", action="store_true")
     a = ap.parse_args()
     sid = a.skill
-    S = os.path.join(ROOT, "skills", sid)
+    S = os.path.join(registry.SKILLCHIP, sid)
     if os.path.exists(S) and not a.force:
-        sys.exit(f"skills/{sid} already exists (use --force to overwrite)")
+        sys.exit(f"skillChip/{sid} already exists (use --force to overwrite)")
 
     perks = {}
     for spec in a.perk:
@@ -166,9 +167,9 @@ def main():
         else:                            # the .sh is the tool itself (psql, curl, tar, git, …)
             wsh(f"{P}/src/{tool}.sh", snippet_stub(tool))
 
-    print(f"scaffolded skills/{sid} · perks: {', '.join(perks)}")
+    print(f"scaffolded skillChip/{sid} · perks: {', '.join(perks)}")
     print("  next: fill the snippets (perks/<perk>/src/<tool>.sh), the vars (manifesto+contracts), SKILL.md")
-    print(f"  then: python3 infra/composer.py --ledger skills/{sid}/ledger.json   (structure already composes)")
+    print(f"  then: python3 infra/composer.py --ledger skillChip/{sid}/ledger.json   (structure already composes)")
 
 
 if __name__ == "__main__":

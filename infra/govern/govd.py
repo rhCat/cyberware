@@ -20,7 +20,7 @@ Principles enforced here:
     ledger is server-owned; the upstream-order gate can't be forged.
 
 HTTP:
-  GET  /health                        -> mode, port, registry, run count
+  GET  /health                        -> mode, port, registry, chip_sha + acquisition provenance, run count
   GET  /catalog                       -> value-free discovery: skills · perks · var-KEYS · skill_sha · verified
   GET  /flow/run/<run_id>             -> THIS run's task-blueprint SVG (perk's gated sequence; value-free; monitor-gated)
   GET  /flow/<skill>                  -> the skill's generic lifecycle blueprint.svg (value-free; fallback)
@@ -41,6 +41,7 @@ from __future__ import annotations
 import argparse, base64, collections, hashlib, hmac, json, os, re, secrets, sys, threading, time, urllib.parse, uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from infra import registry
 from infra.govern import compiler
 from infra.govern import composer
 from infra.tool import skill_index   # verify the registry matches its committed per-skill authenticity index
@@ -119,6 +120,22 @@ def catalog_snapshot():
     return _CATALOG_CACHE["c"]
 
 
+def chip_sha():
+    """The chip's identity — the roll-up sha from the chip manifest (cached; the chip is static at runtime)."""
+    if "sha" not in _CATALOG_CACHE:
+        mp = os.path.join(registry.SKILLCHIP, registry.CHIP_MANIFEST)
+        _CATALOG_CACHE["sha"] = json.load(open(mp)).get("chip_sha") if os.path.isfile(mp) else None
+    return _CATALOG_CACHE["sha"]
+
+
+def chip_provenance():
+    """How this chip was acquired (chipfetch hands it over: local baked, or cloud source@ref#commit)."""
+    try:
+        return json.loads(os.environ.get("GOVD_CHIP_PROVENANCE") or "null")
+    except ValueError:
+        return None
+
+
 def task_flow_svg(rec):
     """The run's TASK blueprint as SVG — the perk's actual gated sequence with each gate bound to the
     concrete contract check it stands for (NOT the generic skill lifecycle). Rendered VALUE-FREE: var KEYS
@@ -165,7 +182,7 @@ def govern(ledger, cfg):
 
     if not skill or not perk:
         return {"decision": "reject", "problems": [{"id": "missing_skill_or_perk"}]}
-    pdir = os.path.join(ROOT, "skills", skill, "perks", perk)
+    pdir = os.path.join(registry.SKILLCHIP, skill, "perks", perk)
     if not os.path.isdir(pdir):
         return {"decision": "reject", "problems": [{"id": "unknown_skill_perk", "detail": f"{skill}/{perk}"}]}
 
@@ -183,8 +200,8 @@ def govern(ledger, cfg):
 
     try:
         contract = json.load(open(os.path.join(pdir, "src", "contracts.json")))
-        bp = json.load(open(os.path.join(ROOT, "skills", skill, "blueprint.json")))
-        perks = json.load(open(os.path.join(ROOT, "skills", skill, "perks.json")))["perks"]
+        bp = json.load(open(os.path.join(registry.SKILLCHIP, skill, "blueprint.json")))
+        perks = json.load(open(os.path.join(registry.SKILLCHIP, skill, "perks.json")))["perks"]
     except (OSError, ValueError, KeyError) as e:
         return {"decision": "reject", "problems": [{"id": "registry_error", "detail": str(e)}]}
     destructive = next((p.get("destructive", False) for p in perks if p.get("id") == perk), False)
@@ -495,7 +512,8 @@ class Handler(BaseHTTPRequestHandler):
         host, port = self.server.server_address[0], self.server.server_address[1]
         if self.path == "/health":
             return self._json(200, {"status": "ok", "service": "cyberware-govd", "mode": cfg["mode"],
-                                    "host": host, "port": port, "registry": os.path.join(ROOT, "skills"),
+                                    "host": host, "port": port, "registry": registry.SKILLCHIP,
+                                    "chip_sha": chip_sha(), "chip": chip_provenance(),
                                     "runs": len(store.runs)})
         path = self.path.split("?", 1)[0]
         if path == "/catalog":
@@ -520,7 +538,7 @@ class Handler(BaseHTTPRequestHandler):
             # never escape the registry. (The dashboard's Flow tab uses /flow/run/<id>; this is a fallback.)
             skill = urllib.parse.unquote(path[len("/flow/"):])
             if skill in set(skill_index.all_skills()):
-                svgp = os.path.join(ROOT, "skills", skill, "blueprint.svg")
+                svgp = os.path.join(registry.SKILLCHIP, skill, "blueprint.svg")
                 if os.path.isfile(svgp):
                     return self._svg(open(svgp, "rb").read())
             return self._json(404, {"error": "no flow diagram", "skill": skill})
@@ -749,7 +767,11 @@ def serve(cfg):
     httpd.cfg, httpd.store = cfg, store
     dash_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
     print(f"govd · {cfg['mode']} · http://{host}:{port}  ·  ws://{host}:{port}/oversight")
-    print(f"  registry={os.path.join(ROOT, 'skills')}   record_root={store.root}")
+    prov = chip_provenance()
+    src = (f"cloud {prov.get('source')} @ {prov.get('ref')} ({str(prov.get('commit'))[:12]})"
+           if (prov or {}).get("mode") == "cloud" else "local (baked)")
+    print(f"  skillChip={registry.SKILLCHIP}   chip_sha={(chip_sha() or '?')[:16]}   source={src}")
+    print(f"  record_root={store.root}")
     print(f"  dashboard:  http://{dash_host}:{port}/?token={cfg['monitor_token']}"
           + ("   (default local token 'admin' — set GOVD_MONITOR_TOKEN to change)"
              if cfg["monitor_token"] == "admin" else ""))

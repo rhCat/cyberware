@@ -36,7 +36,7 @@ provenance ledger. Like a bank session: the ledger, not the contents of your box
 ## HTTP
 
 ```
-GET  /health                          -> {status, mode, host, port, registry, runs}
+GET  /health                          -> {status, mode, host, port, registry, chip_sha, chip, runs}
 GET  /catalog                         -> value-free discovery: skills · perks · var-KEYS · skill_sha · verified
 POST /govern  {skill, perk, var_keys, approve?}
        -> 200 allow      {run_id, decision, plan, plan_sha, session_token, ws}     plan = sequence+wrapper+hashes
@@ -75,11 +75,17 @@ catalog and the agent's local view are built by the **same** `skill_index.catalo
 respective registries, so the two can only differ by a real hash difference — never by drift in the
 catalog code itself.
 
-## Authenticity — the per-skill index
+## Authenticity — the chip manifest + the per-skill index
 
-Each skill carries `skills/<skill>/index.json`: the sha256 of every file + a roll-up `skill_sha`
-(`python3 -m infra.tool.skill_index --all` to generate, `--check` to verify; CI gates on it). It is the
-authenticity reference both sides check against:
+The skills live on the **skillChip** (the cartridge — its own repo, vendored as the `skillChip/`
+submodule), located by `infra/registry.py` (`registry.SKILLCHIP`, default `<repo>/skillChip`, overridable
+with `$CYBERWARE_SKILLCHIP`). The chip is **self-describing**: `skillChip/index.json` is the **chip
+manifest** — every skill with its `skill_sha`, plus a roll-up `chip_sha` — which cyberware retrieves to
+discover + verify the whole chip as a unit before trusting any one skill.
+
+Within it, each skill carries `skillChip/<skill>/index.json`: the sha256 of every file + a roll-up
+`skill_sha` (`python3 -m infra.tool.skill_index --all` to generate, `--check` to verify; CI gates on it).
+It is the file-level authenticity reference both sides check against:
 
 - **govd** won't bless a registry that doesn't match its index (`registry_drift` → reject), and pins the
   perk's closure hashes (from the index) in the plan.
@@ -114,6 +120,31 @@ secrets, bad keys, destructive perks awaiting approval), and a **live event feed
 `GET /monitor/state` (the run list + overview) every 1.5 s and `GET /monitor/run/<run_id>` for the
 selected run; both are **value-free** (names, hashes, status — never values, secrets, or output) and
 monitor-token gated. Runs restored from disk (a prior session) are tagged `restored`.
+
+## Feed-stock acquisition — local vs cloud (`CLOUD_MODE`)
+
+The container boots through **`chipfetch`** (acquire + validate), and govd starts only if the chip passes
+the same authenticity gate as the build (every skill's `index.json` + the chip manifest). Two modes:
+
+- **local** (default) — the chip baked into the image at build (`COPY skillChip/`), re-validated at boot.
+- **cloud** (`CLOUD_MODE=1`) — clone the chip **live at boot** from `CLOUD_SOURCE` (default: the
+  [skillChip repo](https://github.com/rhCat/skillChip)) at **`CLOUD_SOURCE_TAG`** (a branch, tag, or
+  commit sha; default `main`). A **private** source authenticates with **`CLOUD_SOURCE_TOKEN`** — the
+  token is passed to git only via a `GIT_ASKPASS` helper — never written into a URL, `.git/config`, the
+  command line, an error message, the provenance, or govd's own environment; a failed clone leaves nothing
+  on disk, and the boot-only `CLOUD_*` vars are dropped before govd starts. The clone is fresh each boot (`CLOUD_CHIP_DIR`, default
+  `~/.cyberware/skillChip-cloud`); updating the chip = restart the container at the new ref.
+
+```sh
+docker run -p 5773:5773 cyberware-govd                                  # local: the baked chip
+docker run -e CLOUD_MODE=1 -e CLOUD_SOURCE_TAG=v1.2 \
+           -e CLOUD_SOURCE_TOKEN=ghp_... -p 5773:5773 cyberware-govd    # cloud: live chip at tag v1.2
+```
+
+A drifted chip (any skill failing its index, or the manifest failing its `chip_sha`) **refuses to boot** —
+`chipfetch: REFUSED` with the drift list. `GET /health` attests which cartridge is being governed:
+`chip_sha` plus the acquisition provenance (`local`, or `cloud source @ ref (commit)`); the boot banner
+prints the same.
 
 ## Persistent ledger (mount it)
 

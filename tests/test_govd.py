@@ -15,6 +15,7 @@ import urllib.request
 
 import pytest
 
+from infra import registry
 from infra.govern import compiler
 from infra.govern import govd
 from infra.govern import govd_client
@@ -55,6 +56,7 @@ def test_health(server):
     base, _, _ = server
     h = json.loads(urllib.request.urlopen(base + "/health").read())
     assert h["status"] == "ok" and h["service"] == "cyberware-govd"
+    assert h["chip_sha"] == json.load(open(registry.manifest_path()))["chip_sha"]   # attests WHICH cartridge
 
 
 def test_catalog_endpoint_is_ungated_and_matches_the_builder(server):
@@ -106,14 +108,14 @@ def test_discover_tags_verified_unverified_and_drift(server, tmp_path):
     assert set(d["summary"]) == {"verified"} and not d["missing_local"]
     # 2) a divergent local registry: copy the skills, add a NEW one, tamper an existing one
     reg = tmp_path / "reg"
-    shutil.copytree(govd.ROOT + "/skills", reg / "skills")
-    src = reg / "skills" / "znew" / "perks" / "noop" / "src"
+    shutil.copytree(registry.SKILLCHIP, reg)                          # the agent's registry IS a skillChip (skills at root)
+    src = reg / "znew" / "perks" / "noop" / "src"
     src.mkdir(parents=True)
-    (reg / "skills" / "znew" / "perks.json").write_text(json.dumps(
+    (reg / "znew" / "perks.json").write_text(json.dumps(
         {"skill": "znew", "perks": [{"id": "noop", "summary": "new", "destructive": False, "tools": ["znew_noop"]}]}))
     (src / "contracts.json").write_text(json.dumps({"tool": "znew_noop", "inputs": {"FOO": {"required": True}}}))
-    skill_index.write_index("znew", str(reg / "skills"))
-    with open(reg / "skills" / "fs" / "SKILL.md", "a") as f:
+    skill_index.write_index("znew", str(reg))
+    with open(reg / "fs" / "SKILL.md", "a") as f:
         f.write("\n# tampered\n")                                      # files no longer match fs's own index
     d2 = govd_client.discover(base, registry=str(reg))
     by = {s["skill"]: s["status"] for s in d2["skills"]}
@@ -179,7 +181,7 @@ def test_govern_runs_the_compose_check_incl_tlc(server):
 
 
 def test_tlc_result_is_cached_per_blueprint():
-    bp = json.loads(open(govd.ROOT + "/skills/fs/blueprint.json").read())
+    bp = json.loads(open(registry.SKILLCHIP + "/fs/blueprint.json").read())
     govd._TLC_CACHE.clear()
     first = govd.tlc_check(bp)
     assert govd.tlc_check(bp) == first and len(govd._TLC_CACHE) == 1   # runs once, then cached

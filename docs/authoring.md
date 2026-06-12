@@ -1,9 +1,10 @@
 # Authoring a skill
 
-A skill is a directory under `skills/`. Its anatomy:
+A skill is a directory on the **skillChip** — cyberware's skill cartridge, a separate repo vendored as the
+`skillChip/` submodule (located by `$CYBERWARE_SKILLCHIP`, default `<repo>/skillChip`). Its anatomy:
 
 ```
-skills/<skill>/
+skillChip/<skill>/
   SKILL.md                 context for the intelligence — what it does, what to watch, which logs to check
   blueprint.json           the L++ CFG (the perk-agnostic lifecycle + safety_invariants)
   perks.json               the proven pathways (id, summary, tools, destructive?)
@@ -97,7 +98,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exec python3 "$HERE/<tool>.py"
 ```
 
-`scaffold.py` writes exactly this when a perk's binary is `python3` (see `skills/codebaseqc`, whose
+`scaffold.py` writes exactly this when a perk's binary is `python3` (see `skillChip/codebaseqc`, whose
 `cbqc_*` tools are standalone `.py` cores behind thin porters).
 
 ## 5. Visualize, index + run
