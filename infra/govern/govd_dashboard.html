@@ -80,7 +80,8 @@
 const qs = new URLSearchParams(location.search);
 let token = qs.get("token") || sessionStorage.getItem("govd_monitor_token") || "";
 const state = { snap:null, selected:null, detail:null, tab:"Run" };
-const flowCache = {};   // skill -> blueprint.svg markup (fetched once; the diagram is static per skill)
+const flowCache = {};   // run_id -> task-blueprint svg (fetched once; the blueprint is static per run)
+let lastSig = "";       // signature of the last RENDERED view; an idle poll whose signature matches is a no-op
 const root = document.getElementById("root");
 const dot = document.getElementById("dot"), stamp = document.getElementById("stamp"), chips = document.getElementById("chips");
 const enc = encodeURIComponent;
@@ -118,6 +119,12 @@ async function refreshDetail(){
   render();
 }
 
+function viewSig(){
+  // everything the DOM is built from, EXCEPT the per-poll clock (snap.now) — so an idle poll is a no-op.
+  const s = state.snap ? {...state.snap, now:0} : null;
+  return JSON.stringify([state.selected, state.tab, s, state.detail]);
+}
+
 function render(){
   if(!state.snap) return;
   const s=state.snap;
@@ -144,6 +151,7 @@ function render(){
 
   if(state.selected===null) overview(main, s); else detailView(main);
   app.append(nav,main); root.appendChild(app);
+  lastSig=viewSig();                                   // remember what we just drew, so an unchanged poll no-ops
 }
 
 function sect(title){ const s=el("section"); s.appendChild(el("div","hd",title)); const b=el("div","pad"); s.appendChild(b); return {s,b}; }
@@ -241,7 +249,8 @@ async function tick(){
     if(r.status===403){ dot.className="dot err"; sessionStorage.removeItem("govd_monitor_token"); token=""; askToken(); return; }
     state.snap=await r.json();
     if(state.selected){ const d=await fetch("/monitor/run/"+enc(state.selected)+"?token="+enc(token),{cache:"no-store"}); state.detail=d.ok?await d.json():null; }
-    render(); dot.className="dot live"; stamp.textContent="updated "+fmt(state.snap.now);
+    dot.className="dot live"; stamp.textContent="updated "+fmt(state.snap.now);   // liveness ticks every poll…
+    if(viewSig()!==lastSig) render();                                             // …but the DOM rebuilds ONLY on a real change
   }catch(e){ dot.className="dot err"; stamp.textContent="disconnected — retrying"; }
 }
 tick(); setInterval(tick, 1500);
