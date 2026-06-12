@@ -21,7 +21,7 @@ is a keyword heuristic — a recommendation, not a proof; the intelligence makes
 ## Perks
 - `evaluate` — classify a candidate + recommendation (read-only).
 - `scaffold` — lay down the cyberware skeleton (blueprint + perks + contracts + snippet stubs) for a fitting
-  skill, via `infra/scaffold.py`.
+  skill, via `infra/tool/scaffold.py`.
 
 ## How to use it
 1. `evaluate`: set `SKILL_NAME` + `SKILL_DESC` → the verdict.

@@ -23,11 +23,11 @@ executes it. Destructive SQL is refused unless explicitly approved.
    `manifesto.json` (the variables it accepts) and `src/contracts.json` (the I/O + checks).
 3. Hand it to the infrastructure:
    ```sh
-   python3 infra/validator.py --ledger task-ledger.json     # are the claims real?
-   python3 infra/composer.py  --ledger task-ledger.json     # L++ → TLC, no deadlock
-   python3 infra/compiler.py  --ledger task-ledger.json -o run.sh
-   python3 infra/oversight.py --script run.sh               # OVERSIGHT_RULE (drops refused)
-   python3 infra/executor.py  --script run.sh --step 1      # the ONLY way to run
+   python3 -m infra.govern.validator --ledger task-ledger.json     # are the claims real?
+   python3 -m infra.govern.composer  --ledger task-ledger.json     # L++ → TLC, no deadlock
+   python3 -m infra.govern.compiler  --ledger task-ledger.json -o run.sh
+   python3 -m infra.govern.oversight --script run.sh               # OVERSIGHT_RULE (drops refused)
+   python3 -m infra.govern.executor  --script run.sh --step 1      # the ONLY way to run
    ```
 
 ## Perks

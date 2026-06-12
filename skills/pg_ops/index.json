@@ -1,9 +1,9 @@
 {
   "skill": "pg_ops",
-  "skill_sha": "c2d3acd917f991edb72fe6920ab17cf9e7cddd8a05b79562f666d3e63682ef3e",
+  "skill_sha": "eed0051b9e2edf0f2cb4c4f7860dbd96f278db5552a151fc6c668f158d7343ee",
   "file_count": 14,
   "files": {
-    "SKILL.md": "a1b60f62560a79a8d6c8f34b781bc838bf7e39cf7f18ad9f0bf4ab6d1f9f74b1",
+    "SKILL.md": "1dad29216eabf36b0e2feabd79f48cb111cb36d1086083c03e78bbcbeae0656d",
     "blueprint.drawio": "a389f5c27753766f51b631e7114372029c97e6e8959491045031687f9bf3ac1e",
     "blueprint.json": "85dd54ee5aef62147a6837e91c79191b7cf6f8f44123d1f0d622cf4cce9f2044",
     "blueprint.svg": "1a4ccd5a0ce4e34a1c14cbcc86af92d37aeb81eddfc6447573092c522747522d",
