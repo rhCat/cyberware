@@ -13,7 +13,7 @@ composes out of the box; you fill in each perk's vars and the proven-pathway sni
 from __future__ import annotations
 import argparse, json, os, stat, sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def wj(p, o):

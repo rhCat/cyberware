@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cyberware · govd monitor</title>
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#0f1722; --panel2:#131d2b; --line:#1e2c3d; --ink:#cdd9e5;
+    --dim:#6b7d92; --accent:#39d0d8; --allow:#36d399; --push:#fbbd23; --reject:#f87272;
+    --destructive:#c084fc; --restored:#7f8fa3; --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 var(--mono);
+    background-image:radial-gradient(circle at 18% -10%,rgba(57,208,216,.08),transparent 42%)}
+  header{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:rgba(10,14,20,.94);backdrop-filter:blur(6px);z-index:5;flex-wrap:wrap}
+  h1{font-size:15px;margin:0;letter-spacing:.05em} h1 b{color:var(--accent)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--dim)} .dot.live{background:var(--allow)} .dot.err{background:var(--reject)}
+  .grow{flex:1} .stamp{color:var(--dim);font-size:11px}
+  .chips{display:flex;gap:7px;flex-wrap:wrap}
+  .chip{padding:3px 9px;border:1px solid var(--line);border-radius:14px;background:var(--panel);font-size:11px}
+  .chip b{font-size:13px}
+  .chip.allow b{color:var(--allow)} .chip.push b{color:var(--push)} .chip.reject b{color:var(--reject)} .chip.dest b{color:var(--destructive)}
+  .app{display:flex;align-items:stretch;min-height:60vh}
+  .nav{width:300px;flex:none;border-right:1px solid var(--line);overflow:auto;max-height:calc(100vh - 60px)}
+  .main{flex:1;min-width:0;overflow:auto;max-height:calc(100vh - 60px);padding:14px 18px}
+  @media(max-width:760px){.app{flex-direction:column}.nav{width:auto;max-height:38vh;border-right:0;border-bottom:1px solid var(--line)}}
+  .navitem{padding:9px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+  .navitem:hover{background:var(--panel)} .navitem.sel{background:var(--panel2);box-shadow:inset 3px 0 0 var(--accent)}
+  .navitem .r1{display:flex;align-items:center;gap:8px} .navitem .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .navitem .r2{display:flex;gap:10px;margin-top:3px;color:var(--dim);font-size:10px}
+  .navhd{padding:8px 14px;color:var(--dim);text-transform:uppercase;letter-spacing:.12em;font-size:10px;border-bottom:1px solid var(--line)}
+  .badge{padding:1px 7px;border-radius:6px;font-size:10px;border:1px solid}
+  .b-allow{color:var(--allow);border-color:var(--allow)} .b-push{color:var(--push);border-color:var(--push)} .b-reject{color:var(--reject);border-color:var(--reject)}
+  .tag-dest{color:var(--destructive);border:1px solid var(--destructive);border-radius:6px;padding:0 6px;font-size:10px}
+  .tag-restored{color:var(--restored);border:1px solid var(--restored);border-radius:6px;padding:0 6px;font-size:10px}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:14px;overflow:hidden}
+  .hd{padding:9px 13px;border-bottom:1px solid var(--line);color:var(--dim);text-transform:uppercase;letter-spacing:.12em;font-size:10px}
+  .pad{padding:10px 13px}
+  .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:12px}
+  .meta .k{color:var(--dim)}
+  .keys span,.pills .pill{font-size:10px;border:1px solid var(--line);border-radius:5px;padding:1px 6px;margin:0 4px 4px 0;display:inline-block;color:var(--dim)}
+  .pills{display:flex;gap:5px;flex-wrap:wrap}
+  .pill.ok{color:var(--allow);border-color:var(--allow)} .pill.error{color:var(--reject);border-color:var(--reject)}
+  .pill.granted{color:var(--accent);border-color:var(--accent)} .pill.pending{opacity:.5}
+  .tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .tool{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel2)}
+  .tool .ct{display:flex;gap:10px;margin-top:4px;font-size:11px}
+  .tool .ct .ok{color:var(--allow)} .tool .ct .er{color:var(--reject)} .tool .ct .gr{color:var(--accent)}
+  table{width:100%;border-collapse:collapse} td{padding:5px 8px;border-bottom:1px solid var(--line);font-size:11px;vertical-align:top}
+  .tl div{display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--line);font-size:11px;align-items:baseline}
+  .tl .t{color:var(--dim);min-width:62px} .tl .ev{min-width:92px}
+  .ev-granted{color:var(--accent)} .ev-step_result{color:var(--allow)} .ev-step_refused{color:var(--reject)}
+  pre{margin:0;padding:10px 13px;background:var(--panel2);border-radius:8px;max-height:240px;overflow:auto;font-size:11px;color:var(--dim);white-space:pre-wrap;word-break:break-word}
+  .empty{color:var(--dim);padding:18px;text-align:center}
+  .ask{padding:40px;text-align:center;color:var(--dim)}
+  .ask input{font:13px var(--mono);padding:8px 12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--ink);width:340px;max-width:80vw}
+  .ask button{font:13px var(--mono);padding:8px 16px;margin-left:8px;background:var(--accent);border:0;border-radius:6px;color:#04181a;cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="dot"></span>
+  <h1>cyberware · <b>govd</b> monitor</h1>
+  <div class="chips" id="chips"></div>
+  <span class="grow"></span>
+  <span class="stamp" id="stamp">connecting…</span>
+</header>
+<div id="root"></div>
+<script>
+"use strict";
+const qs = new URLSearchParams(location.search);
+let token = qs.get("token") || sessionStorage.getItem("govd_monitor_token") || "";
+const state = { snap:null, selected:null, detail:null };
+const root = document.getElementById("root");
+const dot = document.getElementById("dot"), stamp = document.getElementById("stamp"), chips = document.getElementById("chips");
+const enc = encodeURIComponent;
+function el(tag, cls, text){ const e=document.createElement(tag); if(cls)e.className=cls; if(text!=null)e.textContent=text; return e; }
+const DEC = {allow:"b-allow", push_back:"b-push", reject:"b-reject"};
+function badge(d){ return el("span","badge "+(DEC[d]||""), d||"?"); }
+function fmt(ts){ if(!ts) return "-"; const m=String(ts).match(/T(\d\d:\d\d:\d\d)/); return m?m[1]:ts; }
+function stepStates(seq, events){
+  seq = seq||[]; events = events||[];
+  const res={}, granted=new Set();
+  for(const e of events){ if(e.type==="step_result") res[e.step]=e; if(e.type==="granted") granted.add(e.step); }
+  return seq.map((tool,i)=>{ const n=i+1, r=res[String(n)];
+    const st = r ? (r.status==="ok"?"ok":"error") : (granted.has(String(n))?"granted":"pending");
+    return {n, tool, state:st}; });
+}
+
+function askToken(){
+  dot.className="dot"; stamp.textContent="enter monitor token";
+  root.innerHTML="";
+  const box=el("div","ask");
+  box.appendChild(el("p",null,"Enter the monitor token (printed in the govd boot log; local default: admin):"));
+  const inp=el("input"); inp.type="password"; inp.placeholder="monitor token";
+  const btn=el("button",null,"connect");
+  const go=()=>{ token=inp.value.trim(); sessionStorage.setItem("govd_monitor_token",token); tick(); };
+  btn.onclick=go; inp.onkeydown=e=>{ if(e.key==="Enter") go(); };
+  box.append(inp,btn); root.appendChild(box); inp.focus();
+}
+
+function select(id){ state.selected=id; state.detail=null; render(); if(id) refreshDetail(); }
+
+async function refreshDetail(){
+  if(!state.selected) return;
+  try{ const d=await fetch("/monitor/run/"+enc(state.selected)+"?token="+enc(token),{cache:"no-store"});
+       state.detail = d.ok ? await d.json() : null; }catch(e){ state.detail=null; }
+  render();
+}
+
+function render(){
+  if(!state.snap) return;
+  const s=state.snap;
+  chips.innerHTML="";
+  const t=s.totals||{};
+  const mk=(c,l,n)=>{ const x=el("span","chip "+c); x.appendChild(el("b",null,String(n||0))); x.appendChild(document.createTextNode(" "+l)); return x; };
+  chips.append(mk("","runs",s.runs_live), mk("allow","allow",t.allow), mk("push","push-back",t.push_back),
+    mk("reject","reject",t.reject), mk("dest","destructive",(s.runs||[]).filter(r=>r.destructive).length));
+
+  root.innerHTML="";
+  const app=el("div","app"), nav=el("div","nav"), main=el("div","main");
+
+  nav.appendChild(el("div","navhd","Review · select a run"));
+  const ov=el("div","navitem"+(state.selected===null?" sel":"")); ov.appendChild(el("span","nm","▤ Overview"));
+  ov.onclick=()=>select(null); nav.appendChild(ov);
+  for(const r of (s.runs||[])){
+    const it=el("div","navitem"+(state.selected===r.run_id?" sel":""));
+    const r1=el("div","r1"); r1.appendChild(el("span","nm",(r.skill||"?")+" / "+(r.perk||"?"))); r1.appendChild(badge(r.decision));
+    const r2=el("div","r2"); r2.appendChild(el("span",null,fmt(r.ts))); r2.appendChild(el("span",null,r.progress||"-"));
+    if(r.destructive) r2.appendChild(el("span","tag-dest","D"));
+    if(r.restored) r2.appendChild(el("span","tag-restored","restored"));
+    it.append(r1,r2); it.onclick=()=>select(r.run_id); nav.appendChild(it);
+  }
+
+  if(state.selected===null) overview(main, s); else detailView(main);
+  app.append(nav,main); root.appendChild(app);
+}
+
+function sect(title){ const s=el("section"); s.appendChild(el("div","hd",title)); const b=el("div","pad"); s.appendChild(b); return {s,b}; }
+
+function overview(main, s){
+  const tu=sect("Tool usage"); const tools=Object.entries(s.tools||{});
+  if(!tools.length) tu.b.appendChild(el("div","empty","no tool runs yet"));
+  else{ const g=el("div","tools"); tools.sort((a,b)=>(b[1].ok+b[1].error+b[1].granted)-(a[1].ok+a[1].error+a[1].granted));
+    for(const [n,c] of tools){ const card=el("div","tool"); card.appendChild(el("div",null,n));
+      const ct=el("div","ct"); ct.append(el("span","ok","✓ "+c.ok),el("span","er","✕ "+c.error),el("span","gr","→ "+c.granted)); card.appendChild(ct); g.appendChild(card); }
+    tu.b.appendChild(g); }
+  main.appendChild(tu.s);
+
+  const dc=sect("Recent decisions"); const dt=el("table");
+  for(const x of (s.decisions||[])){ const tr=el("tr");
+    tr.appendChild(el("td",null,fmt(x.ts))); const c2=el("td"); c2.appendChild(el("span",null,(x.skill||"?")+" / "+(x.perk||"?"))); tr.appendChild(c2);
+    const c3=el("td"); c3.appendChild(badge(x.decision)); if(x.destructive) c3.appendChild(el("span","tag-dest"," D")); tr.appendChild(c3);
+    const note=(x.problems&&x.problems.length)?x.problems.join(", "):(x.needs_approve&&x.needs_approve.length?("approve: "+x.needs_approve.join(",")):""); tr.appendChild(el("td",null,note)); dt.appendChild(tr); }
+  if(!(s.decisions||[]).length) dc.b.appendChild(el("div","empty","no decisions yet")); else dc.b.appendChild(dt);
+  main.appendChild(dc.s);
+
+  const fd=sect("Live event feed"); const tl=el("div","tl");
+  for(const e of (s.feed||[])){ const row=el("div"); row.appendChild(el("span","t",fmt(e.ts))); row.appendChild(el("span","ev ev-"+e.type,e.type));
+    let txt=(e.skill||"?")+"/"+(e.perk||"?")+" step "+e.step; if(e.type==="step_result")txt+=" · "+(e.status||"")+" (exit "+e.exit+")"; if(e.type==="step_refused")txt+=" · "+(e.reason||"");
+    row.appendChild(el("span",null,txt)); tl.appendChild(row); }
+  if(!(s.feed||[]).length) fd.b.appendChild(el("div","empty","no events yet")); else fd.b.appendChild(tl);
+  main.appendChild(fd.s);
+}
+
+function detailView(main){
+  const d=state.detail;
+  if(!d){ main.appendChild(el("div","empty","loading run… (or it aged out of memory — check the mounted ledger on disk)")); return; }
+  const hd=sect(d.skill+" / "+d.perk); const hdEl=hd.s.querySelector(".hd");
+  hdEl.appendChild(document.createTextNode("  ")); hdEl.appendChild(badge(d.decision));
+  if(d.destructive) hdEl.appendChild(el("span","tag-dest"," destructive"));
+  if(d.restored) hdEl.appendChild(el("span","tag-restored"," restored"));
+  const m=el("div","meta");
+  const row=(k,v)=>{ m.appendChild(el("span","k",k)); m.appendChild(el("span",null,v)); };
+  row("run_id", d.run_id); row("time", fmt(d.ts)); row("plan_sha", (d.plan_sha||"").slice(0,24));
+  row("tlc", d.tlc||"-"); if(d.approved&&d.approved.length) row("approved", d.approved.join(", "));
+  hd.b.appendChild(m);
+  if(d.var_keys&&d.var_keys.length){ const k=el("div","keys"); k.style.marginTop="8px"; for(const x of d.var_keys) k.appendChild(el("span",null,x)); hd.b.appendChild(k); }
+  main.appendChild(hd.s);
+
+  const steps=stepStates(d.seq, d.events);
+  if(steps.length){ const ss=sect("Steps"); const p=el("div","pills"); for(const st of steps) p.appendChild(el("span","pill "+st.state, st.n+"·"+st.tool)); ss.b.appendChild(p); main.appendChild(ss.s); }
+
+  const tlS=sect("Event timeline"); const tl=el("div","tl");
+  for(const e of (d.events||[])){ const row2=el("div"); row2.appendChild(el("span","t",fmt(e.ts))); row2.appendChild(el("span","ev ev-"+e.type,e.type));
+    let txt="step "+e.step; if(e.type==="step_result")txt+=" · "+(e.status||"")+" (exit "+e.exit+")"; if(e.type==="step_refused")txt+=" · "+(e.reason||""); if(e.type==="granted")txt+=" · plan "+String(e.plan_sha||"").slice(0,12);
+    row2.appendChild(el("span",null,txt)); tl.appendChild(row2); }
+  if(!(d.events||[]).length) tlS.b.appendChild(el("div","empty","no events recorded for this run")); else tlS.b.appendChild(tl);
+  main.appendChild(tlS.s);
+
+  if(d.wrapper){ const pl=sect("Blessed plan (value-free)"); const shas=el("div","keys"); for(const [t,h] of Object.entries(d.snippet_shas||{})) shas.appendChild(el("span",null,t+" "+String(h).slice(0,10))); pl.b.appendChild(shas); pl.s.appendChild(el("pre",null,d.wrapper)); main.appendChild(pl.s); }
+}
+
+async function tick(){
+  if(!token){ askToken(); return; }
+  try{
+    const r=await fetch("/monitor/state?token="+enc(token),{cache:"no-store"});
+    if(r.status===403){ dot.className="dot err"; sessionStorage.removeItem("govd_monitor_token"); token=""; askToken(); return; }
+    state.snap=await r.json();
+    if(state.selected){ const d=await fetch("/monitor/run/"+enc(state.selected)+"?token="+enc(token),{cache:"no-store"}); state.detail=d.ok?await d.json():null; }
+    render(); dot.className="dot live"; stamp.textContent="updated "+fmt(state.snap.now);
+  }catch(e){ dot.className="dot err"; stamp.textContent="disconnected — retrying"; }
+}
+tick(); setInterval(tick, 1500);
+</script>
+</body>
+</html>

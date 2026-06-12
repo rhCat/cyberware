@@ -6,8 +6,8 @@ consistent (perks.json ↔ dirs ↔ manifesto ↔ SKILL.md) and carry the real o
 import json
 import os
 
-import compiler
-import oversight
+from infra.govern import compiler
+from infra.govern import oversight
 import pytest
 from conftest import ROOT, all_perks
 

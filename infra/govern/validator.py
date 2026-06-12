@@ -12,9 +12,9 @@ inspection — it touches nothing it doesn't own.
 from __future__ import annotations
 import argparse, json, os, shutil, socket, sys
 
-from runlog import is_default as is_placeholder, run_dir   # one definition of "still a placeholder"
+from infra.govern.runlog import is_default as is_placeholder, run_dir
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def load(p): return json.load(open(p))

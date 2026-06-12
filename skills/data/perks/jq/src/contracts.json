@@ -2,8 +2,9 @@
   "tool": "data_jq",
   "inputs": {
     "JSON_FILE": {
-      "type": "string",
-      "required": true
+      "type": "file",
+      "required": true,
+      "scan_content": false
     },
     "QUERY": {
       "type": "string",

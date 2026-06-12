@@ -22,14 +22,14 @@ governance you cannot bypass without leaving a hole in the chain.
 from __future__ import annotations
 import argparse, hashlib, json, os, re, subprocess, sys, time
 
-from oversight import scan
+from infra.govern.oversight import scan
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def sha(b): return hashlib.sha256(b if isinstance(b, bytes) else b.encode()).hexdigest()[:16]
 def now(): return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-def rules(): return json.load(open(os.path.join(ROOT, "infra", "EXECUTOR_RULE.json")))
+def rules(): return json.load(open(os.path.join(ROOT, "infra", "govern", "EXECUTOR_RULE.json")))
 
 
 def record_store_of(script):

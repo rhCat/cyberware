@@ -27,13 +27,19 @@
     },
     {
       "id": "delete_nowhere",
-      "pattern": "(?i)\\bdelete\\s+from\\s+\\w+\\s*;",
-      "reason": "DELETE without WHERE",
+      "pattern": "(?i)\\bdelete\\s+from\\s+[\\w.]+\\b(?!\\s+where\\b)",
+      "reason": "DELETE without a WHERE clause (trailing ';' no longer required to match)",
+      "approvable": true
+    },
+    {
+      "id": "alter_destructive",
+      "pattern": "(?i)\\balter\\s+table\\b[^\\n;]*\\b(drop\\s+column|rename\\s+to|rename\\s+column)\\b",
+      "reason": "ALTER TABLE ... DROP COLUMN / RENAME is schema-destructive",
       "approvable": true
     },
     {
       "id": "git_force_push",
-      "pattern": "\\bgit\\s+push\\b[^\\n]*--force",
+      "pattern": "\\bgit\\s+push\\b[^\\n]*(--force(-with-lease)?|\\s-f\\b)",
       "reason": "force-push rewrites remote history",
       "approvable": true
     },
@@ -68,6 +74,12 @@
       "approvable": true
     },
     {
+      "id": "chmod_world_writable",
+      "pattern": "\\bchmod\\s+(-R\\s+)?([ugoa]*[goa][ugoa]*[+=]|[+=])[rwx]*w",
+      "reason": "grants write to group/other/all (symbolic world-writable)",
+      "approvable": true
+    },
+    {
       "id": "dd_disk",
       "pattern": "\\bdd\\s+if=",
       "reason": "raw disk write",
@@ -89,6 +101,12 @@
       "id": "sudo",
       "pattern": "\\bsudo\\b",
       "reason": "privilege escalation",
+      "approvable": false
+    },
+    {
+      "id": "doas",
+      "pattern": "\\bdoas\\b",
+      "reason": "privilege escalation (doas)",
       "approvable": false
     },
     {
