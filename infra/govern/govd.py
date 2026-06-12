@@ -22,7 +22,8 @@ Principles enforced here:
 HTTP:
   GET  /health                        -> mode, port, registry, run count
   GET  /catalog                       -> value-free discovery: skills · perks · var-KEYS · skill_sha · verified
-  GET  /flow/<skill>                  -> the skill's blueprint.svg (lifecycle diagram; value-free, for the dashboard)
+  GET  /flow/run/<run_id>             -> THIS run's task-blueprint SVG (perk's gated sequence; value-free; monitor-gated)
+  GET  /flow/<skill>                  -> the skill's generic lifecycle blueprint.svg (value-free; fallback)
   POST /govern  {skill,perk,var_keys,approve?}
                   -> 200 allow      {run_id, decision, plan, plan_sha, session_token, ws}   (plan = value-free)
                      409 push_back  {run_id, decision, needs_approve, ...}                   (destructive: approve)
@@ -99,6 +100,7 @@ def ensure_monitor_token(cfg):
 _TLC_CACHE = {}                                          # blueprint sha -> (ok, msg); blueprints are static
 _VERIFY_CACHE = {}                                       # skill -> (ok, drift); the registry is static at runtime
 _CATALOG_CACHE = {}                                      # the value-free discovery catalog; registry static
+_FLOW_CACHE = {}                                         # run_id -> the rendered task-blueprint SVG (record static)
 
 
 def verify_skill(skill):
@@ -115,6 +117,23 @@ def catalog_snapshot():
     if "c" not in _CATALOG_CACHE:
         _CATALOG_CACHE["c"] = skill_index.catalog()
     return _CATALOG_CACHE["c"]
+
+
+def task_flow_svg(rec):
+    """The run's TASK blueprint as SVG — the perk's actual gated sequence with each gate bound to the
+    concrete contract check it stands for (NOT the generic skill lifecycle). Rendered VALUE-FREE: var KEYS
+    appear as `${KEY}` placeholders (never values) and the run dir as `$RUN`, so it's built purely from the
+    value-free record (skill · perk · seq · var_keys). Cached per run (the record is static)."""
+    rid = rec.get("run_id")
+    if rid in _FLOW_CACHE:
+        return _FLOW_CACHE[rid]
+    from infra.tool import visualize
+    keys = rec.get("var_keys") or []
+    L = {"skill": rec.get("skill"), "perk": rec.get("perk"), "vars": {k: "${" + k + "}" for k in keys}}
+    bp = compiler.task_blueprint(L, "$RUN", rec.get("seq") or None)   # $RUN placeholder — no real path either
+    out = visualize.svg(bp, (bp.get("task") or {}).get("tools"))
+    _FLOW_CACHE[rid] = out
+    return out
 _TLC_LOCK = threading.Lock()
 
 
@@ -483,10 +502,22 @@ class Handler(BaseHTTPRequestHandler):
             # value-free discovery (names · perks · var-KEYS · skill_sha · verified) — ungated like /health,
             # so an agent can ask "what do you govern?" before it claims. No values, no run data.
             return self._json(200, catalog_snapshot())
+        if path.startswith("/flow/run/"):
+            # THIS run's task blueprint (the perk's gated sequence, gates bound to concrete contract
+            # checks) — rendered value-free from the record. Monitor-gated like /monitor/run.
+            if not self._monitor_authed(cfg):
+                return self._json(403, {"error": "missing/invalid monitor token"})
+            rec = store.get(urllib.parse.unquote(path[len("/flow/run/"):]))
+            if rec and rec.get("skill") and rec.get("perk"):
+                try:
+                    return self._svg(task_flow_svg(rec).encode())
+                except Exception as e:
+                    return self._json(500, {"error": "task flow render failed", "detail": str(e)})
+            return self._json(404, {"error": "unknown run_id"})
         if path.startswith("/flow/"):
-            # the skill's lifecycle diagram (blueprint.svg) for the dashboard Flow tab — a value-free
-            # registry artifact, ungated like /catalog. Path-safe: only an EXACT known skill name is
-            # served, so the path can never escape the registry.
+            # the skill's generic lifecycle diagram (blueprint.svg) — a value-free registry artifact,
+            # ungated like /catalog. Path-safe: only an EXACT known skill name is served, so the path can
+            # never escape the registry. (The dashboard's Flow tab uses /flow/run/<id>; this is a fallback.)
             skill = urllib.parse.unquote(path[len("/flow/"):])
             if skill in set(skill_index.all_skills()):
                 svgp = os.path.join(ROOT, "skills", skill, "blueprint.svg")
