@@ -16,6 +16,7 @@ evidence rather than assertions, produced by the chip's own validator skills + e
 """
 from __future__ import annotations
 import argparse
+import concurrent.futures
 import json
 import os
 import subprocess
@@ -51,20 +52,29 @@ def check_authenticity():
 def mutation_score(module, slice_, cap):
     """Drive the chip's cws-mutate core over `module` with `slice_` as the test; return its report dict."""
     rs = tempfile.mkdtemp(prefix="selfmon-mut-")
+    # -x stops at the first failing test (a mutant is killed the moment ONE test fails — no need to run the
+    # rest of the slice); -p no:cacheprovider skips the unused .pytest_cache. Both leave the score identical,
+    # they just make each of the ~90 per-mutant runs return as soon as the verdict is known.
     env = {**os.environ, "PROJECT_DIR": ROOT, "TARGET": module,
-           "TEST_CMD": f"python3 -m pytest {slice_} -q", "MAX_MUTANTS": str(cap), "THRESHOLD": "0",
-           "RECORD_STORE": rs}
+           "TEST_CMD": f"python3 -m pytest {slice_} -q -x -p no:cacheprovider", "MAX_MUTANTS": str(cap),
+           "THRESHOLD": "0", "RECORD_STORE": rs}
     subprocess.run([sys.executable, MUTATE_CORE], env=env, capture_output=True, text=True)
     rep = os.path.join(rs, "mutate.json")
     return json.load(open(rep)) if os.path.isfile(rep) else None
 
 
 def check_mutation():
-    """(rows, failures): each enforcement-surface module's score vs its ratchet floor."""
+    """(rows, failures): each enforcement-surface module's score vs its ratchet floor.
+
+    The modules are independent — each mutation campaign runs in its own sandbox + record store — so they
+    run CONCURRENTLY (wall-clock = the slowest module, not the sum). subprocess work releases the GIL, so a
+    thread pool suffices; results are collected in policy order so the report is deterministic."""
     policy = json.load(open(POLICY))
+    surface = policy["enforcement_surface"]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(surface))) as ex:
+        reps = list(ex.map(lambda e: mutation_score(e["module"], e["slice"], e.get("cap", 50)), surface))
     rows, fail = [], []
-    for e in policy["enforcement_surface"]:
-        rep = mutation_score(e["module"], e["slice"], e.get("cap", 50))
+    for e, rep in zip(surface, reps):
         score = (rep or {}).get("mutation_score", 0.0)
         ok = rep is not None and score >= e["floor"]
         rows.append({"module": e["module"], "score": score, "floor": e["floor"],
