@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse, hashlib, json, os, sys
 
 from infra import registry
+from infra.cwp import canonical
 
 SKILLS = registry.SKILLCHIP                             # the skillChip — the skill feed-stock cyberware reads
 INDEX = "index.json"
@@ -47,7 +48,7 @@ def skill_files(skill_dir):
 def build_index(skill, skills_dir=None):
     skills_dir = skills_dir or SKILLS
     files = {rel: sha256_file(ap) for rel, ap in sorted(skill_files(os.path.join(skills_dir, skill)).items())}
-    roll = hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
+    roll = canonical.digest(files)
     return {"skill": skill, "skill_sha": roll, "file_count": len(files), "files": files}
 
 
@@ -120,7 +121,7 @@ def chip_manifest(skills_dir=None):
     for s in all_skills(skills_dir):
         idx = json.load(open(os.path.join(skills_dir, s, INDEX))) if os.path.isfile(os.path.join(skills_dir, s, INDEX)) else {}
         entries.append({"skill": s, "skill_sha": idx.get("skill_sha"), "file_count": idx.get("file_count")})
-    roll = hashlib.sha256(json.dumps({e["skill"]: e["skill_sha"] for e in entries}, sort_keys=True).encode()).hexdigest()
+    roll = canonical.digest({e["skill"]: e["skill_sha"] for e in entries})
     return {"chip": "skillChip", "count": len(entries), "skills": entries, "chip_sha": roll}
 
 

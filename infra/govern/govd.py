@@ -42,6 +42,7 @@ import argparse, base64, collections, hashlib, hmac, json, os, re, secrets, sys,
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from infra import registry
+from infra.cwp import canonical
 from infra.govern import compiler
 from infra.govern import composer
 from infra.tool import skill_index   # verify the registry matches its committed per-skill authenticity index
@@ -158,7 +159,7 @@ def tlc_check(bp):
     """The TLA+/TLC deadlock model check, run here in the control plane and cached per blueprint (so TLC
     runs once per skill). Returns (ok, msg, tla, output): the verdict plus the TLA+ spec and TLC's FULL log
     (ok None = TLC unavailable, structural check governs; in the container the jar is present so it's real)."""
-    key = hashlib.sha256(json.dumps(bp, sort_keys=True).encode()).hexdigest()
+    key = canonical.digest(bp)
     with _TLC_LOCK:
         if key in _TLC_CACHE:
             return _TLC_CACHE[key]
