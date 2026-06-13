@@ -27,6 +27,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install ruff mypy pytest pytest-cov
+          pip install -r requirements.txt
       - name: lint (ruff)
         run: ruff check infra
       - name: skill authenticity index
