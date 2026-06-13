@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Generate spec/vectors/corpus.json — the JCS canonicalization vector corpus (P0-T07, canonicalization
++ digest slice; signature + chip-fixture vectors are ROADMAP, pending infra/cwp/sign.py).
+
+Each vector is `{name, input}` — just the input JSON value. The corpus is the shared input set; the
+cross-language harness (tests/test_crosslang.py) computes the canonical bytes + sha256 with BOTH
+infra/cwp/canonical.py and the independent Go verifier and asserts they agree byte-for-byte. Deterministic
+(no randomness) so the corpus is reproducible.
+
+  python3 spec/vectors/generate.py        # writes spec/vectors/corpus.json
+"""
+from __future__ import annotations
+import json
+import os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def vectors():
+    v = []
+
+    # literals + empties
+    for name, val in [("null", None), ("true", True), ("false", False), ("empty_str", ""),
+                      ("empty_obj", {}), ("empty_arr", [])]:
+        v.append((f"lit_{name}", val))
+
+    # integers, including values beyond float64's exact range (must stay exact — int path, not ES6)
+    for i in (0, 1, -1, 42, -42, 1000, 2**53, 2**53 + 1, 2**63, 10**30, -(10**30)):
+        v.append((f"int_{i}", i))
+
+    # ES6 Number::toString edges (floats), curated + a swept range across the fixed/exponential boundaries
+    for f in (0.0, 4.5, 0.002, 1e30, 1e-27, 1e20, 1e21, 1e22, 1e-6, 1e-7, 1e15, 1e16,
+              123456789.0, 3.141592653589793, 2.5e-10, 9.999999999999999e22, 5e-324):
+        v.append((f"flt_{f!r}", f))
+    for exp in range(-25, 26):
+        for m in (1.0, 2.5, 9.99):
+            v.append((f"sweep_{m}e{exp}", m * (10.0 ** exp)))
+
+    # strings: every C0 control (→ \u00xx or a short escape), quote/backslash/slash, non-ASCII, surrogate pair
+    for cp in range(0x00, 0x20):
+        v.append((f"ctrl_{cp:02x}", chr(cp)))
+    for name, s in [("quote", '"'), ("backslash", "\\"), ("slash", "/"), ("euro", "€"),
+                    ("check", "✓"), ("eacute", "é"), ("zhong", "中"), ("emoji", "😀"),
+                    ("mixed", 'a"b\\c/d\te\n€✓中😀')]:
+        v.append((f"str_{name}", s))
+
+    # object key ordering by UTF-16 code units (BMP + astral)
+    v.append(("sort_basic", {"z": 1, "a": 2, "b": 3, "A": 4, "é": 5, "😀": 6, "中": 7}))
+    v.append(("sort_prefix", {"ab": 1, "a": 2, "abc": 3, "": 4}))
+    v.append(("sort_astral_vs_bmp", {"\U0001F600": 1, "￿": 2, "z": 3}))
+
+    # nesting to depth, alternating object/array
+    cur = "leaf"
+    for d in range(1, 13):
+        cur = {"k": cur, "n": d} if d % 2 else [cur, d]
+        v.append((f"nest_{d}", cur))
+
+    # the RFC 8785 Appendix B example (input) — cross-checked Py==Go
+    v.append(("rfc8785_appendix_b", {
+        "numbers": [333333333.33333329, 1e30, 4.50, 2e-3, 0.000000000000000000000000001],
+        "string": "€$\nA'B\"\\\\\"/",
+        "literals": [None, True, False],
+    }))
+
+    # representative real cyberware records (the shapes actually canonicalized)
+    v.append(("rec_done_ledger_entry", {"seq": 1, "ts": "2026-06-13T00:00:00Z", "task_id": "P0-T12",
+                                        "validator": "cws-conform", "verdict": "pass",
+                                        "evidence_sha": "0" * 64, "prev": "0" * 64}))
+    v.append(("rec_plan", {"skill": "cws-conform", "perk": "doclint", "sequence": ["cws_doclint"],
+                           "snippet_shas": {"cws_doclint.py": "ab" * 32}, "skill_sha": "cd" * 32}))
+    return v
+
+
+def main():
+    corpus = [{"name": n, "input": val} for n, val in vectors()]
+    out = os.path.join(HERE, "corpus.json")
+    with open(out, "w") as f:
+        json.dump(corpus, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    print(f"wrote {len(corpus)} vectors → {out}")
+
+
+if __name__ == "__main__":
+    main()
