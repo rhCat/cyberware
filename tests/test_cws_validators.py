@@ -285,6 +285,50 @@ def test_observe_redeem_appends_a_genesis_chained_entry_and_is_idempotent(tmp_pa
     v = {"SWARM_DIR": str(sw), "TASK_ID": "P0-T17", "RUN_LEDGER": str(ev / "run-ledger.json"), "DONE_LEDGER": str(dl)}
     assert _run("cws-observe", "redeem", "cws_observe_redeem", v, store) == 0
     led = json.load(open(dl))
-    assert len(led["entries"]) == 1 and led["entries"][0]["prev"] == "0" * 64
+    # decision-4: redemptions land on a canonical (major-2) chain that opens with a genesis record
+    from infra.cwp import ledger
+    assert led["schema"] == 2
+    g, red = led["entries"]
+    assert g["type"] == "genesis" and g["prev"] == "0" * 64
+    assert red["task_id"] == "P0-T17" and red["verdict"] == "pass"
+    assert red["prev"] == ledger.link_digest(ledger.link_of(g), 2)   # canonical-chained to the genesis
     assert _run("cws-observe", "redeem", "cws_observe_redeem", v, store) == 0   # re-run
-    assert len(json.load(open(dl))["entries"]) == 1, "redeem must be idempotent per task"
+    assert len(json.load(open(dl))["entries"]) == 2, "redeem must be idempotent per task"
+
+
+def test_observe_status_reads_a_valid_v2_chain_across_majors(tmp_path):
+    """status verifies frozen v1 (major 1) AND the canonical v2 chain (major 2) with a correct genesis
+    cross-reference, counting redemptions from both (decision-4: verifiers support majors N and N-1)."""
+    from infra.cwp import ledger
+    sw = tmp_path / "swarm"
+    v1e = {"seq": 1, "ts": "t", "task_id": "P0-T01", "validator": "cws-conform",
+           "verdict": "pass", "evidence_sha": "x", "prev": "0" * 64}
+    _mini_swarm(sw, [("P0-T01", "cws-conform", []), ("P0-T02", "cws-conform", [])], ledger_entries=[v1e])
+    genesis = {"type": "genesis", "schema": 2, "supersedes": "done-ledger", "supersedes_schema": 1,
+               "supersedes_head": ledger.head_of([v1e], 1), "supersedes_count": 1, "prev": "0" * 64}
+    red = {"seq": 2, "ts": "t", "task_id": "P0-T02", "validator": "cws-conform", "verdict": "pass",
+           "evidence_sha": "y", "prev": ledger.link_digest(ledger.link_of(genesis), 2)}
+    (sw / "done-ledger-v2.json").write_text(json.dumps({"chain": "done-ledger-v2", "schema": 2, "entries": [genesis, red]}))
+    store = tmp_path / "out"
+    rc = _run("cws-observe", "status", "cws_observe_status", {"SWARM_DIR": str(sw)}, store)
+    rep = json.load(open(store / "observe.json"))
+    assert rc == 0 and rep["done_ledger_chain"] == "ok"
+    assert rep["by_task"]["P0-T01"] == "redeemed" and rep["by_task"]["P0-T02"] == "redeemed"
+
+
+def test_observe_status_breaks_when_v2_genesis_cross_ref_mismatches_v1(tmp_path):
+    """decision-4 tamper-binding: the v2 genesis must cross-reference frozen v1's EXACT head; a wrong
+    supersedes_head (v1 altered after v2 forked) MUST read as a broken chain."""
+    from infra.cwp import ledger
+    sw = tmp_path / "swarm"
+    v1e = {"seq": 1, "ts": "t", "task_id": "P0-T01", "validator": "cws-conform",
+           "verdict": "pass", "evidence_sha": "x", "prev": "0" * 64}
+    _mini_swarm(sw, [("P0-T01", "cws-conform", []), ("P0-T02", "cws-conform", [])], ledger_entries=[v1e])
+    genesis = {"type": "genesis", "schema": 2, "supersedes_head": "deadbeef", "prev": "0" * 64}   # wrong head
+    red = {"seq": 2, "ts": "t", "task_id": "P0-T02", "validator": "cws-conform", "verdict": "pass",
+           "evidence_sha": "y", "prev": ledger.link_digest(ledger.link_of(genesis), 2)}
+    (sw / "done-ledger-v2.json").write_text(json.dumps({"chain": "done-ledger-v2", "schema": 2, "entries": [genesis, red]}))
+    store = tmp_path / "out"
+    rc = _run("cws-observe", "status", "cws_observe_status", {"SWARM_DIR": str(sw)}, store)
+    rep = json.load(open(store / "observe.json"))
+    assert rep["done_ledger_chain"] == "broken" and rc != 0
