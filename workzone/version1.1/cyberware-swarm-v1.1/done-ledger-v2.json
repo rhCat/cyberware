@@ -1,0 +1,34 @@
+{
+  "chain": "done-ledger-v2",
+  "schema": 2,
+  "entries": [
+    {
+      "type": "genesis",
+      "schema": 2,
+      "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+      "supersedes": "done-ledger",
+      "supersedes_file": "done-ledger.json",
+      "supersedes_schema": 1,
+      "supersedes_head": "ac7d16f1c28ff158528639ca48a7e0b6053b6211747d6e8baaac0e6c6e0f50d1",
+      "supersedes_count": 10
+    },
+    {
+      "seq": 2,
+      "ts": "2026-06-13T22:39:18Z",
+      "task_id": "P0-T04",
+      "validator": "cws-conform",
+      "verdict": "pass",
+      "evidence_sha": "d2fe6fed78aa7fb1371fc33f971cf48432a63faf46bd6702a3c13676446e72a3",
+      "prev": "58f39682708c1ab21c3273cd2b2a84cbd6a9f697f13a24b2f93abd537a53ef68"
+    },
+    {
+      "seq": 3,
+      "ts": "2026-06-13T22:39:18Z",
+      "task_id": "P0-T18",
+      "validator": "cws-conform",
+      "verdict": "pass",
+      "evidence_sha": "3878047ec26246fe3e7fd027b0e072bebc92f04fad1da4fab0ca8946dae5738e",
+      "prev": "b5b955221c78c1549991007bc0c678d32aa677a37988ef61b6f20877bc9b6c2f"
+    }
+  ]
+}
