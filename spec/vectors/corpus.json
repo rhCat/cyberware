@@ -1314,6 +1314,53 @@
     }
   },
   {
+    "name": "rec_plan_full",
+    "input": {
+      "skill": "cws-conform",
+      "perk": "doclint",
+      "sequence": [
+        "cws_doclint"
+      ],
+      "wrapper": "set -e\nstep1() {\n\ttool ${X}\n}\n",
+      "snippet_shas": {
+        "cws_doclint.py": "abababababababababababababababababababababababababababababababab"
+      },
+      "skill_sha": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+    }
+  },
+  {
+    "name": "chip_files_map",
+    "input": {
+      "SKILL.md": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "blueprint.json": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+      "perks.json": "0101010101010101010101010101010101010101010101010101010101010101"
+    }
+  },
+  {
+    "name": "chip_skillsha_map",
+    "input": {
+      "cws-conform": "1111111111111111111111111111111111111111111111111111111111111111",
+      "cws-observe": "2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  },
+  {
+    "name": "chip_skillsha_map_empty",
+    "input": {}
+  },
+  {
+    "name": "rec_ledger_genesis",
+    "input": {
+      "type": "genesis",
+      "schema": 2,
+      "supersedes": "done-ledger",
+      "supersedes_file": "done-ledger.json",
+      "supersedes_schema": 1,
+      "supersedes_head": "0000000000000000000000000000000000000000000000000000000000000000",
+      "supersedes_count": 10,
+      "prev": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  {
     "name": "pub_arrays",
     "input": [
       56,
