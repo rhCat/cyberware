@@ -44,6 +44,7 @@
   .pills{display:flex;gap:5px;flex-wrap:wrap}
   .pill.ok{color:var(--allow);border-color:var(--allow)} .pill.error{color:var(--reject);border-color:var(--reject)}
   .pill.granted{color:var(--accent);border-color:var(--accent)} .pill.pending{opacity:.5}
+  .pill.refused{color:var(--reject);border-color:var(--reject)}
   .tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
   .tool{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel2)}
   .tool .ct{display:flex;gap:10px;margin-top:4px;font-size:11px}
@@ -52,6 +53,14 @@
   .tl div{display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--line);font-size:11px;align-items:baseline}
   .tl .t{color:var(--dim);min-width:62px} .tl .ev{min-width:92px}
   .ev-granted{color:var(--accent)} .ev-step_result{color:var(--allow)} .ev-step_refused{color:var(--reject)}
+  .steps{display:flex;flex-direction:column;gap:10px}
+  .stepblk{border:1px solid var(--line);border-radius:8px;background:var(--panel2);overflow:hidden}
+  .stephd{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line)}
+  .stephd .pill{font-size:10px;border:1px solid var(--line);border-radius:5px;padding:1px 6px;display:inline-block;color:var(--dim)}
+  .stephd .sstate{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim)}
+  .stephd .sstate.ok{color:var(--allow)} .stephd .sstate.error{color:var(--reject)} .stephd .sstate.granted{color:var(--accent)} .stephd .sstate.refused{color:var(--reject)}
+  .stepblk .tl{padding:2px 10px} .stepblk .tl div:last-child{border-bottom:0}
+  .stepblk .note{color:var(--dim);padding:6px 0;font-size:11px}
   pre{margin:0;padding:10px 13px;background:var(--panel2);border-radius:8px;max-height:240px;overflow:auto;font-size:11px;color:var(--dim);white-space:pre-wrap;word-break:break-word}
   .empty{color:var(--dim);padding:18px;text-align:center}
   .ask{padding:40px;text-align:center;color:var(--dim)}
@@ -91,10 +100,11 @@ function badge(d){ return el("span","badge "+(DEC[d]||""), d||"?"); }
 function fmt(ts){ if(!ts) return "-"; const m=String(ts).match(/T(\d\d:\d\d:\d\d)/); return m?m[1]:ts; }
 function stepStates(seq, events){
   seq = seq||[]; events = events||[];
-  const res={}, granted=new Set();
-  for(const e of events){ if(e.type==="step_result") res[e.step]=e; if(e.type==="granted") granted.add(e.step); }
+  const res={}, granted=new Set(), refused=new Set();
+  for(const e of events){ if(e.type==="step_result") res[e.step]=e; if(e.type==="granted") granted.add(e.step); if(e.type==="step_refused") refused.add(e.step); }
   return seq.map((tool,i)=>{ const n=i+1, r=res[String(n)];
-    const st = r ? (r.status==="ok"?"ok":"error") : (granted.has(String(n))?"granted":"pending");
+    const st = r ? (r.status==="ok"?"ok":"error")
+             : refused.has(String(n)) ? "refused" : granted.has(String(n)) ? "granted" : "pending";
     return {n, tool, state:st}; });
 }
 
@@ -211,14 +221,35 @@ function detailView(main){
 }
 
 function runTab(panel, d){
-  const steps=stepStates(d.seq, d.events);
-  if(steps.length){ const ss=sect("Steps"); const p=el("div","pills"); for(const st of steps) p.appendChild(el("span","pill "+st.state, st.n+"·"+st.tool)); ss.b.appendChild(p); panel.appendChild(ss.s); }
-  const tlS=sect("Event timeline"); const tl=el("div","tl");
-  for(const e of (d.events||[])){ const row2=el("div"); row2.appendChild(el("span","t",fmt(e.ts))); row2.appendChild(el("span","ev ev-"+e.type,e.type));
-    let txt="step "+e.step; if(e.type==="step_result")txt+=" · "+(e.status||"")+" (exit "+e.exit+")"; if(e.type==="step_refused")txt+=" · "+(e.reason||""); if(e.type==="granted")txt+=" · plan "+String(e.plan_sha||"").slice(0,12);
-    row2.appendChild(el("span",null,txt)); tl.appendChild(row2); }
-  if(!(d.events||[]).length) tlS.b.appendChild(el("div","empty","no events recorded for this run")); else tlS.b.appendChild(tl);
-  panel.appendChild(tlS.s);
+  // Per-step log view: group every recorded event under the step it belongs to, so each step shows its
+  // own log (grant → result/refusal). These are the value-free provenance lines govd holds — status, exit,
+  // plan hash, refusal reason/diff — NEVER command output (the value-free boundary, govd.py step_result).
+  const seq=d.seq||[], events=d.events||[];
+  const ss=sect("Steps & logs");
+  if(!seq.length && !events.length){ ss.b.appendChild(el("div","empty","no steps recorded for this run")); panel.appendChild(ss.s); return; }
+  const byStep={};
+  for(const e of events){ const k=e.step!=null?String(e.step):"?"; (byStep[k]=byStep[k]||[]).push(e); }
+  const detail=e=>{
+    if(e.type==="granted") return "plan "+String(e.plan_sha||"").slice(0,12);
+    if(e.type==="step_result") return (e.status||"")+" (exit "+e.exit+")";
+    if(e.type==="step_refused"){ let t=e.reason||""; if(e.diff_lines!=null) t+=" · "+e.diff_lines+" diff lines"; return t; }
+    return "";
+  };
+  const block=(n,tool,st,evs)=>{
+    const blk=el("div","stepblk"), head=el("div","stephd");
+    head.appendChild(el("span","pill "+(st||"pending"), (n!=null?n+"·":"")+(tool||"?")));
+    if(st) head.appendChild(el("span","sstate "+st, st));
+    blk.appendChild(head);
+    const tl=el("div","tl"); evs=(evs||[]).slice().sort((a,b)=>String(a.ts).localeCompare(String(b.ts)));
+    for(const e of evs){ const row=el("div"); row.appendChild(el("span","t",fmt(e.ts)));
+      row.appendChild(el("span","ev ev-"+e.type,e.type)); row.appendChild(el("span",null,detail(e))); tl.appendChild(row); }
+    if(!evs.length) tl.appendChild(el("div","note","awaiting grant / result"));
+    blk.appendChild(tl); return blk;
+  };
+  const list=el("div","steps"), states=stepStates(seq, events), inSeq=new Set();
+  for(const s of states){ inSeq.add(String(s.n)); list.appendChild(block(s.n, s.tool, s.state, byStep[String(s.n)])); }
+  for(const k of Object.keys(byStep)){ if(!inSeq.has(k)) list.appendChild(block(k==="?"?null:k, null, null, byStep[k])); }
+  ss.b.appendChild(list); panel.appendChild(ss.s);
 }
 
 function flowTab(panel, d){
