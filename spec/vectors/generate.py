@@ -82,13 +82,27 @@ def vectors():
     return v
 
 
+def published():
+    """The cyberphone/json-canonicalization reference vectors (external truth): each carries its
+    published canonical `expected` output, which cws-conform/vectors verifies byte-for-byte (P0-T02)."""
+    pub = os.path.join(HERE, "published")
+    out = []
+    idir = os.path.join(pub, "input")
+    if os.path.isdir(idir):
+        for fn in sorted(os.listdir(idir)):
+            inp = json.load(open(os.path.join(idir, fn)))
+            exp = open(os.path.join(pub, "output", fn), encoding="utf-8").read().rstrip("\n")
+            out.append({"name": f"pub_{fn[:-5]}", "input": inp, "expected": exp})
+    return out
+
+
 def main():
-    corpus = [{"name": n, "input": val} for n, val in vectors()]
+    corpus = [{"name": n, "input": val} for n, val in vectors()] + published()
     out = os.path.join(HERE, "corpus.json")
     with open(out, "w") as f:
         json.dump(corpus, f, ensure_ascii=False, indent=2)
         f.write("\n")
-    print(f"wrote {len(corpus)} vectors → {out}")
+    print(f"wrote {len(corpus)} vectors ({sum('expected' in v for v in corpus)} with published expected) → {out}")
 
 
 if __name__ == "__main__":
