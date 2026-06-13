@@ -1,0 +1,40 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P3-T08",
+  "task_hash": "b11628b23ee3",
+  "title": "Author alchemy skill (extract, conserve, classify, concord) \u2014 the ancestor (T24/T25)",
+  "phase": "P3",
+  "ladder_rung": "SV-4",
+  "kind": "skill",
+  "effort": "XL",
+  "parallel_group": "p3-alchemy",
+  "depends_on": [],
+  "executor": "external-anchor",
+  "validated_by": "alchemy",
+  "bootstrap_exempt": true,
+  "validation_available_after": null,
+  "skill": null,
+  "perk": null,
+  "record_store": "<abs dir for P3-T08 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "skillChip/alchemy/ \u2014 wraps pinned alembic + putrefactio in file-mode (no warehouse dep on the chip path); perks extract/conserve/classify/concord",
+  "satisfies_criteria": [
+    "F9",
+    "M11",
+    "P3-V15",
+    "P3-V16"
+  ],
+  "acceptance": {
+    "extract": "L++ emitted per snippet core",
+    "conserve": {
+      "unexplained_defects": 0
+    },
+    "classify": {
+      "unnamed": 0
+    },
+    "concord": "extracted CFG structurally contained in declared blueprint; diff stored",
+    "pinned": "alembic+putrefactio+laws commits in deps.lock"
+  },
+  "status": "todo",
+  "assignee": null
+}

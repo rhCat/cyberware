@@ -1,0 +1,31 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P0-T12",
+  "task_hash": "a4ad53339194",
+  "title": "Write spec/inflight.md (M9: the five decided sentences)",
+  "phase": "P0",
+  "ladder_rung": "SV-1",
+  "kind": "spec",
+  "effort": "S",
+  "parallel_group": "p0-spec",
+  "depends_on": [],
+  "executor": "human-authoring",
+  "validated_by": "cws-conform",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P0-T17",
+  "skill": "cws-conform",
+  "perk": null,
+  "record_store": "<abs dir for P0-T12 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "spec/inflight.md \u2014 revocation-mid-run, cancel, metered-escrow funds cap, schema evolution, WS resume",
+  "satisfies_criteria": [
+    "M9"
+  ],
+  "acceptance": {
+    "exists": "spec/inflight.md",
+    "count": "exactly 5 decided transitions",
+    "each": "one normative sentence with the chosen behavior"
+  },
+  "status": "todo",
+  "assignee": null
+}

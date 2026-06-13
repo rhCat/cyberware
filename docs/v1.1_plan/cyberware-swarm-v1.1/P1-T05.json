@@ -1,0 +1,32 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P1-T05",
+  "task_hash": "08e19d5438a8",
+  "title": "Per-step snippet verification at instant of execution",
+  "phase": "P1",
+  "ladder_rung": "SV-2",
+  "kind": "build",
+  "effort": "M",
+  "parallel_group": "p1",
+  "depends_on": [
+    "P0-T02"
+  ],
+  "executor": "governed-channel",
+  "validated_by": "cws-ledgercheck",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P1-T09",
+  "skill": "cws-ledgercheck",
+  "perk": null,
+  "record_store": "<abs dir for P1-T05 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "executor verifies each snippet sha256 against index.json immediately before that step (closes F3 + TOCTOU)",
+  "satisfies_criteria": [
+    "F3",
+    "P1-V05"
+  ],
+  "acceptance": {
+    "post_bless_mutation": "refuses exactly the affected step with expected-vs-found digests"
+  },
+  "status": "todo",
+  "assignee": null
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P0-T03",
+  "task_hash": "76defa223742",
+  "title": "Implement sign.py (Ed25519 + DSSE PAE)",
+  "phase": "P0",
+  "ladder_rung": "SV-1",
+  "kind": "build",
+  "effort": "M",
+  "parallel_group": "p0-core",
+  "depends_on": [
+    "P0-T02"
+  ],
+  "executor": "local-code",
+  "validated_by": "cws-conform",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P0-T17",
+  "skill": "cws-conform",
+  "perk": null,
+  "record_store": "<abs dir for P0-T03 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "infra/cwp/sign.py \u2014 sign()/verify(), DSSE v1.0 envelopes, key-id indirection",
+  "satisfies_criteria": [
+    "F1",
+    "P0-V05"
+  ],
+  "acceptance": {
+    "exists": "infra/cwp/sign.py",
+    "interop": "cosign-generated DSSE verifies in cwp.verify and vice versa"
+  },
+  "status": "todo",
+  "assignee": null
+}

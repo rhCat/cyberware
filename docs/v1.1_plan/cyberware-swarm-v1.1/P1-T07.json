@@ -1,0 +1,33 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P1-T07",
+  "task_hash": "93ea37317f37",
+  "title": "Crypto-shredding fields in records (M5)",
+  "phase": "P1",
+  "ladder_rung": "SV-2",
+  "kind": "build",
+  "effort": "M",
+  "parallel_group": "p1-ledger",
+  "depends_on": [
+    "P1-T01",
+    "P0-T10"
+  ],
+  "executor": "governed-channel",
+  "validated_by": "cws-ledgercheck",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P1-T09",
+  "skill": "cws-ledgercheck",
+  "perk": null,
+  "record_store": "<abs dir for P1-T07 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "subject-DEK ciphertext for personal fields; chain hashes ciphertext; erasure = DEK destruction",
+  "satisfies_criteria": [
+    "M5",
+    "P1-V13"
+  ],
+  "acceptance": {
+    "erasure_drill": "destroy DEK \u2192 chain still verifies; subject fields unrecoverable; other queries unaffected"
+  },
+  "status": "todo",
+  "assignee": null
+}

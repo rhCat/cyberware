@@ -1,0 +1,33 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P2-T07",
+  "task_hash": "b00befa84925",
+  "title": "exod-attested meters + proto-receipts (Phase-6 meter dry-run)",
+  "phase": "P2",
+  "ladder_rung": "SV-3",
+  "kind": "build",
+  "effort": "M",
+  "parallel_group": "p2-exod",
+  "depends_on": [
+    "P2-T02"
+  ],
+  "executor": "governed-channel",
+  "validated_by": "cws-bench",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P2-T08",
+  "skill": "cws-bench",
+  "perk": null,
+  "record_store": "<abs dir for P2-T07 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "exod signs proto-receipts carrying attested meters (wall, bytes, provider-usage where applicable)",
+  "satisfies_criteria": [
+    "P2-V07",
+    "P2-V09"
+  ],
+  "acceptance": {
+    "meters_attested": "originate from exod, never the agent",
+    "first_attested_meter_artifact": true
+  },
+  "status": "todo",
+  "assignee": null
+}

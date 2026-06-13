@@ -1,0 +1,36 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P0-T17",
+  "task_hash": "120660071af9",
+  "title": "Author cws-conform skill (vectors, crosslang perks)",
+  "phase": "P0",
+  "ladder_rung": "SV-1",
+  "kind": "skill",
+  "effort": "M",
+  "parallel_group": "p0-core",
+  "depends_on": [
+    "P0-T07",
+    "P0-T08"
+  ],
+  "executor": "external-anchor",
+  "validated_by": "cws-conform",
+  "bootstrap_exempt": true,
+  "validation_available_after": null,
+  "skill": null,
+  "perk": null,
+  "record_store": "<abs dir for P0-T17 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "skillChip/cws-conform/ \u2014 perks: vectors (replay+verdict json), crosslang (drive Go verifier, diff)",
+  "satisfies_criteria": [
+    "P0-V06"
+  ],
+  "acceptance": {
+    "governed_run": "conformance verdict produced through the executor",
+    "json": {
+      "failed": 0,
+      "total": ">=250"
+    }
+  },
+  "status": "todo",
+  "assignee": null
+}

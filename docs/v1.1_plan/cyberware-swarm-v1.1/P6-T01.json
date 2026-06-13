@@ -1,0 +1,29 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P6-T01",
+  "task_hash": "189db1d621ff",
+  "title": "Money type (stdlib decimal scale-4 HALF_EVEN, float-ban lint) (T20)",
+  "phase": "P6",
+  "ladder_rung": "SV-6",
+  "kind": "build",
+  "effort": "S",
+  "parallel_group": "p6-settle",
+  "depends_on": [],
+  "executor": "governed-channel",
+  "validated_by": "cws-settle-sim",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P6-T09",
+  "skill": "cws-settle-sim",
+  "perk": null,
+  "record_store": "<abs dir for P6-T01 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "infra/settle/money.py \u2014 decimal scale 4, ROUND_HALF_EVEN, explicit context; AST lint bans binary floats on money paths",
+  "satisfies_criteria": [
+    "P6-V03"
+  ],
+  "acceptance": {
+    "float_ban": "no binary float touches money paths (AST lint, 0 occurrences)"
+  },
+  "status": "todo",
+  "assignee": null
+}

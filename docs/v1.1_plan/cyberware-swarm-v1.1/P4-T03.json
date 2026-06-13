@@ -1,0 +1,36 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P4-T03",
+  "task_hash": "ef4465df9b90",
+  "title": "Workflow algebra: seq/par/choice/saga \u2192 product automaton",
+  "phase": "P4",
+  "ladder_rung": "SV-5",
+  "kind": "build",
+  "effort": "L",
+  "parallel_group": "p4-modelcheck",
+  "depends_on": [
+    "P4-T02"
+  ],
+  "executor": "governed-channel",
+  "validated_by": "cws-modelcheck",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P4-T08",
+  "skill": "cws-modelcheck",
+  "perk": null,
+  "record_store": "<abs dir for P4-T03 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "workflow.json composes nodes; composer builds bounded-counter product automaton; workflow_sha over child plan_shas",
+  "satisfies_criteria": [
+    "F8",
+    "P4-V05"
+  ],
+  "acceptance": {
+    "budgets": {
+      "states": "<=5e6",
+      "tlc_wall_s": "<=120"
+    },
+    "bounded_counters": "retry budgets keep state finite"
+  },
+  "status": "todo",
+  "assignee": null
+}

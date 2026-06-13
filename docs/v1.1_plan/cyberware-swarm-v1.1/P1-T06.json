@@ -1,0 +1,31 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P1-T06",
+  "task_hash": "c22e5d6589ba",
+  "title": "Plan as sole source of step truth (delete --list execution)",
+  "phase": "P1",
+  "ladder_rung": "SV-2",
+  "kind": "build",
+  "effort": "S",
+  "parallel_group": "p1",
+  "depends_on": [],
+  "executor": "governed-channel",
+  "validated_by": "cws-ledgercheck",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P1-T09",
+  "skill": "cws-ledgercheck",
+  "perk": null,
+  "record_store": "<abs dir for P1-T06 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "step enumeration from blessed plan / compile metadata; remove bash script --list execution (closes F4)",
+  "satisfies_criteria": [
+    "F4",
+    "P1-V06"
+  ],
+  "acceptance": {
+    "no_artifact_exec_outside_grant": true,
+    "list_absent_from_tree": true
+  },
+  "status": "todo",
+  "assignee": null
+}
