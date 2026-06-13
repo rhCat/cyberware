@@ -395,3 +395,46 @@ def test_port_rotation_skips_occupied():
         if httpd:
             httpd.server_close()
         busy.close()
+
+
+# ── event-logic gates (added to kill the cws-mutate survivors in ran_ok/steps_seen/monitor_snapshot:
+#    the first self-monitored improvement — the platform graded itself and these pin what it found unpinned) ──
+
+def test_ran_ok_counts_only_ok_step_results(tmp_path):
+    """ran_ok feeds the upstream gate (a step can't run until predecessors ran ok). Pin BOTH its
+    filters — `type == step_result` AND `status == ok` — so neither comparison can be flipped silently."""
+    st = govd.Store(str(tmp_path / "s"))
+    st.create("r", {"run_id": "r", "events": []})
+    st.append("r", {"type": "step_result", "step": "1", "status": "ok"})
+    st.append("r", {"type": "step_result", "step": "2", "status": "error"})    # wrong status → excluded
+    st.append("r", {"type": "granted", "step": "3"})                            # wrong type → excluded
+    st.append("r", {"type": "step_result", "step": "4", "status": "ok"})
+    assert st.ran_ok("r") == {"1", "4"}
+
+
+def test_steps_seen_splits_granted_from_recorded(tmp_path):
+    """steps_seen binds a step_result to a prior grant — pin that `granted` and `step_result` are
+    classified by their exact event type."""
+    st = govd.Store(str(tmp_path / "s"))
+    st.create("r", {"run_id": "r", "events": []})
+    st.append("r", {"type": "granted", "step": "1"})
+    st.append("r", {"type": "granted", "step": "2"})
+    st.append("r", {"type": "step_result", "step": "1", "status": "ok"})
+    granted, done = st.steps_seen("r")
+    assert granted == {"1", "2"} and done == {"1"}
+
+
+def test_monitor_snapshot_classifies_each_step_state(tmp_path):
+    """The dashboard's per-step ok/error/granted/pending classification — pin it so the state
+    comparisons (and the granted-set membership) can't be flipped without a test noticing."""
+    st = govd.Store(str(tmp_path / "s"))
+    st.create("r", {"run_id": "r", "ts": "t", "skill": "sk", "perk": "pk", "seq": ["a", "b", "c", "d"], "events": []})
+    st.append("r", {"type": "step_result", "step": "1", "status": "ok"})
+    st.append("r", {"type": "step_result", "step": "2", "status": "error"})
+    st.append("r", {"type": "granted", "step": "3"})
+    snap = st.monitor_snapshot()
+    run = next(rv for rv in snap["runs"] if rv["run_id"] == "r")
+    assert {s["n"]: s["state"] for s in run["steps"]} == {1: "ok", 2: "error", 3: "granted", 4: "pending"}
+    assert snap["tools"]["a"]["ok"] == 1
+    assert snap["tools"]["b"]["error"] == 1
+    assert snap["tools"]["c"]["granted"] == 1
