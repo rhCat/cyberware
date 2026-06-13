@@ -1,0 +1,3 @@
+# cyberware runtime/conformance dependencies. The engine core is stdlib; this is the crypto seam.
+# Pinned-by-lockfile (deps.lock.json + SBOM + osv) is P0-T14; this file is the minimal declared set.
+cryptography>=3.4
