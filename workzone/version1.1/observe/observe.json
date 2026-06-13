@@ -1,22 +1,24 @@
 {
-  "swarm_dir": "/Users/ruihe/hunyuan/cyberware/docs/v1.1_plan/cyberware-swarm-v1.1",
+  "swarm_dir": "/Users/ruihe/hunyuan/cyberware/workzone/version1.1/cyberware-swarm-v1.1",
   "total": 90,
   "done_ledger_chain": "ok",
   "counts": {
-    "redeemed": 4,
-    "ready": 8,
-    "blocked:deps": 26,
+    "redeemed": 6,
+    "ready": 10,
+    "blocked:deps": 22,
     "blocked:validator": 52
   },
   "next_pullable": [
-    "P0-T01",
     "P0-T02",
-    "P0-T06",
+    "P0-T05",
     "P0-T13",
     "P0-T14",
     "P0-T15",
+    "P0-T16",
     "P1-T06",
-    "P1-T08"
+    "P1-T08",
+    "P4-T01",
+    "P4-T02"
   ],
   "validators_available": [
     "cws-conform",
@@ -103,7 +105,7 @@
         "P4-T09"
       ],
       "closure": 8,
-      "redeemed": 0,
+      "redeemed": 1,
       "gate_redeemed": false,
       "closed": false,
       "promise": "Composed workflows \u2014 and the settlement lifecycle itself \u2014 are proven free of deadlock and conservation violation BEFORE they run, across three independent checkers."
@@ -122,12 +124,12 @@
     }
   ],
   "by_task": {
-    "P0-T01": "ready",
+    "P0-T01": "redeemed",
     "P0-T02": "ready",
     "P0-T03": "blocked:deps",
     "P0-T04": "blocked:deps",
-    "P0-T05": "blocked:deps",
-    "P0-T06": "ready",
+    "P0-T05": "ready",
+    "P0-T06": "redeemed",
     "P0-T07": "blocked:deps",
     "P0-T08": "blocked:deps",
     "P0-T09": "redeemed",
@@ -137,7 +139,7 @@
     "P0-T13": "ready",
     "P0-T14": "ready",
     "P0-T15": "ready",
-    "P0-T16": "blocked:deps",
+    "P0-T16": "ready",
     "P0-T17": "blocked:deps",
     "P0-T18": "blocked:deps",
     "P1-T01": "blocked:deps",
@@ -177,8 +179,8 @@
     "P3-T14": "blocked:validator",
     "P3-T15": "blocked:validator",
     "P3-T16": "blocked:validator",
-    "P4-T01": "blocked:deps",
-    "P4-T02": "blocked:deps",
+    "P4-T01": "ready",
+    "P4-T02": "ready",
     "P4-T03": "blocked:deps",
     "P4-T04": "blocked:deps",
     "P4-T05": "blocked:deps",
