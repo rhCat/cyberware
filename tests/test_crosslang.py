@@ -19,6 +19,14 @@ from infra.cwp import canonical as c
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GO_DIR = os.path.join(ROOT, "verifiers", "go")
 CORPUS = os.path.join(ROOT, "spec", "vectors", "corpus.json")
+SIG_CORPUS = os.path.join(ROOT, "spec", "vectors", "signatures.json")
+
+
+def _build_go():
+    binp = os.path.join(tempfile.mkdtemp(prefix="jcs-"), "jcs-verify")
+    b = subprocess.run(["go", "build", "-o", binp, "."], cwd=GO_DIR, capture_output=True, text=True)
+    assert b.returncode == 0, f"go build failed:\n{b.stderr}"
+    return binp
 
 # Known-correct outputs (external truth), hand-verified — so the anchor is not merely "two impls agree"
 # but "both match the spec's prescribed bytes".
@@ -74,3 +82,27 @@ def test_go_verifier_matches_known_external_outputs():
     results = {r["name"]: r["canonical"] for r in json.loads(run.stdout)}
     for i, (_, want) in enumerate(EXTERNAL_TRUTH):
         assert results[f"ext_{i}"] == want, f"Go ext_{i}: {results[f'ext_{i}']!r} != {want!r}"
+
+
+@pytest.mark.skipif(shutil.which("go") is None, reason="go toolchain absent")
+def test_go_verifier_reproduces_dsse_sig_verdicts():
+    """The sig-verdict half of the anchor: a DSSE/Ed25519 signature produced by infra/cwp/sign.py must
+    verify identically in the independent Go implementation (Ed25519 is deterministic), and both must
+    agree with each vector's declared verdict — including the tampered + wrong-key negatives."""
+    pytest.importorskip("cryptography")
+    import base64
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    from infra.cwp import sign
+
+    vectors = json.load(open(SIG_CORPUS))
+    binp = _build_go()
+    run = subprocess.run([binp, "sig"], stdin=open(SIG_CORPUS), capture_output=True, text=True)
+    assert run.returncode == 0, f"go sig verify failed:\n{run.stderr}"
+    go = {r["name"]: r["valid"] for r in json.loads(run.stdout)}
+
+    assert any(v["expect_valid"] for v in vectors) and any(not v["expect_valid"] for v in vectors)
+    for v in vectors:
+        name, want = v["name"], v["expect_valid"]
+        pub = Ed25519PublicKey.from_public_bytes(base64.b64decode(v["pubkey"]))
+        assert sign.verify(v["envelope"], pub) == want, f"py verdict {name}"   # Python agrees with the vector
+        assert go[name] == want, f"go verdict {name}: {go[name]} != {want}"     # Go agrees with the vector (and Python)
