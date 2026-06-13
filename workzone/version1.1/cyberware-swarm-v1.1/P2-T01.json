@@ -1,0 +1,36 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P2-T01",
+  "task_hash": "5e7addbedf72",
+  "title": "Signed grants (Ed25519-DSSE, skew, nonce, reserved quote_sha)",
+  "phase": "P2",
+  "ladder_rung": "SV-3",
+  "kind": "build",
+  "effort": "M",
+  "parallel_group": "p2-core",
+  "depends_on": [
+    "P0-T03",
+    "P0-T11"
+  ],
+  "executor": "governed-channel",
+  "validated_by": "cws-redteam",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P2-T08",
+  "skill": "cws-redteam",
+  "perk": null,
+  "record_store": "<abs dir for P2-T01 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "govd issues signed grant {run_id, plan_sha, snippet_shas, capabilities, credentials, nbf, exp, nonce}; \u00b160s skew; monotonic nonce cache",
+  "satisfies_criteria": [
+    "F6",
+    "P2-V04"
+  ],
+  "acceptance": {
+    "replay_refused": true,
+    "expired_refused": true,
+    "skew_honored": "\u00b160s boundaries",
+    "verifiable_offline": true
+  },
+  "status": "todo",
+  "assignee": null
+}

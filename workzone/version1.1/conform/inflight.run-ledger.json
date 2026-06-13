@@ -1,0 +1,14 @@
+{
+  "script": "run.sh",
+  "runs": [
+    {
+      "ts": "2026-06-13T12:54:30Z",
+      "step": "1",
+      "status": "ok",
+      "exit": 0,
+      "seconds": 0.04,
+      "stdout_sha": "dce34796277d6907",
+      "stdout_tail": "{\"tool\": \"cws_doclint\", \"status\": \"ok\", \"normative\": 11, \"problems\": 0, \"report\": \"/var/folders/0_/2nfzd8lx4q39l8tqz34tzvh40000gn/T/wz-cws-conform-doclint-4xemgxgd/doclint.json\"}"
+    }
+  ]
+}

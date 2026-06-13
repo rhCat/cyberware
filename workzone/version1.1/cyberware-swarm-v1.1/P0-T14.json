@@ -1,0 +1,31 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P0-T14",
+  "task_hash": "0a8d8227d0bc",
+  "title": "deps.lock.json + SBOM + osv-scanner gate (R1/T23)",
+  "phase": "P0",
+  "ladder_rung": "-",
+  "kind": "infra",
+  "effort": "S",
+  "parallel_group": "p0-infra",
+  "depends_on": [],
+  "executor": "local-code",
+  "validated_by": "cws-conform",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P0-T17",
+  "skill": "cws-conform",
+  "perk": null,
+  "record_store": "<abs dir for P0-T14 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "deps.lock.json (every runtime dep hash-pinned) + CycloneDX SBOM + osv-scanner CI gate",
+  "satisfies_criteria": [
+    "P0-V09"
+  ],
+  "acceptance": {
+    "unpinned_imports": 0,
+    "sbom_emitted": true,
+    "osv": "clean or waivered on record"
+  },
+  "status": "todo",
+  "assignee": null
+}

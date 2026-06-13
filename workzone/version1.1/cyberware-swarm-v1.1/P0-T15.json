@@ -1,0 +1,33 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P0-T15",
+  "task_hash": "242b96c31928",
+  "title": "KeyStore adapter seam (file + PKCS#11 stub, R2)",
+  "phase": "P0",
+  "ladder_rung": "SV-1",
+  "kind": "build",
+  "effort": "S",
+  "parallel_group": "p0-core",
+  "depends_on": [
+    "P0-T09"
+  ],
+  "executor": "local-code",
+  "validated_by": "cws-conform",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P0-T17",
+  "skill": "cws-conform",
+  "perk": null,
+  "record_store": "<abs dir for P0-T15 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "infra/cwp/keystore.py \u2014 file backend + PKCS#11 stub, one contract suite (T29)",
+  "satisfies_criteria": [
+    "M2",
+    "P0-V12"
+  ],
+  "acceptance": {
+    "both_backends_pass": "one contract suite",
+    "seam_real": true
+  },
+  "status": "todo",
+  "assignee": null
+}

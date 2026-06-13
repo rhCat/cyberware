@@ -1,0 +1,32 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P6-T20",
+  "task_hash": "d8dfa0cc5e60",
+  "title": "Self-bounty: cyberware's security program through its own ledger (M12 roadmap)",
+  "phase": "P6",
+  "ladder_rung": "SV-6",
+  "kind": "drill",
+  "effort": "M",
+  "parallel_group": "p6-ledger",
+  "depends_on": [
+    "P6-T05",
+    "P3-T16"
+  ],
+  "executor": "governed-channel",
+  "validated_by": "cws-settle-sim",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P6-T09",
+  "skill": "cws-settle-sim",
+  "perk": null,
+  "record_store": "<abs dir for P6-T20 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "vulnerabilities = bounty tasks; disclosure = the validated deliverable; payment flows through the reward ledger (adversarial dogfooding)",
+  "satisfies_criteria": [
+    "M12"
+  ],
+  "acceptance": {
+    "first_external_program": "the economy's first outside users are paid to break it"
+  },
+  "status": "todo",
+  "assignee": null
+}

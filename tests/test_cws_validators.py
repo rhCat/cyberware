@@ -169,3 +169,107 @@ def test_conform_repin_flags_pre_existing_drift(tmp_path):
     assert report and report["status"] == "drift"
     assert report["drift_count"] >= 1
     assert any(d["skill"] == "demoskill" for d in report["pre_drift"])
+
+
+def test_doclint_rejects_a_non_normative_or_off_topic_spec(tmp_path):
+    """doclint must DISCRIMINATE: a doc that decides nothing (no RFC-2119 keyword) or omits a required
+    topic fails. A core that always reports ok would pass the happy self-test but fail here."""
+    core = _core("cws-conform", "doclint", "cws_doclint")
+
+    def lint(text, store, **extra):
+        spec = tmp_path / f"{store}.md"
+        spec.write_text(text)
+        sdir = tmp_path / store
+        env = {**os.environ, "SPEC": str(spec), "RECORD_STORE": str(sdir), **extra}
+        rc = subprocess.run([sys.executable, core], env=env, capture_output=True, text=True, cwd=ROOT).returncode
+        return rc, json.load(open(sdir / "doclint.json"))
+
+    rc, rep = lint("# Title\n\nThis says nothing binding.\n", "weak", MIN_NORMATIVE="1")
+    assert rc != 0 and rep["status"] == "fail" and rep["normative_count"] == 0
+
+    rc, rep = lint("# Title\n\nA grant MUST carry a key-id.\n", "offtopic", REQUIRE="rotation")
+    assert rc != 0 and "rotation" in str(rep["missing_required"])
+
+
+# ── cws-observe ──────────────────────────────────────────────────────────────────────────────────
+
+def _run(skill, perk, mod, vars_, store):
+    """Run a perk core to a persistent store (so the test can inspect the files it wrote)."""
+    env = {**os.environ, "RECORD_STORE": str(store), "CYBERWARE_ROOT": ROOT, **vars_}
+    return subprocess.run([sys.executable, _core(skill, perk, mod)], env=env,
+                          capture_output=True, text=True, cwd=ROOT).returncode
+
+
+def _mini_swarm(d, tasks, ledger_entries=None):
+    """tasks = [(task_id, validated_by, depends_on)]; optional done-ledger entries."""
+    d.mkdir(parents=True, exist_ok=True)
+    for tid, vby, deps in tasks:
+        (d / f"{tid}.json").write_text(json.dumps({"task_id": tid, "validated_by": vby, "depends_on": deps}))
+    (d / "_swarm_manifest.json").write_text(json.dumps({"milestones": []}))
+    if ledger_entries is not None:
+        (d / "done-ledger.json").write_text(json.dumps({"chain": "done-ledger", "entries": ledger_entries}))
+
+
+def test_observe_status_flags_a_broken_done_ledger_chain(tmp_path):
+    sw = tmp_path / "swarm"
+    tampered = {"seq": 1, "ts": "t", "task_id": "P0-T01", "validator": "cws-conform",
+                "verdict": "pass", "evidence_sha": "x", "prev": "deadbeef"}   # prev != genesis
+    _mini_swarm(sw, [("P0-T01", "cws-conform", [])], ledger_entries=[tampered])
+    store = tmp_path / "out"
+    rc = _run("cws-observe", "status", "cws_observe_status", {"SWARM_DIR": str(sw)}, store)
+    rep = json.load(open(store / "observe.json"))
+    assert rep["done_ledger_chain"] == "broken" and rc != 0
+
+
+def test_observe_status_blocks_a_task_whose_dep_is_not_redeemed(tmp_path):
+    sw = tmp_path / "swarm"
+    _mini_swarm(sw, [("P0-T01", "cws-conform", []), ("P0-T02", "cws-modelcheck", ["P0-T01"])], ledger_entries=[])
+    store = tmp_path / "out"
+    rc = _run("cws-observe", "status", "cws_observe_status", {"SWARM_DIR": str(sw)}, store)
+    rep = json.load(open(store / "observe.json"))
+    assert rc == 0
+    assert rep["by_task"]["P0-T01"] == "ready"            # validator built, no deps
+    assert rep["by_task"]["P0-T02"] == "blocked:deps"     # its dep is not redeemed
+
+
+def test_observe_redeem_refuses_failing_evidence(tmp_path):
+    sw = tmp_path / "swarm"; _mini_swarm(sw, [("P0-T17", "cws-conform", [])])
+    ev = tmp_path / "ev"; ev.mkdir()
+    (ev / "run-ledger.json").write_text(json.dumps(
+        {"script": "run.sh", "runs": [{"ts": "t", "step": "1", "status": "error", "exit": 1}]}))
+    store, dl = tmp_path / "out", tmp_path / "done.json"
+    rc = _run("cws-observe", "redeem", "cws_observe_redeem",
+              {"SWARM_DIR": str(sw), "TASK_ID": "P0-T17", "RUN_LEDGER": str(ev / "run-ledger.json"),
+               "DONE_LEDGER": str(dl)}, store)
+    rep = json.load(open(store / "redeem.json"))
+    assert rc != 0 and rep["verdict"] == "refused"
+    assert not dl.exists(), "a refused redemption must not write a done-ledger entry"
+
+
+def test_observe_redeem_refuses_evidence_from_the_wrong_validator(tmp_path):
+    sw = tmp_path / "swarm"; _mini_swarm(sw, [("P0-T17", "cws-conform", [])])
+    ev = tmp_path / "ev"; ev.mkdir()
+    (ev / "run-ledger.json").write_text(json.dumps(
+        {"script": "run.sh", "runs": [{"ts": "t", "step": "1", "status": "ok", "exit": 0, "stdout_sha": "a"}]}))
+    (ev / "task-ledger.json").write_text(json.dumps({"skill": "cws-modelcheck", "perk": "check"}))
+    store, dl = tmp_path / "out", tmp_path / "done.json"
+    rc = _run("cws-observe", "redeem", "cws_observe_redeem",
+              {"SWARM_DIR": str(sw), "TASK_ID": "P0-T17", "RUN_LEDGER": str(ev / "run-ledger.json"),
+               "DONE_LEDGER": str(dl)}, store)
+    rep = json.load(open(store / "redeem.json"))
+    assert rc != 0 and rep["verdict"] == "refused" and "cws-modelcheck" in rep["reason"]
+
+
+def test_observe_redeem_appends_a_genesis_chained_entry_and_is_idempotent(tmp_path):
+    sw = tmp_path / "swarm"; _mini_swarm(sw, [("P0-T17", "cws-conform", [])])
+    ev = tmp_path / "ev"; ev.mkdir()
+    (ev / "run-ledger.json").write_text(json.dumps(
+        {"script": "run.sh", "runs": [{"ts": "t", "step": "1", "status": "ok", "exit": 0, "stdout_sha": "a"}]}))
+    (ev / "task-ledger.json").write_text(json.dumps({"skill": "cws-conform", "perk": "repin"}))
+    store, dl = tmp_path / "out", tmp_path / "done.json"
+    v = {"SWARM_DIR": str(sw), "TASK_ID": "P0-T17", "RUN_LEDGER": str(ev / "run-ledger.json"), "DONE_LEDGER": str(dl)}
+    assert _run("cws-observe", "redeem", "cws_observe_redeem", v, store) == 0
+    led = json.load(open(dl))
+    assert len(led["entries"]) == 1 and led["entries"][0]["prev"] == "0" * 64
+    assert _run("cws-observe", "redeem", "cws_observe_redeem", v, store) == 0   # re-run
+    assert len(json.load(open(dl))["entries"]) == 1, "redeem must be idempotent per task"

@@ -1,0 +1,218 @@
+{
+  "swarm_dir": "/Users/user/hunyuan/cyberware/workzone/version1.1/cyberware-swarm-v1.1",
+  "total": 90,
+  "done_ledger_chain": "ok",
+  "counts": {
+    "redeemed": 6,
+    "ready": 10,
+    "blocked:deps": 22,
+    "blocked:validator": 52
+  },
+  "next_pullable": [
+    "P0-T02",
+    "P0-T05",
+    "P0-T13",
+    "P0-T14",
+    "P0-T15",
+    "P0-T16",
+    "P1-T06",
+    "P1-T08",
+    "P4-T01",
+    "P4-T02"
+  ],
+  "validators_available": [
+    "cws-conform",
+    "cws-ledgercheck",
+    "cws-modelcheck",
+    "cws-mutate"
+  ],
+  "validators_missing": [
+    "alchemy",
+    "cws-bench",
+    "cws-chaos",
+    "cws-redteam",
+    "cws-release",
+    "cws-settle-sim"
+  ],
+  "milestones": [
+    {
+      "id": "M0",
+      "rung": "-",
+      "gate": [
+        "P6-T05"
+      ],
+      "closure": 15,
+      "redeemed": 1,
+      "gate_redeemed": false,
+      "closed": false,
+      "promise": "Internal only: a task can be claimed, blessed, executed under attestation, and its outcome recorded \u2014 the load-bearing wall is up."
+    },
+    {
+      "id": "M1",
+      "rung": "SV-1",
+      "gate": [
+        "P0-T18"
+      ],
+      "closure": 7,
+      "redeemed": 0,
+      "gate_redeemed": false,
+      "closed": false,
+      "promise": "cyberware is a specification, not a codebase: every hash is canonical and reproduced byte-for-byte by an independent implementation."
+    },
+    {
+      "id": "M2",
+      "rung": "SV-2",
+      "gate": [
+        "P1-T09",
+        "P1-T10"
+      ],
+      "closure": 8,
+      "redeemed": 0,
+      "gate_redeemed": false,
+      "closed": false,
+      "promise": "Every record of what happened is chained, signed, and independently re-verifiable \u2014 history cannot be rewritten."
+    },
+    {
+      "id": "M3",
+      "rung": "SV-3",
+      "gate": [
+        "P2-T08",
+        "P2-T09"
+      ],
+      "closure": 10,
+      "redeemed": 1,
+      "gate_redeemed": false,
+      "closed": false,
+      "promise": "Agents execute only attested, sandboxed, hash-pinned pathways; the privilege boundary is enforced by the OS, not by software trust."
+    },
+    {
+      "id": "M4",
+      "rung": "SV-4",
+      "gate": [
+        "P3-T09",
+        "P3-T15"
+      ],
+      "closure": 9,
+      "redeemed": 0,
+      "gate_redeemed": false,
+      "closed": false,
+      "promise": "Skills and the engine are signed, publicly logged, and revocable network-wide in minutes; approval to destroy is cryptographically human; the code agrees with its declared blueprint."
+    },
+    {
+      "id": "M5",
+      "rung": "SV-5",
+      "gate": [
+        "P4-T09"
+      ],
+      "closure": 8,
+      "redeemed": 1,
+      "gate_redeemed": false,
+      "closed": false,
+      "promise": "Composed workflows \u2014 and the settlement lifecycle itself \u2014 are proven free of deadlock and conservation violation BEFORE they run, across three independent checkers."
+    },
+    {
+      "id": "M6",
+      "rung": "SV-6",
+      "gate": [
+        "P6-T21"
+      ],
+      "closure": 21,
+      "redeemed": 1,
+      "gate_redeemed": false,
+      "closed": false,
+      "promise": "Validated work settles; intelligence is priced per contract; value is never minted, only earned \u2014 and the system paid for its own completion."
+    }
+  ],
+  "by_task": {
+    "P0-T01": "redeemed",
+    "P0-T02": "ready",
+    "P0-T03": "blocked:deps",
+    "P0-T04": "blocked:deps",
+    "P0-T05": "ready",
+    "P0-T06": "redeemed",
+    "P0-T07": "blocked:deps",
+    "P0-T08": "blocked:deps",
+    "P0-T09": "redeemed",
+    "P0-T10": "redeemed",
+    "P0-T11": "redeemed",
+    "P0-T12": "redeemed",
+    "P0-T13": "ready",
+    "P0-T14": "ready",
+    "P0-T15": "ready",
+    "P0-T16": "ready",
+    "P0-T17": "blocked:deps",
+    "P0-T18": "blocked:deps",
+    "P1-T01": "blocked:deps",
+    "P1-T02": "blocked:deps",
+    "P1-T03": "blocked:deps",
+    "P1-T04": "blocked:deps",
+    "P1-T05": "blocked:deps",
+    "P1-T06": "ready",
+    "P1-T07": "blocked:deps",
+    "P1-T08": "ready",
+    "P1-T09": "blocked:deps",
+    "P1-T10": "blocked:deps",
+    "P2-T01": "blocked:validator",
+    "P2-T02": "blocked:validator",
+    "P2-T03": "blocked:validator",
+    "P2-T04": "blocked:validator",
+    "P2-T05": "blocked:validator",
+    "P2-T06": "blocked:validator",
+    "P2-T07": "blocked:validator",
+    "P2-T08": "blocked:validator",
+    "P2-T09": "blocked:validator",
+    "P2-T10": "blocked:validator",
+    "P2-T11": "blocked:validator",
+    "P3-T01": "blocked:validator",
+    "P3-T02": "blocked:validator",
+    "P3-T03": "blocked:validator",
+    "P3-T04": "blocked:validator",
+    "P3-T05": "blocked:validator",
+    "P3-T06": "blocked:validator",
+    "P3-T07": "blocked:validator",
+    "P3-T08": "blocked:validator",
+    "P3-T09": "blocked:validator",
+    "P3-T10": "blocked:validator",
+    "P3-T11": "blocked:validator",
+    "P3-T12": "blocked:validator",
+    "P3-T13": "blocked:validator",
+    "P3-T14": "blocked:validator",
+    "P3-T15": "blocked:validator",
+    "P3-T16": "blocked:validator",
+    "P4-T01": "ready",
+    "P4-T02": "ready",
+    "P4-T03": "blocked:deps",
+    "P4-T04": "blocked:deps",
+    "P4-T05": "blocked:deps",
+    "P4-T06": "blocked:deps",
+    "P4-T07": "blocked:deps",
+    "P4-T08": "blocked:deps",
+    "P4-T09": "blocked:deps",
+    "P5-T01": "blocked:validator",
+    "P5-T02": "blocked:validator",
+    "P5-T03": "blocked:validator",
+    "P5-T04": "blocked:validator",
+    "P5-T05": "blocked:validator",
+    "P6-T01": "blocked:validator",
+    "P6-T02": "blocked:validator",
+    "P6-T03": "blocked:validator",
+    "P6-T04": "blocked:validator",
+    "P6-T05": "blocked:validator",
+    "P6-T06": "blocked:validator",
+    "P6-T07": "blocked:deps",
+    "P6-T08": "blocked:validator",
+    "P6-T09": "blocked:validator",
+    "P6-T10": "blocked:validator",
+    "P6-T11": "blocked:validator",
+    "P6-T12": "blocked:validator",
+    "P6-T13": "blocked:validator",
+    "P6-T14": "blocked:validator",
+    "P6-T15": "blocked:validator",
+    "P6-T16": "blocked:validator",
+    "P6-T17": "blocked:validator",
+    "P6-T18": "blocked:validator",
+    "P6-T19": "blocked:validator",
+    "P6-T20": "blocked:validator",
+    "P6-T21": "blocked:validator"
+  }
+}

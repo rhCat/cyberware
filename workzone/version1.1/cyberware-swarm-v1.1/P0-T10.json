@@ -1,0 +1,34 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P0-T10",
+  "task_hash": "8973208b4f31",
+  "title": "Write spec/privacy.md (M5: crypto-shredding, retention, metadata)",
+  "phase": "P0",
+  "ladder_rung": "SV-1",
+  "kind": "spec",
+  "effort": "M",
+  "parallel_group": "p0-spec",
+  "depends_on": [],
+  "executor": "human-authoring",
+  "validated_by": "cws-conform",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P0-T17",
+  "skill": "cws-conform",
+  "perk": null,
+  "record_store": "<abs dir for P0-T10 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "spec/privacy.md \u2014 data classes, subject-DEK crypto-shredding, hash-only payload refs, retention tiers, /rep gating, FMV k-floor as privacy",
+  "satisfies_criteria": [
+    "M5"
+  ],
+  "acceptance": {
+    "exists": "spec/privacy.md",
+    "must": [
+      "crypto-shredding design",
+      "metadata-is-data treatment",
+      "erasure-with-intact-chain rule"
+    ]
+  },
+  "status": "todo",
+  "assignee": null
+}

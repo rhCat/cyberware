@@ -1,0 +1,34 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P3-T11",
+  "task_hash": "3b43475e0579",
+  "title": "Tier wiring to P2 sandbox profiles",
+  "phase": "P3",
+  "ladder_rung": "-",
+  "kind": "build",
+  "effort": "M",
+  "parallel_group": "p3-exod",
+  "depends_on": [
+    "P2-T03",
+    "P2-T04",
+    "P3-T01"
+  ],
+  "executor": "local-code",
+  "validated_by": "cws-release",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P3-T08",
+  "skill": "cws-release",
+  "perk": null,
+  "record_store": "<abs dir for P3-T11 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "core/verified\u2192bwrap, community\u2192microVM; tier recorded in catalog and enforced at grant",
+  "satisfies_criteria": [
+    "F12"
+  ],
+  "acceptance": {
+    "tier_enforced_at_grant": true,
+    "community_no_secrets_schema_and_runtime": true
+  },
+  "status": "todo",
+  "assignee": null
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P1-T01",
+  "task_hash": "a0c89066c2a0",
+  "title": "Ledger v2: append-only JSONL + prev-chain + genesis binding",
+  "phase": "P1",
+  "ladder_rung": "SV-2",
+  "kind": "build",
+  "effort": "L",
+  "parallel_group": "p1-ledger",
+  "depends_on": [
+    "P0-T03"
+  ],
+  "executor": "governed-channel",
+  "validated_by": "cws-ledgercheck",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P1-T09",
+  "skill": "cws-ledgercheck",
+  "perk": null,
+  "record_store": "<abs dir for P1-T01 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "infra/ledger/ \u2014 append-only JSONL, seq + full-sha256 prev, genesis binds {run_id, plan_sha}, full digests",
+  "satisfies_criteria": [
+    "F2",
+    "F7"
+  ],
+  "acceptance": {
+    "chain_verifiable": true,
+    "genesis_non_transplant": "replay under different {run_id,plan_sha} fails"
+  },
+  "status": "todo",
+  "assignee": null
+}

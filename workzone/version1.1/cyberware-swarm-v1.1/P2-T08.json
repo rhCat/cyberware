@@ -1,0 +1,36 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P2-T08",
+  "task_hash": "f7602afc898d",
+  "title": "Author cws-redteam skill (\u226512 attack perks, expect refusal)",
+  "phase": "P2",
+  "ladder_rung": "SV-3",
+  "kind": "skill",
+  "effort": "M",
+  "parallel_group": "p2-skill",
+  "depends_on": [
+    "P2-T03"
+  ],
+  "executor": "external-anchor",
+  "validated_by": "cws-redteam",
+  "bootstrap_exempt": true,
+  "validation_available_after": null,
+  "skill": null,
+  "perk": null,
+  "record_store": "<abs dir for P2-T08 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "skillChip/cws-redteam/ \u2014 one perk per attack class; each contract expects nonzero exit + refusal class (meta-rule M4)",
+  "satisfies_criteria": [
+    "P2-V01",
+    "P2-V09"
+  ],
+  "acceptance": {
+    "corpus": ">=12 behaviors",
+    "each_expect": {
+      "exit": "nonzero"
+    },
+    "governed": "run under exod's own observation"
+  },
+  "status": "todo",
+  "assignee": null
+}

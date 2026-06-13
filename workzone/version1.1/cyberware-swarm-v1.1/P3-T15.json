@@ -1,0 +1,35 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P3-T15",
+  "task_hash": "9ba92bca829f",
+  "title": "Author cws-release skill (index, sign, log, manifest, engine perks)",
+  "phase": "P3",
+  "ladder_rung": "SV-4",
+  "kind": "skill",
+  "effort": "M",
+  "parallel_group": "p3-core",
+  "depends_on": [
+    "P3-T01",
+    "P3-T02",
+    "P3-T05"
+  ],
+  "executor": "external-anchor",
+  "validated_by": "cws-release",
+  "bootstrap_exempt": true,
+  "validation_available_after": null,
+  "skill": null,
+  "perk": null,
+  "record_store": "<abs dir for P3-T15 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "skillChip/cws-release/ \u2014 the registry (and engine) publishes itself through the channel",
+  "satisfies_criteria": [
+    "P3-V09",
+    "P3-V12"
+  ],
+  "acceptance": {
+    "governed_release": "chip + engine release are dual-signed receipts via the channel",
+    "rekor_proof_stored": true
+  },
+  "status": "todo",
+  "assignee": null
+}
