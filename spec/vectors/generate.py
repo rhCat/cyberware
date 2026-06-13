@@ -68,6 +68,17 @@ def vectors():
                                         "evidence_sha": "0" * 64, "prev": "0" * 64}))
     v.append(("rec_plan", {"skill": "cws-conform", "perk": "doclint", "sequence": ["cws_doclint"],
                            "snippet_shas": {"cws_doclint.py": "ab" * 32}, "skill_sha": "cd" * 32}))
+
+    # chip fixtures — the authenticity shapes whose digest IS the chip's identity (covers "chip")
+    v.append(("chip_skill_index", {"skill": "cws-conform", "skill_sha": "ab" * 32, "file_count": 9,
+                                   "files": {"SKILL.md": "cd" * 32, "blueprint.json": "ef" * 32,
+                                             "perks.json": "01" * 32}}))
+    v.append(("chip_manifest", {"chip": "skillChip", "count": 3,
+                                "skills": [{"skill": "cws-conform", "skill_sha": "11" * 32, "file_count": 9},
+                                           {"skill": "cws-mutate", "skill_sha": "22" * 32, "file_count": 7},
+                                           {"skill": "cws-observe", "skill_sha": "33" * 32, "file_count": 12}],
+                                "chip_sha": "44" * 32}))
+    v.append(("chip_empty_manifest", {"chip": "skillChip", "count": 0, "skills": [], "chip_sha": "00" * 32}))
     return v
 
 

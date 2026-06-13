@@ -9,6 +9,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -52,7 +53,41 @@ type result struct {
 	Digest    string `json:"digest"`
 }
 
+type sigVector struct {
+	Name   string      `json:"name"`
+	Pubkey string      `json:"pubkey"` // base64 of the raw 32-byte Ed25519 public key
+	Env    sigEnvelope `json:"envelope"`
+}
+
+func runSig() {
+	var vecs []sigVector
+	if err := json.NewDecoder(os.Stdin).Decode(&vecs); err != nil {
+		fmt.Fprintln(os.Stderr, "decode sig corpus:", err)
+		os.Exit(2)
+	}
+	type verdict struct {
+		Name  string `json:"name"`
+		Valid bool   `json:"valid"`
+	}
+	out := make([]verdict, 0, len(vecs))
+	for _, v := range vecs {
+		pub, err := base64.StdEncoding.DecodeString(v.Pubkey)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "sig vector %q: bad pubkey\n", v.Name)
+			os.Exit(1)
+		}
+		out = append(out, verdict{v.Name, verifyEnvelope(pub, v.Env)})
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(out)
+}
+
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "sig" {
+		runSig()
+		return
+	}
 	dec := json.NewDecoder(os.Stdin)
 	dec.UseNumber() // preserve number tokens so int/float is classified exactly as Python's json does
 	var corpus []vector
