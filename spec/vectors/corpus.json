@@ -1312,5 +1312,91 @@
       "skills": [],
       "chip_sha": "0000000000000000000000000000000000000000000000000000000000000000"
     }
+  },
+  {
+    "name": "pub_arrays",
+    "input": [
+      56,
+      {
+        "d": true,
+        "10": null,
+        "1": []
+      }
+    ],
+    "expected": "[56,{\"1\":[],\"10\":null,\"d\":true}]"
+  },
+  {
+    "name": "pub_french",
+    "input": {
+      "peach": "This sorting order",
+      "péché": "is wrong according to French",
+      "pêche": "but canonicalization MUST",
+      "sin": "ignore locale"
+    },
+    "expected": "{\"peach\":\"This sorting order\",\"péché\":\"is wrong according to French\",\"pêche\":\"but canonicalization MUST\",\"sin\":\"ignore locale\"}"
+  },
+  {
+    "name": "pub_structures",
+    "input": {
+      "1": {
+        "f": {
+          "f": "hi",
+          "F": 5
+        },
+        "\n": 56.0
+      },
+      "10": {},
+      "": "empty",
+      "a": {},
+      "111": [
+        {
+          "e": "yes",
+          "E": "no"
+        }
+      ],
+      "A": {}
+    },
+    "expected": "{\"\":\"empty\",\"1\":{\"\\n\":56,\"f\":{\"F\":5,\"f\":\"hi\"}},\"10\":{},\"111\":[{\"E\":\"no\",\"e\":\"yes\"}],\"A\":{},\"a\":{}}"
+  },
+  {
+    "name": "pub_unicode",
+    "input": {
+      "Unnormalized Unicode": "Å"
+    },
+    "expected": "{\"Unnormalized Unicode\":\"Å\"}"
+  },
+  {
+    "name": "pub_values",
+    "input": {
+      "numbers": [
+        333333333.3333333,
+        1e+30,
+        4.5,
+        0.002,
+        1e-27
+      ],
+      "string": "€$\u000f\nA'B\"\\\\\"/",
+      "literals": [
+        null,
+        true,
+        false
+      ]
+    },
+    "expected": "{\"literals\":[null,true,false],\"numbers\":[333333333.3333333,1e+30,4.5,0.002,1e-27],\"string\":\"€$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\"}"
+  },
+  {
+    "name": "pub_weird",
+    "input": {
+      "€": "Euro Sign",
+      "\r": "Carriage Return",
+      "\n": "Newline",
+      "1": "One",
+      "": "Control",
+      "😂": "Smiley",
+      "ö": "Latin Small Letter O With Diaeresis",
+      "דּ": "Hebrew Letter Dalet With Dagesh",
+      "</script>": "Browser Challenge"
+    },
+    "expected": "{\"\\n\":\"Newline\",\"\\r\":\"Carriage Return\",\"1\":\"One\",\"</script>\":\"Browser Challenge\",\"\":\"Control\",\"ö\":\"Latin Small Letter O With Diaeresis\",\"€\":\"Euro Sign\",\"😂\":\"Smiley\",\"דּ\":\"Hebrew Letter Dalet With Dagesh\"}"
   }
 ]
