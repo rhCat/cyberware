@@ -32,7 +32,9 @@ def server(tmp_path):
     httpd, _ = govd.bind_server("127.0.0.1", [0])
     httpd.daemon_threads = True
     httpd.cfg, httpd.store = cfg, store
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    # poll the shutdown flag every 20ms (not the 0.5s default) so the per-test teardown returns promptly —
+    # otherwise httpd.shutdown() below waits up to half a second × every test in this file.
+    threading.Thread(target=httpd.serve_forever, kwargs={"poll_interval": 0.02}, daemon=True).start()
     base = f"http://127.0.0.1:{httpd.server_address[1]}"
     for _ in range(100):
         try:
