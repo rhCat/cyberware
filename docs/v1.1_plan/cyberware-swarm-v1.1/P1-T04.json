@@ -1,0 +1,34 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P1-T04",
+  "task_hash": "04b29fe0dc1f",
+  "title": "cyberware ledger verify + Go chain-checker (anchor)",
+  "phase": "P1",
+  "ladder_rung": "SV-2",
+  "kind": "build",
+  "effort": "M",
+  "parallel_group": "p1-ledger",
+  "depends_on": [
+    "P1-T01"
+  ],
+  "executor": "governed-channel",
+  "validated_by": "cws-ledgercheck",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P1-T09",
+  "skill": "cws-ledgercheck",
+  "perk": null,
+  "record_store": "<abs dir for P1-T04 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "ledger verify CLI + ~150-line Go port that cold-verifies any chain (meta-rule M3)",
+  "satisfies_criteria": [
+    "F2",
+    "P1-V03",
+    "P1-V04"
+  ],
+  "acceptance": {
+    "single_bit_flip": "detected, names the record",
+    "go_cold_verify": "100% of fixtures + CI ledgers"
+  },
+  "status": "todo",
+  "assignee": null
+}

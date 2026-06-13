@@ -1,0 +1,35 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P0-T09",
+  "task_hash": "a98e59c3d709",
+  "title": "Write spec/keys.md (M2: hierarchy, rotation, compromise, bootstrap)",
+  "phase": "P0",
+  "ladder_rung": "SV-1",
+  "kind": "spec",
+  "effort": "M",
+  "parallel_group": "p0-spec",
+  "depends_on": [],
+  "executor": "human-authoring",
+  "validated_by": "cws-conform",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P0-T17",
+  "skill": "cws-conform",
+  "perk": null,
+  "record_store": "<abs dir for P0-T09 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "spec/keys.md \u2014 offline root \u2192 service keys \u2192 store HMAC; rotation overlap; compromise runbook; key bootstrap (pinning; TOFU rejected for priced/destructive)",
+  "satisfies_criteria": [
+    "M2"
+  ],
+  "acceptance": {
+    "exists": "spec/keys.md",
+    "must": [
+      "key hierarchy",
+      "rotation with overlap + cross-sign",
+      "compromise runbook",
+      "bootstrap/pinning story"
+    ]
+  },
+  "status": "todo",
+  "assignee": null
+}

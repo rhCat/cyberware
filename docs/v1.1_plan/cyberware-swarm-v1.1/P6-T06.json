@@ -1,0 +1,31 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P6-T06",
+  "task_hash": "eaa2153ebc23",
+  "title": "reward verify (chain + per-record zero + global zero + receipt cross-check)",
+  "phase": "P6",
+  "ladder_rung": "SV-6",
+  "kind": "build",
+  "effort": "M",
+  "parallel_group": "p6-ledger",
+  "depends_on": [
+    "P6-T02"
+  ],
+  "executor": "governed-channel",
+  "validated_by": "cws-settle-sim",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P6-T09",
+  "skill": "cws-settle-sim",
+  "perk": null,
+  "record_store": "<abs dir for P6-T06 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "cyberware reward verify: chain integrity + per-record sum-zero + global per-currency sum-zero + every settlement references a verifying dual-signed pass receipt",
+  "satisfies_criteria": [
+    "P6-V01"
+  ],
+  "acceptance": {
+    "cross_checks_receipt_store": "money trail and work trail cannot drift silently"
+  },
+  "status": "todo",
+  "assignee": null
+}

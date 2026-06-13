@@ -1,0 +1,938 @@
+{
+  "$schema": "cwp-swarm-manifest-v1.1",
+  "program": "cyberware Foundation Plan v1.1",
+  "generated_from": "single-source generator (generate_swarm.py)",
+  "task_count": 90,
+  "phases": {
+    "P0": [
+      "P0-T01",
+      "P0-T02",
+      "P0-T03",
+      "P0-T04",
+      "P0-T05",
+      "P0-T06",
+      "P0-T07",
+      "P0-T08",
+      "P0-T09",
+      "P0-T10",
+      "P0-T11",
+      "P0-T12",
+      "P0-T13",
+      "P0-T14",
+      "P0-T15",
+      "P0-T16",
+      "P0-T17",
+      "P0-T18"
+    ],
+    "P1": [
+      "P1-T01",
+      "P1-T02",
+      "P1-T03",
+      "P1-T04",
+      "P1-T05",
+      "P1-T06",
+      "P1-T07",
+      "P1-T08",
+      "P1-T09",
+      "P1-T10"
+    ],
+    "P2": [
+      "P2-T01",
+      "P2-T02",
+      "P2-T03",
+      "P2-T04",
+      "P2-T05",
+      "P2-T06",
+      "P2-T07",
+      "P2-T08",
+      "P2-T09",
+      "P2-T10",
+      "P2-T11"
+    ],
+    "P3": [
+      "P3-T01",
+      "P3-T02",
+      "P3-T03",
+      "P3-T04",
+      "P3-T05",
+      "P3-T06",
+      "P3-T07",
+      "P3-T08",
+      "P3-T09",
+      "P3-T10",
+      "P3-T11",
+      "P3-T12",
+      "P3-T13",
+      "P3-T14",
+      "P3-T15",
+      "P3-T16"
+    ],
+    "P4": [
+      "P4-T01",
+      "P4-T02",
+      "P4-T03",
+      "P4-T04",
+      "P4-T05",
+      "P4-T06",
+      "P4-T07",
+      "P4-T08",
+      "P4-T09"
+    ],
+    "P5": [
+      "P5-T01",
+      "P5-T02",
+      "P5-T03",
+      "P5-T04",
+      "P5-T05"
+    ],
+    "P6": [
+      "P6-T01",
+      "P6-T02",
+      "P6-T03",
+      "P6-T04",
+      "P6-T05",
+      "P6-T06",
+      "P6-T07",
+      "P6-T08",
+      "P6-T09",
+      "P6-T10",
+      "P6-T11",
+      "P6-T12",
+      "P6-T13",
+      "P6-T14",
+      "P6-T15",
+      "P6-T16",
+      "P6-T17",
+      "P6-T18",
+      "P6-T19",
+      "P6-T20",
+      "P6-T21"
+    ]
+  },
+  "ladder": {
+    "SV-1": [
+      "P0-T01",
+      "P0-T02",
+      "P0-T03",
+      "P0-T04",
+      "P0-T05",
+      "P0-T06",
+      "P0-T07",
+      "P0-T08",
+      "P0-T09",
+      "P0-T10",
+      "P0-T11",
+      "P0-T12",
+      "P0-T13",
+      "P0-T15",
+      "P0-T17",
+      "P0-T18"
+    ],
+    "SV-2": [
+      "P1-T01",
+      "P1-T02",
+      "P1-T03",
+      "P1-T04",
+      "P1-T05",
+      "P1-T06",
+      "P1-T07",
+      "P1-T08",
+      "P1-T09"
+    ],
+    "SV-3": [
+      "P2-T01",
+      "P2-T02",
+      "P2-T03",
+      "P2-T05",
+      "P2-T06",
+      "P2-T07",
+      "P2-T08",
+      "P2-T09"
+    ],
+    "SV-4": [
+      "P3-T01",
+      "P3-T02",
+      "P3-T03",
+      "P3-T04",
+      "P3-T05",
+      "P3-T06",
+      "P3-T07",
+      "P3-T08",
+      "P3-T09",
+      "P3-T10",
+      "P3-T12",
+      "P3-T13",
+      "P3-T14",
+      "P3-T15"
+    ],
+    "SV-5": [
+      "P4-T01",
+      "P4-T02",
+      "P4-T03",
+      "P4-T04",
+      "P4-T05",
+      "P4-T06",
+      "P4-T08",
+      "P4-T09"
+    ],
+    "SV-6": [
+      "P6-T01",
+      "P6-T02",
+      "P6-T03",
+      "P6-T04",
+      "P6-T05",
+      "P6-T06",
+      "P6-T07",
+      "P6-T08",
+      "P6-T09",
+      "P6-T10",
+      "P6-T11",
+      "P6-T12",
+      "P6-T13",
+      "P6-T14",
+      "P6-T15",
+      "P6-T16",
+      "P6-T17",
+      "P6-T18",
+      "P6-T19",
+      "P6-T20",
+      "P6-T21"
+    ]
+  },
+  "spine": [
+    "P0-T02",
+    "P0-T03",
+    "P0-T04",
+    "P0-T17",
+    "P0-T18",
+    "P1-T01",
+    "P1-T02",
+    "P1-T04",
+    "P1-T05",
+    "P1-T09",
+    "P2-T01",
+    "P2-T02",
+    "P2-T03",
+    "P2-T05",
+    "P2-T08",
+    "P3-T01",
+    "P3-T03",
+    "P3-T05",
+    "P3-T15",
+    "P6-T01",
+    "P6-T02",
+    "P6-T03",
+    "P6-T05",
+    "P6-T06"
+  ],
+  "dag_edges": 121,
+  "roots": [
+    "P0-T01",
+    "P0-T02",
+    "P0-T06",
+    "P0-T09",
+    "P0-T10",
+    "P0-T11",
+    "P0-T12",
+    "P0-T13",
+    "P0-T14",
+    "P1-T06",
+    "P1-T08",
+    "P3-T08",
+    "P3-T16",
+    "P5-T02",
+    "P6-T01"
+  ],
+  "validation_classes": [
+    "V-AUTO",
+    "V-PROP",
+    "V-RED",
+    "V-BENCH",
+    "V-EXT",
+    "V-GOV",
+    "V-MUT",
+    "V-CHAOS",
+    "V-LIVE"
+  ],
+  "criterion_to_tasks": {
+    "F1": [
+      "P0-T02",
+      "P0-T03",
+      "P0-T04"
+    ],
+    "F10": [
+      "P3-T01",
+      "P3-T02",
+      "P3-T03"
+    ],
+    "F11": [
+      "P0-T01",
+      "P0-T05",
+      "P0-T06",
+      "P0-T08"
+    ],
+    "F12": [
+      "P3-T10",
+      "P3-T11"
+    ],
+    "F2": [
+      "P1-T01",
+      "P1-T02",
+      "P1-T04"
+    ],
+    "F3": [
+      "P1-T05"
+    ],
+    "F4": [
+      "P1-T06"
+    ],
+    "F5": [
+      "P1-T08",
+      "P5-T01",
+      "P5-T03"
+    ],
+    "F6": [
+      "P2-T01",
+      "P2-T05",
+      "P3-T04",
+      "P3-T14"
+    ],
+    "F7": [
+      "P1-T01"
+    ],
+    "F8": [
+      "P0-T06",
+      "P4-T01",
+      "P4-T02",
+      "P4-T03",
+      "P4-T05"
+    ],
+    "F9": [
+      "P2-T02",
+      "P2-T03",
+      "P2-T06",
+      "P2-T11",
+      "P3-T08",
+      "P3-T09"
+    ],
+    "M1": [
+      "P0-T13",
+      "P2-T02",
+      "P3-T05"
+    ],
+    "M10": [
+      "P0-T16"
+    ],
+    "M11": [
+      "P1-T10",
+      "P2-T10",
+      "P3-T08",
+      "P6-T19"
+    ],
+    "M12": [
+      "P3-T16",
+      "P6-T20"
+    ],
+    "M13": [
+      "P6-T15"
+    ],
+    "M2": [
+      "P0-T09",
+      "P0-T15",
+      "P3-T06"
+    ],
+    "M3": [
+      "P3-T12",
+      "P5-T04",
+      "P6-T03"
+    ],
+    "M4": [
+      "P4-T06",
+      "P6-T03",
+      "P6-T07"
+    ],
+    "M5": [
+      "P0-T10",
+      "P1-T07"
+    ],
+    "M7": [
+      "P1-T03",
+      "P6-T02",
+      "P6-T16"
+    ],
+    "M8": [
+      "P0-T11",
+      "P3-T07"
+    ],
+    "M9": [
+      "P0-T12",
+      "P3-T13"
+    ],
+    "P0-V01": [
+      "P0-T07",
+      "P0-T08"
+    ],
+    "P0-V02": [
+      "P0-T02"
+    ],
+    "P0-V03": [
+      "P0-T04"
+    ],
+    "P0-V04": [
+      "P0-T05"
+    ],
+    "P0-V05": [
+      "P0-T03"
+    ],
+    "P0-V06": [
+      "P0-T17"
+    ],
+    "P0-V07": [
+      "P0-T18"
+    ],
+    "P0-V08": [
+      "P0-T16"
+    ],
+    "P0-V09": [
+      "P0-T14"
+    ],
+    "P0-V11": [
+      "P0-T13"
+    ],
+    "P0-V12": [
+      "P0-T15"
+    ],
+    "P1-V01": [
+      "P1-T02"
+    ],
+    "P1-V02": [
+      "P1-T02"
+    ],
+    "P1-V03": [
+      "P1-T04"
+    ],
+    "P1-V04": [
+      "P1-T04"
+    ],
+    "P1-V05": [
+      "P1-T05"
+    ],
+    "P1-V06": [
+      "P1-T06"
+    ],
+    "P1-V07": [
+      "P1-T08"
+    ],
+    "P1-V09": [
+      "P1-T09"
+    ],
+    "P1-V11": [
+      "P1-T03"
+    ],
+    "P1-V12": [
+      "P1-T03"
+    ],
+    "P1-V13": [
+      "P1-T07"
+    ],
+    "P1-V14": [
+      "P1-T10"
+    ],
+    "P2-V01": [
+      "P2-T03",
+      "P2-T08"
+    ],
+    "P2-V02": [
+      "P2-T03"
+    ],
+    "P2-V03": [
+      "P2-T05"
+    ],
+    "P2-V04": [
+      "P2-T01"
+    ],
+    "P2-V07": [
+      "P2-T07",
+      "P2-T09"
+    ],
+    "P2-V08": [
+      "P2-T06"
+    ],
+    "P2-V09": [
+      "P2-T07",
+      "P2-T08"
+    ],
+    "P2-V10": [
+      "P2-T04"
+    ],
+    "P2-V11": [
+      "P2-T10"
+    ],
+    "P2-V12": [
+      "P2-T10"
+    ],
+    "P3-V01": [
+      "P3-T01"
+    ],
+    "P3-V02": [
+      "P3-T02"
+    ],
+    "P3-V03": [
+      "P3-T03"
+    ],
+    "P3-V04": [
+      "P3-T03"
+    ],
+    "P3-V05": [
+      "P3-T03"
+    ],
+    "P3-V06": [
+      "P3-T04"
+    ],
+    "P3-V07": [
+      "P3-T04"
+    ],
+    "P3-V08": [
+      "P3-T10"
+    ],
+    "P3-V09": [
+      "P3-T15"
+    ],
+    "P3-V10": [
+      "P3-T14"
+    ],
+    "P3-V11": [
+      "P3-T05"
+    ],
+    "P3-V12": [
+      "P3-T05",
+      "P3-T15"
+    ],
+    "P3-V13": [
+      "P3-T06"
+    ],
+    "P3-V14": [
+      "P3-T07"
+    ],
+    "P3-V15": [
+      "P3-T08",
+      "P3-T09"
+    ],
+    "P3-V16": [
+      "P3-T08",
+      "P3-T09"
+    ],
+    "P3-V17": [
+      "P3-T12"
+    ],
+    "P4-V01": [
+      "P4-T01"
+    ],
+    "P4-V02": [
+      "P4-T04",
+      "P4-T08"
+    ],
+    "P4-V03": [
+      "P4-T04"
+    ],
+    "P4-V04": [
+      "P4-T07"
+    ],
+    "P4-V05": [
+      "P4-T03"
+    ],
+    "P4-V06": [
+      "P4-T02"
+    ],
+    "P4-V07": [
+      "P4-T09"
+    ],
+    "P4-V08": [
+      "P4-T06"
+    ],
+    "P4-V09": [
+      "P4-T06"
+    ],
+    "P4-V10": [
+      "P4-T05"
+    ],
+    "P4-V11": [
+      "P4-T05"
+    ],
+    "P5-V01": [
+      "P5-T02"
+    ],
+    "P5-V02": [
+      "P5-T01"
+    ],
+    "P5-V03": [
+      "P5-T03"
+    ],
+    "P5-V04": [
+      "P5-T05"
+    ],
+    "P5-V05": [
+      "P5-T01"
+    ],
+    "P5-V07": [
+      "P5-T04"
+    ],
+    "P5-V08": [
+      "P5-T04"
+    ],
+    "P5-V09": [
+      "P5-T04"
+    ],
+    "P6-V01": [
+      "P6-T02",
+      "P6-T04",
+      "P6-T06",
+      "P6-T18"
+    ],
+    "P6-V02": [
+      "P6-T05"
+    ],
+    "P6-V03": [
+      "P6-T01"
+    ],
+    "P6-V04": [
+      "P6-T08"
+    ],
+    "P6-V05": [
+      "P6-T09"
+    ],
+    "P6-V06": [
+      "P6-T11",
+      "P6-T18"
+    ],
+    "P6-V07": [
+      "P6-T10"
+    ],
+    "P6-V08": [
+      "P6-T12",
+      "P6-T18"
+    ],
+    "P6-V09": [
+      "P6-T14"
+    ],
+    "P6-V10": [
+      "P6-T13"
+    ],
+    "P6-V11": [
+      "P6-T21"
+    ],
+    "P6-V12": [
+      "P6-T03"
+    ],
+    "P6-V13": [
+      "P6-T07"
+    ],
+    "P6-V15": [
+      "P6-T14"
+    ],
+    "P6-V16": [
+      "P6-T15"
+    ],
+    "P6-V17": [
+      "P6-T16"
+    ],
+    "P6-V18": [
+      "P6-T17"
+    ],
+    "P6-V19": [
+      "P6-T13"
+    ],
+    "P6-V20": [
+      "P6-T19"
+    ],
+    "R2": [
+      "P2-T04"
+    ]
+  },
+  "milestones": [
+    {
+      "id": "M0",
+      "label": "The spine stands \u2014 governed execution end to end (internal)",
+      "rung": "-",
+      "on_spine": true,
+      "gate_tasks": [
+        "P6-T05"
+      ],
+      "promise_outward": "Internal only: a task can be claimed, blessed, executed under attestation, and its outcome recorded \u2014 the load-bearing wall is up.",
+      "demo": "A single governed run: claim \u2192 grant \u2192 exod step \u2192 chained ledger record, no value, no market.",
+      "redeemed_by": "the spine task set complete",
+      "tasks_cumulative": 15,
+      "tasks_new": [
+        "P0-T02",
+        "P0-T03",
+        "P0-T11",
+        "P1-T01",
+        "P1-T03",
+        "P1-T05",
+        "P2-T01",
+        "P2-T02",
+        "P2-T07",
+        "P3-T04",
+        "P3-T14",
+        "P6-T01",
+        "P6-T02",
+        "P6-T04",
+        "P6-T05"
+      ],
+      "tasks_new_count": 15,
+      "spine_tasks_new": [
+        "P0-T02",
+        "P0-T03",
+        "P1-T01",
+        "P1-T05",
+        "P2-T01",
+        "P2-T02",
+        "P6-T01",
+        "P6-T02",
+        "P6-T05"
+      ]
+    },
+    {
+      "id": "M1",
+      "label": "SV-1 \u2014 the protocol is real and portable",
+      "rung": "SV-1",
+      "on_spine": true,
+      "gate_tasks": [
+        "P0-T18"
+      ],
+      "promise_outward": "cyberware is a specification, not a codebase: every hash is canonical and reproduced byte-for-byte by an independent implementation.",
+      "demo": "The Go verifier reproduces 250+ golden vectors; the chip re-pins its own identity under canonical hashing.",
+      "redeemed_by": "cws-conform governed run + the chip re-pin transition record",
+      "tasks_cumulative": 7,
+      "tasks_new": [
+        "P0-T04",
+        "P0-T07",
+        "P0-T08",
+        "P0-T17",
+        "P0-T18"
+      ],
+      "tasks_new_count": 5,
+      "spine_tasks_new": [
+        "P0-T04",
+        "P0-T17",
+        "P0-T18"
+      ]
+    },
+    {
+      "id": "M2",
+      "label": "SV-2 \u2014 evidence becomes tamper-evident",
+      "rung": "SV-2",
+      "on_spine": true,
+      "gate_tasks": [
+        "P1-T09",
+        "P1-T10"
+      ],
+      "promise_outward": "Every record of what happened is chained, signed, and independently re-verifiable \u2014 history cannot be rewritten.",
+      "demo": "16 concurrent writers + 500 crash injections survive with a single verified chain; a one-byte flip is caught and named.",
+      "redeemed_by": "cws-ledgercheck torture+verify receipts; the Go chain-checker cold-verify",
+      "tasks_cumulative": 8,
+      "tasks_new": [
+        "P1-T01",
+        "P1-T02",
+        "P1-T04",
+        "P1-T05",
+        "P1-T09",
+        "P1-T10"
+      ],
+      "tasks_new_count": 6,
+      "spine_tasks_new": [
+        "P1-T01",
+        "P1-T02",
+        "P1-T04",
+        "P1-T05",
+        "P1-T09"
+      ]
+    },
+    {
+      "id": "M3",
+      "label": "SV-3 \u2014 execution becomes a kernel-enforced boundary  \u25c0 MVP",
+      "rung": "SV-3",
+      "on_spine": true,
+      "gate_tasks": [
+        "P2-T08",
+        "P2-T09"
+      ],
+      "promise_outward": "Agents execute only attested, sandboxed, hash-pinned pathways; the privilege boundary is enforced by the OS, not by software trust.",
+      "demo": "A 12-attack corpus refuses every case WITH the software scan disabled \u2014 the kernel is the counterparty; meters are attested.",
+      "redeemed_by": "cws-redteam expected-refusal receipts + cws-bench attested-meter receipts",
+      "tasks_cumulative": 10,
+      "tasks_new": [
+        "P0-T11",
+        "P2-T01",
+        "P2-T02",
+        "P2-T03",
+        "P2-T07",
+        "P2-T08",
+        "P2-T09"
+      ],
+      "tasks_new_count": 7,
+      "spine_tasks_new": [
+        "P2-T01",
+        "P2-T02",
+        "P2-T03",
+        "P2-T08"
+      ]
+    },
+    {
+      "id": "M4",
+      "label": "SV-4 \u2014 the registry and the engine publish and revoke themselves",
+      "rung": "SV-4",
+      "on_spine": true,
+      "gate_tasks": [
+        "P3-T09",
+        "P3-T15"
+      ],
+      "promise_outward": "Skills and the engine are signed, publicly logged, and revocable network-wide in minutes; approval to destroy is cryptographically human; the code agrees with its declared blueprint.",
+      "demo": "The registry publishes itself through a perk; a revocation drill measures kill-switch latency; alchemy/concord proves CFG-vs-blueprint on the whole chip.",
+      "redeemed_by": "dual-signed release receipts + Rekor inclusion proofs + the revocation drill receipt",
+      "tasks_cumulative": 9,
+      "tasks_new": [
+        "P0-T13",
+        "P3-T01",
+        "P3-T02",
+        "P3-T05",
+        "P3-T08",
+        "P3-T09",
+        "P3-T15"
+      ],
+      "tasks_new_count": 7,
+      "spine_tasks_new": [
+        "P3-T01",
+        "P3-T05",
+        "P3-T15"
+      ]
+    },
+    {
+      "id": "M5",
+      "label": "SV-5 \u2014 workflows and the money's lifecycle are model-checked",
+      "rung": "SV-5",
+      "on_spine": false,
+      "gate_tasks": [
+        "P4-T09"
+      ],
+      "promise_outward": "Composed workflows \u2014 and the settlement lifecycle itself \u2014 are proven free of deadlock and conservation violation BEFORE they run, across three independent checkers.",
+      "demo": "The remaining plan, encoded as a workflow, verifies deadlock-free; settlement.blueprint.json passes EMPIRICAL+SYMBOLIC with seeded money-mutants caught.",
+      "redeemed_by": "cws-modelcheck certificates (EMPIRICAL / SYMBOLIC / AXIOMATIC)",
+      "tasks_cumulative": 8,
+      "tasks_new": [
+        "P0-T06",
+        "P4-T01",
+        "P4-T02",
+        "P4-T03",
+        "P4-T04",
+        "P4-T05",
+        "P4-T08",
+        "P4-T09"
+      ],
+      "tasks_new_count": 8,
+      "spine_tasks_new": []
+    },
+    {
+      "id": "M6",
+      "label": "SV-6 \u2014 the work pays for the work  (the ladder closes)",
+      "rung": "SV-6",
+      "on_spine": true,
+      "gate_tasks": [
+        "P6-T21"
+      ],
+      "promise_outward": "Validated work settles; intelligence is priced per contract; value is never minted, only earned \u2014 and the system paid for its own completion.",
+      "demo": "10+ development milestones settle as internal-credit bounties; the first FMV index prices cyberware's own tasks; the plan's completion is a settled, TSA-anchored receipt reconciled against the PSP sandbox.",
+      "redeemed_by": "the birth-certificate receipt \u2014 verified offline end to end",
+      "tasks_cumulative": 21,
+      "tasks_new": [
+        "P0-T02",
+        "P0-T03",
+        "P0-T11",
+        "P1-T01",
+        "P1-T03",
+        "P1-T05",
+        "P2-T01",
+        "P2-T02",
+        "P2-T07",
+        "P3-T04",
+        "P3-T08",
+        "P3-T14",
+        "P6-T01",
+        "P6-T02",
+        "P6-T04",
+        "P6-T05",
+        "P6-T11",
+        "P6-T12",
+        "P6-T18",
+        "P6-T19",
+        "P6-T21"
+      ],
+      "tasks_new_count": 21,
+      "spine_tasks_new": [
+        "P0-T02",
+        "P0-T03",
+        "P1-T01",
+        "P1-T05",
+        "P2-T01",
+        "P2-T02",
+        "P6-T01",
+        "P6-T02",
+        "P6-T05"
+      ]
+    }
+  ],
+  "validators": {
+    "alchemy": [
+      "P3-T08",
+      "P6-T09"
+    ],
+    "cws-bench": [
+      "P2-T09"
+    ],
+    "cws-chaos": [
+      "P2-T10"
+    ],
+    "cws-conform": [
+      "P0-T17"
+    ],
+    "cws-ledgercheck": [
+      "P1-T09"
+    ],
+    "cws-modelcheck": [
+      "P4-T08"
+    ],
+    "cws-mutate": [
+      "P1-T10"
+    ],
+    "cws-redteam": [
+      "P2-T08"
+    ],
+    "cws-release": [
+      "P3-T15"
+    ],
+    "cws-settle-sim": [
+      "P6-T18"
+    ]
+  },
+  "executors": {
+    "human-authoring": 9,
+    "local-code": 18,
+    "external-anchor": 11,
+    "governed-channel": 52
+  },
+  "bootstrap_exempt": [
+    "P0-T17",
+    "P1-T09",
+    "P1-T10",
+    "P2-T08",
+    "P2-T09",
+    "P2-T10",
+    "P3-T08",
+    "P3-T15",
+    "P4-T08",
+    "P6-T09",
+    "P6-T18"
+  ],
+  "six_month_line": "MS-3 (SV-4) is the ~26-week mark; MS-2 (SV-3) at week 16 is the irreducible MVP if time compresses.",
+  "ordering_rule": "Author each phase's validation skill EARLY in its phase so sibling tasks can be validated as they land. Validator-authoring tasks are anchor-validated (M3)."
+}

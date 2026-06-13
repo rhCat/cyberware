@@ -1,0 +1,32 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P0-T04",
+  "task_hash": "c499029bac6c",
+  "title": "One-commit digest cutover (all hashes through canonical_bytes)",
+  "phase": "P0",
+  "ladder_rung": "SV-1",
+  "kind": "build",
+  "effort": "S",
+  "parallel_group": "p0-core",
+  "depends_on": [
+    "P0-T02"
+  ],
+  "executor": "local-code",
+  "validated_by": "cws-conform",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P0-T17",
+  "skill": "cws-conform",
+  "perk": null,
+  "record_store": "<abs dir for P0-T04 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "every plan_sha/skill_sha/chip_sha/ledger hash routed through cwp.canonical_bytes",
+  "satisfies_criteria": [
+    "F1",
+    "P0-V03"
+  ],
+  "acceptance": {
+    "lint": "grep json.dumps \u2227 sha co-occurrence outside infra/cwp = 0"
+  },
+  "status": "todo",
+  "assignee": null
+}

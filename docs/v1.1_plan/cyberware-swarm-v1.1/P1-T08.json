@@ -1,0 +1,32 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P1-T08",
+  "task_hash": "9101bf7f6667",
+  "title": "Transport tourniquet: bearer auth + TLS edge + rate limit (F5 partial)",
+  "phase": "P1",
+  "ladder_rung": "SV-2",
+  "kind": "infra",
+  "effort": "M",
+  "parallel_group": "p1-infra",
+  "depends_on": [],
+  "executor": "governed-channel",
+  "validated_by": "cws-ledgercheck",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P1-T09",
+  "skill": "cws-ledgercheck",
+  "perk": null,
+  "record_store": "<abs dir for P1-T08 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "Authorization: Bearer only (query tokens deprecated); principals.json (id\u2192token-sha\u2192quota); token-bucket; TLS 1.3 edge documented",
+  "satisfies_criteria": [
+    "F5",
+    "P1-V07"
+  ],
+  "acceptance": {
+    "no_token": "401",
+    "rate_limit": "burst then 429",
+    "every_record_carries_principal": true
+  },
+  "status": "todo",
+  "assignee": null
+}
