@@ -79,6 +79,21 @@ def vectors():
                                            {"skill": "cws-observe", "skill_sha": "33" * 32, "file_count": 12}],
                                 "chip_sha": "44" * 32}))
     v.append(("chip_empty_manifest", {"chip": "skillChip", "count": 0, "skills": [], "chip_sha": "00" * 32}))
+
+    # P0-T04 digest-cutover call-site payloads — the EXACT objects the cutover routes through canonical_bytes,
+    # so cws-conform/crosslang proves the Go anchor reproduces THESE bytes (not just the JCS engine):
+    #  - the full 6-key plan_sha input INCLUDING `wrapper` (the one input carrying \n/\t/${} control chars)
+    v.append(("rec_plan_full", {"skill": "cws-conform", "perk": "doclint", "sequence": ["cws_doclint"],
+                                "wrapper": "set -e\nstep1() {\n\ttool ${X}\n}\n",
+                                "snippet_shas": {"cws_doclint.py": "ab" * 32}, "skill_sha": "cd" * 32}))
+    #  - the BARE maps skill_index actually hashes (skill_index.py:50 hashes `files`; :123 hashes {skill:skill_sha})
+    v.append(("chip_files_map", {"SKILL.md": "cd" * 32, "blueprint.json": "ef" * 32, "perks.json": "01" * 32}))
+    v.append(("chip_skillsha_map", {"cws-conform": "11" * 32, "cws-observe": "22" * 32}))
+    v.append(("chip_skillsha_map_empty", {}))   # the chip roll of a chip with no skills
+    #  - the v2 done-ledger genesis cross-reference record (decision-4 migration; tamper-bound cross-language)
+    v.append(("rec_ledger_genesis", {"type": "genesis", "schema": 2, "supersedes": "done-ledger",
+                                     "supersedes_file": "done-ledger.json", "supersedes_schema": 1,
+                                     "supersedes_head": "00" * 32, "supersedes_count": 10, "prev": "0" * 64}))
     return v
 
 
