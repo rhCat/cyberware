@@ -1,0 +1,37 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P5-T04",
+  "task_hash": "05f91220ee01",
+  "title": "HA design: active-passive govd + advisory-lock lease (M3)",
+  "phase": "P5",
+  "ladder_rung": "-",
+  "kind": "infra",
+  "effort": "L",
+  "parallel_group": "p5-core",
+  "depends_on": [
+    "P5-T01"
+  ],
+  "executor": "local-code",
+  "validated_by": "cws-chaos",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P2-T10",
+  "skill": "cws-chaos",
+  "perk": null,
+  "record_store": "<abs dir for P5-T04 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "active-passive over shared Postgres; single-writer via Postgres advisory-lock lease (no split-brain); WS resume per spec/inflight; maintenance mode pre-issues short-TTL grants; standby serves signed feed mirrors",
+  "satisfies_criteria": [
+    "M3",
+    "P5-V07",
+    "P5-V08",
+    "P5-V09"
+  ],
+  "acceptance": {
+    "failover_drill": "kill active mid-stream; standby acquires lease, WS resume, zero dup grants, zero lost step_results",
+    "no_orphaned_run": "interrupted runs reach terminal/resumable within lease TTL+30s",
+    "split_brain": "second writer cannot append while lease held; attempt recorded"
+  },
+  "status": "todo",
+  "assignee": null,
+  "validator_cross_phase": true
+}

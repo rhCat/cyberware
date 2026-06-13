@@ -1,0 +1,33 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P6-T15",
+  "task_hash": "833ed8962270",
+  "title": "Dust account + adapter-boundary rounding rule (M13 conceded half)",
+  "phase": "P6",
+  "ladder_rung": "SV-6",
+  "kind": "build",
+  "effort": "M",
+  "parallel_group": "p6-settle",
+  "depends_on": [
+    "P6-T01",
+    "P6-T14"
+  ],
+  "executor": "governed-channel",
+  "validated_by": "cws-settle-sim",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P6-T09",
+  "skill": "cws-settle-sim",
+  "perk": null,
+  "record_store": "<abs dir for P6-T15 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "banker's rounding at CWC scale-4 \u2194 integer cents; residue posts to dust:adapter:<id> inside the same balanced entry; monthly signed sweep to treasury",
+  "satisfies_criteria": [
+    "M13",
+    "P6-V16"
+  ],
+  "acceptance": {
+    "dust_conservation": "100k FX-boundary settlements: global zero-sum holds INCLUDING dust accounts; monthly sweep is a balanced signed record"
+  },
+  "status": "todo",
+  "assignee": null
+}

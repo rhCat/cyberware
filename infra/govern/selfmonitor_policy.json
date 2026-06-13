@@ -1,0 +1,29 @@
+{
+  "_doc": "The self-monitor's enforcement-surface mutation ratchet (plan v1.1 §4 / R3). Each gate module is mutation-tested by cws-mutate against its test slice; `floor` is the CURRENT measured coverage and may only RISE — a score below floor fails the gate (so the floor protects the very tests that earn it). `target` is the R3 bar (0.90). Scores are whole-file (diluted by CLI/argparse/print lines outside the gate logic); raise a floor whenever a slice is tightened. cap bounds the mutants sampled (deterministic).",
+  "enforcement_surface": [
+    {
+      "module": "infra/govern/govd.py",
+      "slice": "tests/test_govd.py",
+      "cap": 20,
+      "floor": 1.0,
+      "target": 0.90,
+      "note": "authorize_step / result_acceptable / ran_ok / steps_seen — the grant + upstream gates"
+    },
+    {
+      "module": "infra/govern/oversight.py",
+      "slice": "tests/test_oversight.py",
+      "cap": 50,
+      "floor": 0.4,
+      "target": 0.90,
+      "note": "scan() decision logic IS pinned; the survivors are the module's CLI/argparse/print path"
+    },
+    {
+      "module": "infra/govern/executor.py",
+      "slice": "tests/test_executor.py",
+      "cap": 20,
+      "floor": 0.4,
+      "target": 0.90,
+      "note": "tamper-check + in-channel oversight + upstream gate; raise as test_executor.py tightens"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P6-T03",
+  "task_hash": "fe7955771bc8",
+  "title": "Escrow lifecycle + expiry auto-refund (M4 liveness, M9 sentence 3)",
+  "phase": "P6",
+  "ladder_rung": "SV-6",
+  "kind": "build",
+  "effort": "M",
+  "parallel_group": "p6-settle",
+  "depends_on": [
+    "P6-T02",
+    "P4-T06"
+  ],
+  "executor": "governed-channel",
+  "validated_by": "cws-settle-sim",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P6-T09",
+  "skill": "cws-settle-sim",
+  "perk": null,
+  "record_store": "<abs dir for P6-T03 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "escrow accounts funded by initiators; every escrow carries expires_at; expiry without settlement auto-refunds (the V-LIVE guarantee, model-checked in P4)",
+  "satisfies_criteria": [
+    "M3",
+    "M4",
+    "P6-V12"
+  ],
+  "acceptance": {
+    "expiry_refund": "stalled escrow auto-refunds at expires_at \u00b1 one sweep; zero escrow older than bound at any audit"
+  },
+  "status": "todo",
+  "assignee": null
+}

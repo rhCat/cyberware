@@ -1,0 +1,34 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P0-T05",
+  "task_hash": "a038c10a513f",
+  "title": "Author JSON Schemas (2020-12) for every CWP message",
+  "phase": "P0",
+  "ladder_rung": "SV-1",
+  "kind": "spec",
+  "effort": "S",
+  "parallel_group": "p0-spec",
+  "depends_on": [
+    "P0-T01"
+  ],
+  "executor": "human-authoring",
+  "validated_by": "cws-conform",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P0-T17",
+  "skill": "cws-conform",
+  "perk": null,
+  "record_store": "<abs dir for P0-T05 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "spec/schemas/*.json \u2014 one schema per message type",
+  "satisfies_criteria": [
+    "F11",
+    "P0-V04"
+  ],
+  "acceptance": {
+    "exists": "spec/schemas/",
+    "validates": "every CWP instance in tests against its schema",
+    "threshold": "100%"
+  },
+  "status": "todo",
+  "assignee": null
+}

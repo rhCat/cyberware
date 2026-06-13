@@ -1,0 +1,32 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P6-T09",
+  "task_hash": "6dd8128d3bd9",
+  "title": "llm/* intelligence perk class (schema-validation payment gate)",
+  "phase": "P6",
+  "ladder_rung": "SV-6",
+  "kind": "skill",
+  "effort": "L",
+  "parallel_group": "p6-spec",
+  "depends_on": [
+    "P6-T08"
+  ],
+  "executor": "external-anchor",
+  "validated_by": "alchemy",
+  "bootstrap_exempt": true,
+  "validation_available_after": null,
+  "skill": null,
+  "perk": null,
+  "record_store": "<abs dir for P6-T09 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "skillChip/llm/ \u2014 declared I/O, model class, output contract; schema-fail \u21d2 publisher/agent earn zero, initiator refunded per validation_refund",
+  "satisfies_criteria": [
+    "P6-V05"
+  ],
+  "acceptance": {
+    "schema_fail_refund_split": "publisher/agent zero; initiator refunded per policy; pass-through + govd fee land per policy",
+    "per_contract_intelligence": "the meter measures effort; the contract decides whether effort was work"
+  },
+  "status": "todo",
+  "assignee": null
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P0-T07",
+  "task_hash": "91d3d2964288",
+  "title": "Generate the golden vector corpus (\u2265250)",
+  "phase": "P0",
+  "ladder_rung": "SV-1",
+  "kind": "build",
+  "effort": "M",
+  "parallel_group": "p0-core",
+  "depends_on": [
+    "P0-T02",
+    "P0-T03"
+  ],
+  "executor": "local-code",
+  "validated_by": "cws-conform",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P0-T17",
+  "skill": "cws-conform",
+  "perk": null,
+  "record_store": "<abs dir for P0-T07 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "spec/vectors/ \u2014 \u2265250 vectors: canonicalization edges, digests, DSSE sign/verify, chip fixtures",
+  "satisfies_criteria": [
+    "P0-V01"
+  ],
+  "acceptance": {
+    "exists": "spec/vectors/",
+    "count": ">=250",
+    "covers": [
+      "unicode",
+      "number-format",
+      "nesting",
+      "digests",
+      "signatures",
+      "chip"
+    ]
+  },
+  "status": "todo",
+  "assignee": null
+}

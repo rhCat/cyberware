@@ -1,0 +1,34 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P1-T03",
+  "task_hash": "4d684364ff55",
+  "title": "Merkle checkpoints in Ledger v2 (M7)",
+  "phase": "P1",
+  "ladder_rung": "SV-2",
+  "kind": "build",
+  "effort": "M",
+  "parallel_group": "p1-ledger",
+  "depends_on": [
+    "P1-T01"
+  ],
+  "executor": "governed-channel",
+  "validated_by": "cws-ledgercheck",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P1-T09",
+  "skill": "cws-ledgercheck",
+  "perk": null,
+  "record_store": "<abs dir for P1-T03 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "checkpoint records: chain head + Merkle balance root every N entries/T minutes, writer-signed",
+  "satisfies_criteria": [
+    "M7",
+    "P1-V11",
+    "P1-V12"
+  ],
+  "acceptance": {
+    "cold_verify": "1M-entry chain from last checkpoint <=2s on reference env",
+    "forged_checkpoint": "detected by next audit"
+  },
+  "status": "todo",
+  "assignee": null
+}

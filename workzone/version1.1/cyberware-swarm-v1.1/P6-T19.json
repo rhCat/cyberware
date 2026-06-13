@@ -1,0 +1,33 @@
+{
+  "$schema": "cwp-task-v1.1",
+  "task_id": "P6-T19",
+  "task_hash": "ac4f39369a5e",
+  "title": "Repatriate the ancestor as priced perks (M11 closing move)",
+  "phase": "P6",
+  "ladder_rung": "SV-6",
+  "kind": "build",
+  "effort": "M",
+  "parallel_group": "p6",
+  "depends_on": [
+    "P3-T08",
+    "P6-T05"
+  ],
+  "executor": "governed-channel",
+  "validated_by": "alchemy",
+  "bootstrap_exempt": false,
+  "validation_available_after": "P6-T09",
+  "skill": "alchemy",
+  "perk": null,
+  "record_store": "<abs dir for P6-T19 outputs + run-ledger>",
+  "vars": {},
+  "deliverable": "alchemy extract/conserve/classify/concord published as priced analysis perks; every verified-tier publish pays the lineage",
+  "satisfies_criteria": [
+    "M11",
+    "P6-V20"
+  ],
+  "acceptance": {
+    "lineage_receipt": ">=1 real verified-tier publish pays alchemy/* royalties through the reward ledger"
+  },
+  "status": "todo",
+  "assignee": null
+}
