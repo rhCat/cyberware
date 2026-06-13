@@ -23,6 +23,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-go@v5         # the external anchor (verifiers/go) is built + diffed in CI
+        with:
+          go-version: "1.21"
       - name: install
         run: |
           python -m pip install --upgrade pip
@@ -31,9 +34,11 @@ jobs:
         run: ruff check infra
       - name: skill authenticity index
         run: python3 -m infra.tool.skill_index --check
+      - name: go verifier (vet + unit tests — the independent JCS impl)
+        run: cd verifiers/go && go vet ./... && go test ./...
       - name: types (mypy)
         run: mypy infra || true
-      - name: test (pytest)
+      - name: test (pytest — incl. the cross-language conformance anchor)
         run: |
           if [ -d tests ]; then pytest tests --cov=infra; else echo "no tests/ dir — skipping"; fi
 
