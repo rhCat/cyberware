@@ -171,6 +171,26 @@ def test_conform_repin_flags_pre_existing_drift(tmp_path):
     assert any(d["skill"] == "demoskill" for d in report["pre_drift"])
 
 
+def test_doclint_rejects_a_non_normative_or_off_topic_spec(tmp_path):
+    """doclint must DISCRIMINATE: a doc that decides nothing (no RFC-2119 keyword) or omits a required
+    topic fails. A core that always reports ok would pass the happy self-test but fail here."""
+    core = _core("cws-conform", "doclint", "cws_doclint")
+
+    def lint(text, store, **extra):
+        spec = tmp_path / f"{store}.md"
+        spec.write_text(text)
+        sdir = tmp_path / store
+        env = {**os.environ, "SPEC": str(spec), "RECORD_STORE": str(sdir), **extra}
+        rc = subprocess.run([sys.executable, core], env=env, capture_output=True, text=True, cwd=ROOT).returncode
+        return rc, json.load(open(sdir / "doclint.json"))
+
+    rc, rep = lint("# Title\n\nThis says nothing binding.\n", "weak", MIN_NORMATIVE="1")
+    assert rc != 0 and rep["status"] == "fail" and rep["normative_count"] == 0
+
+    rc, rep = lint("# Title\n\nA grant MUST carry a key-id.\n", "offtopic", REQUIRE="rotation")
+    assert rc != 0 and "rotation" in str(rep["missing_required"])
+
+
 # ── cws-observe ──────────────────────────────────────────────────────────────────────────────────
 
 def _run(skill, perk, mod, vars_, store):
