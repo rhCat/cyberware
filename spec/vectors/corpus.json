@@ -1265,5 +1265,52 @@
       },
       "skill_sha": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
     }
+  },
+  {
+    "name": "chip_skill_index",
+    "input": {
+      "skill": "cws-conform",
+      "skill_sha": "abababababababababababababababababababababababababababababababab",
+      "file_count": 9,
+      "files": {
+        "SKILL.md": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "blueprint.json": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "perks.json": "0101010101010101010101010101010101010101010101010101010101010101"
+      }
+    }
+  },
+  {
+    "name": "chip_manifest",
+    "input": {
+      "chip": "skillChip",
+      "count": 3,
+      "skills": [
+        {
+          "skill": "cws-conform",
+          "skill_sha": "1111111111111111111111111111111111111111111111111111111111111111",
+          "file_count": 9
+        },
+        {
+          "skill": "cws-mutate",
+          "skill_sha": "2222222222222222222222222222222222222222222222222222222222222222",
+          "file_count": 7
+        },
+        {
+          "skill": "cws-observe",
+          "skill_sha": "3333333333333333333333333333333333333333333333333333333333333333",
+          "file_count": 12
+        }
+      ],
+      "chip_sha": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  },
+  {
+    "name": "chip_empty_manifest",
+    "input": {
+      "chip": "skillChip",
+      "count": 0,
+      "skills": [],
+      "chip_sha": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
   }
 ]
