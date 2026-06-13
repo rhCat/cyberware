@@ -54,6 +54,24 @@
       "verdict": "pass",
       "evidence_sha": "f090d1fe3be6ef040ea2b2d5be53180e3dea30634646d710ad3ee94e4ef7991c",
       "prev": "8afc167aee497a4a71220502cd3831ee0510479e064bc3a386905fd623637e59"
+    },
+    {
+      "seq": 7,
+      "ts": "2026-06-13T14:27:03Z",
+      "task_id": "P0-T07",
+      "validator": "cws-conform",
+      "verdict": "pass",
+      "evidence_sha": "14ce9e8a2a21d8139f812f985b98c569eae20ce07fa734ad9c5134c30c310f62",
+      "prev": "da3dfe94178cc8f5db1cde3e34a7e61e0a73091ac71860c05167556c299e9cd6"
+    },
+    {
+      "seq": 8,
+      "ts": "2026-06-13T14:27:03Z",
+      "task_id": "P0-T17",
+      "validator": "cws-conform",
+      "verdict": "pass",
+      "evidence_sha": "14ce9e8a2a21d8139f812f985b98c569eae20ce07fa734ad9c5134c30c310f62",
+      "prev": "a0dfe18f6131b6c367d923584eb156a742541fad1e78a1f5adf93660f262f2ef"
     }
   ]
 }
