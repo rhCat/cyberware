@@ -9,9 +9,10 @@ through `executor.py`. The compiler touches nothing — it returns a string.
   compiler.py --ledger task-ledger.json [-o run.sh]
 """
 from __future__ import annotations
-import argparse, hashlib, json, os, re, shlex, sys
+import argparse, json, os, re, shlex, sys
 
 from infra import registry
+from infra.cwp import canonical
 from infra.govern.runlog import run_dir
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -47,8 +48,10 @@ def build_script(L):
     for i, tool in enumerate(seq, 1):
         out.append(f"step{i}() {{   # {tool}")
         out.append(f'  echo "[step {i}] {tool}"')
-        out.append(f'  bash "$SNIP/{tool}.sh"')
-        # contract checks (output_exists → file present; the snippet itself set -e handles exit_zero)
+        # exit_zero contract: a tool signals failure by its exit code, so propagate it — without this the
+        # step swallows a nonzero exit and a FAILED validator would record `ok` through the governed channel.
+        out.append(f'  bash "$SNIP/{tool}.sh" || exit $?')
+        # contract checks (output_exists → the declared artifact must be present)
         oe = contract.get("checks", {}).get("output_exists")
         if oe and tool == seq[-1]:   # the contract's declared output is the perk's final artifact
             out.append(f'  test -f "{oe}" || {{ echo "CONTRACT FAIL step {i}: missing {oe}" >&2; exit 3; }}')
@@ -95,7 +98,9 @@ def build_plan(skill, perk):
     for i, tool in enumerate(seq, 1):
         wrap.append(f"step{i}() {{   # {tool}")
         wrap.append(f'  echo "[step {i}] {tool}"')
-        wrap.append(f'  bash "$SNIP/{tool}.sh"')
+        # exit_zero contract: propagate the tool's exit — without this a FAILED validator records `ok`
+        # through the governed channel (the step would fall through to the output_exists check and return 0).
+        wrap.append(f'  bash "$SNIP/{tool}.sh" || exit $?')
         oe = contract.get("checks", {}).get("output_exists")
         if oe and tool == seq[-1]:
             wrap.append(f'  test -f "{oe}" || {{ echo "CONTRACT FAIL step {i}: missing {oe}" >&2; exit 3; }}')
@@ -119,10 +124,8 @@ def plan_sha(plan):
     """The sha256 of the execution plan — value-free, so govd and the agent compute the same hash.
     Covers the pathway (skill/perk/sequence), the perk's src-closure hashes + the skill roll-up, and the
     wrapper structure."""
-    canon = json.dumps({k: plan.get(k) for k in
-                        ("skill", "perk", "sequence", "wrapper", "snippet_shas", "skill_sha")},
-                       sort_keys=True)
-    return hashlib.sha256(canon.encode()).hexdigest()
+    return canonical.digest({k: plan.get(k) for k in
+                             ("skill", "perk", "sequence", "wrapper", "snippet_shas", "skill_sha")})
 
 
 def task_blueprint(L, run, seq=None):
