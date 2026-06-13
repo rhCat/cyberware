@@ -232,6 +232,21 @@ def test_observe_status_blocks_a_task_whose_dep_is_not_redeemed(tmp_path):
     assert rep["by_task"]["P0-T02"] == "blocked:deps"     # its dep is not redeemed
 
 
+def test_observe_redeem_accepts_govd_provenance_ledger():
+    """redeem must accept govd's own provenance ledger (events[] + decision) as evidence — so a redemption
+    is backed by the dashboard-visible, value-free record, not just a local executor run-ledger."""
+    rd = _load("cws-observe", "redeem", "cws_observe_redeem")
+    ok = {"decision": "allow", "skill": "cws-conform",
+          "events": [{"type": "granted", "step": "1"}, {"type": "step_result", "step": "1", "status": "ok"}]}
+    assert rd.run_ledger_passed(ok)[0] is True
+    assert rd.run_ledger_passed({**ok, "decision": "reject"})[0] is False
+    err = {"decision": "allow", "skill": "cws-conform", "events": [{"type": "step_result", "step": "1", "status": "error"}]}
+    assert rd.run_ledger_passed(err)[0] is False
+    refused = {"decision": "allow", "skill": "cws-conform",
+               "events": [{"type": "oversight_refused"}, {"type": "step_result", "step": "1", "status": "ok"}]}
+    assert rd.run_ledger_passed(refused)[0] is False
+
+
 def test_observe_redeem_refuses_failing_evidence(tmp_path):
     sw = tmp_path / "swarm"; _mini_swarm(sw, [("P0-T17", "cws-conform", [])])
     ev = tmp_path / "ev"; ev.mkdir()
