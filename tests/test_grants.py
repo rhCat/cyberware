@@ -60,3 +60,26 @@ def test_forged_grant_refused():
 def test_non_grant_envelope_refused():
     sk, pk = _kp()
     assert verify_grant(pk, sign.sign({"x": 1}, sk), now=1000) == (False, "wrong_type")
+
+
+def test_cross_issuer_nonce_isolated():
+    """A shared cache must not let one issuer spend/refuse another issuer's nonce (audit major #1)."""
+    skA, pkA = _kp()
+    skB, pkB = _kp()
+    cache = NonceCache()
+    assert verify_grant(pkA, _grant(skA, 990, 1100, nonce="shared"), now=1000, nonce_cache=cache)[0] is True
+    assert verify_grant(pkB, _grant(skB, 990, 1100, nonce="shared"), now=1000, nonce_cache=cache)[0] is True
+    assert verify_grant(pkA, _grant(skA, 990, 1100, nonce="shared"), now=1000, nonce_cache=cache) == (False, "replay")
+
+
+def test_malformed_nonce_refused_not_crashed():
+    """A None / non-string nonce gives no replay protection -> refuse cleanly, never crash (audit #2/#3)."""
+    import pytest
+    sk, pk = _kp()
+    with pytest.raises(ValueError):
+        mint_grant(sk, run_id="r", plan_sha="p", nbf=990, exp=1100, nonce=None)
+    for bad in (None, ["a", "b"], {"k": 1}, ""):
+        env = sign.sign({"run_id": "r", "plan_sha": "p", "snippet_shas": {}, "capabilities": [],
+                         "credentials": [], "nbf": 990, "exp": 1100, "nonce": bad},
+                        sk, payload_type="application/vnd.cyberware.grant+json")
+        assert verify_grant(pk, env, now=1000, nonce_cache=NonceCache()) == (False, "malformed_nonce")
