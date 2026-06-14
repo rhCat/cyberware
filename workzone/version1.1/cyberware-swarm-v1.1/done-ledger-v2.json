@@ -92,6 +92,15 @@
       "verdict": "pass",
       "evidence_sha": "1d8f5076c23f1cfaf722c6a6d011a4bb500ca9f9eea17b5b66b22cefb1d60249",
       "prev": "3ace57035e8beebd4adf6d6fa62a1da681e45897ff92e43913fddd579834026a"
+    },
+    {
+      "seq": 11,
+      "ts": "2026-06-14T15:19:01Z",
+      "task_id": "P1-T10",
+      "validator": "cws-mutate",
+      "verdict": "pass",
+      "evidence_sha": "94880d4cb4d09d8c15455263c35ef79a160d198e6ca0e8d8928f513385ac3918",
+      "prev": "583504cd5e9e9f4c3c86b45f2a35ab40fbd25f5dcc56fac0a0768ef268042121"
     }
   ]
 }
