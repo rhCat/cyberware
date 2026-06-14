@@ -261,13 +261,17 @@ class Store:
         self.runs = {}                                       # insertion-ordered -> oldest is first
         self.max_runs = max_runs
         self.decisions = collections.deque(maxlen=500)       # every /govern verdict (metadata, for the monitor)
+        self.decisions_log = os.path.join(self.root, "decisions.jsonl")  # durable, append-only: ALL verdicts
         self._hydrate()                                      # load persisted ledgers (mounted record_root)
 
     def _path(self, run_id): return os.path.join(self.root, run_id, "ledger.json")
 
     def _hydrate(self):
         """Load existing per-run ledgers from disk (most recent up to max_runs) so a restarted server with
-        a MOUNTED record_root still shows history for review. Rebuilds the decisions feed from them too."""
+        a MOUNTED record_root still shows history for review. The decisions feed — which includes
+        rejects/push-backs that are NOT persisted as run dirs — is reloaded from the durable, append-only
+        decisions.jsonl; for a legacy record_root without that file, it is rebuilt from the (allow-only)
+        ledgers so nothing regresses."""
         found = []
         for name in os.listdir(self.root):
             p = self._path(name)
@@ -283,12 +287,25 @@ class Store:
                 continue
             rec["restored"] = True                           # loaded from disk (a prior session)
             self.runs[rid] = rec
-            self.decisions.append({"run_id": rid, "ts": rec.get("ts"), "skill": rec.get("skill"),
-                                   "perk": rec.get("perk"), "decision": rec.get("decision"),
-                                   "destructive": rec.get("destructive", False),
-                                   "var_keys": rec.get("var_keys", []), "plan_sha": (rec.get("plan_sha") or "")[:12],
-                                   "tlc": rec.get("tlc"), "problems": [p.get("id") for p in rec.get("problems", [])],
-                                   "needs_approve": [], "restored": True})
+        # the decisions feed = allow runs (from their ledgers, incl. legacy record_roots) UNION every verdict
+        # (from the durable log, incl. rejects/push-backs), deduped by run_id and chronological — so both the
+        # historical allows AND the durable rejects survive a restart.
+        by_id = {}
+        for rid, rec in self.runs.items():
+            by_id[rid] = {"run_id": rid, "ts": rec.get("ts"), "skill": rec.get("skill"), "perk": rec.get("perk"),
+                          "decision": rec.get("decision"), "destructive": rec.get("destructive", False),
+                          "var_keys": rec.get("var_keys", []), "plan_sha": (rec.get("plan_sha") or "")[:12],
+                          "tlc": rec.get("tlc"), "problems": [p.get("id") for p in rec.get("problems", [])],
+                          "needs_approve": [], "restored": True}
+        if os.path.isfile(self.decisions_log):
+            for line in open(self.decisions_log).read().splitlines():
+                try:
+                    s = json.loads(line); s["restored"] = True
+                    by_id[s.get("run_id") or len(by_id)] = s     # the durable log is authoritative for its verdicts
+                except ValueError:
+                    continue
+        for s in sorted(by_id.values(), key=lambda x: x.get("ts") or "")[-self.decisions.maxlen:]:
+            self.decisions.append(s)
 
     def _persist(self, run_id, snapshot):
         os.makedirs(os.path.join(self.root, run_id), exist_ok=True)
@@ -333,6 +350,11 @@ class Store:
     def record_decision(self, summary):
         with self.lock:
             self.decisions.append(summary)
+            try:                                             # durable audit: append EVERY verdict (incl. rejects/
+                with open(self.decisions_log, "a") as f:     # push-backs) so it survives a restart, even though
+                    f.write(json.dumps(summary) + "\n")      # only ALLOW runs get a full per-run ledger dir
+            except OSError:
+                pass
 
     def run_detail(self, run_id):
         """The full value-free record for one run (events, steps, plan hash, tlc) — for the review panel.
