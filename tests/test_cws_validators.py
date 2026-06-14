@@ -332,3 +332,84 @@ def test_observe_status_breaks_when_v2_genesis_cross_ref_mismatches_v1(tmp_path)
     rc = _run("cws-observe", "status", "cws_observe_status", {"SWARM_DIR": str(sw)}, store)
     rep = json.load(open(store / "observe.json"))
     assert rep["done_ledger_chain"] == "broken" and rc != 0
+
+
+# ── cws-pm (composite operator: progress-report rendering robustness) ───────────────────────────────
+import re  # noqa: E402
+
+
+def _tables_wellformed(md):
+    """Every markdown table data row must carry the same unescaped-pipe cell count as its header.
+    Returns the malformed rows — the property the §3/§4/§5 cell-escaping must guarantee."""
+    def cells(ln):
+        return len(re.split(r"(?<!\\)\|", ln)) - 2          # cells between the outer pipes
+    bad, hdr = [], None
+    for i, ln in enumerate(md.splitlines()):
+        s = ln.strip()
+        if s.startswith("|") and s.endswith("|"):
+            if set(s.replace("|", "").strip()) <= set("-: "):   # the |---|---| separator row
+                continue
+            if hdr is None:
+                hdr = cells(s)
+            elif cells(s) != hdr:
+                bad.append((i, ln))
+        else:
+            hdr = None                                          # a blank/prose line ends the table
+    return bad
+
+
+def _pm_report(report, dag, redeemed, dry):
+    return _load("cws-pm", "run", "cws_pm")._render_report(report, "", dag, redeemed, dry)
+
+
+def _pm_counts(**kw):
+    c = {"already_redeemed": 0, "redeemed": 0, "ran": 0, "blocked_deps": 0,
+         "blocked_validator": 0, "failed": 0, "dry": 0}
+    c.update(kw)
+    return c
+
+
+def test_pm_report_escapes_table_breaking_text_in_a_title():
+    """A title with a pipe/backtick/newline (P4-T02 ships one: `on_fail: to|retry|compensate`) must not
+    split its §3 row into extra cells — the live content-loss bug the report audit caught."""
+    dag = {"P0-T01": {"task_id": "P0-T01", "depends_on": [],
+                      "title": "Failure (on_fail: to|retry|compensate) `tick`\nand a newline"}}
+    report = {"status": "ok", "dry_run": True, "total": 1, "redeemed_total": 0,
+              "counts": _pm_counts(dry=1),
+              "steps": [{"task_id": "P0-T01", "skill": "cws-conform", "perk": "x", "status": "dry"}]}
+    assert _tables_wellformed(_pm_report(report, dag, set(), True)) == []
+
+
+def test_pm_report_program_count_intersects_the_dag():
+    """Off-DAG / stale done-ledger pass entries must NOT inflate the Program roll-up — parity with
+    cws-observe/status's `redeemed &= set(tasks)` (otherwise the bar renders a nonsensical >100%)."""
+    dag = {"P0-T01": {"task_id": "P0-T01", "depends_on": []},
+           "P0-T02": {"task_id": "P0-T02", "depends_on": []}}
+    report = {"status": "ok", "dry_run": True, "total": 0, "redeemed_total": 1,
+              "counts": _pm_counts(), "steps": []}
+    md = _pm_report(report, dag, {"P0-T01", "STALE-1", "STALE-2", "DEMO-9"}, True)   # 3 of 4 off-DAG
+    assert "**Program:** 1 of 2 DAG tasks redeemed" in md
+    assert "250%" not in md and "300%" not in md
+
+
+def test_pm_report_live_failed_detail_stays_single_line():
+    """An untrusted govd error carrying a newline/backtick must not break the §5 table or bullet."""
+    report = {"status": "fail", "dry_run": False, "total": 1, "redeemed_total": 0,
+              "counts": _pm_counts(failed=1),
+              "steps": [{"task_id": "P0-T01", "skill": "cws-conform", "perk": "x", "status": "failed",
+                         "run_id": "abc", "detail": "decision=reject\nreason `boom`"}]}
+    md = _pm_report(report, {}, set(), False)
+    assert _tables_wellformed(md) == []
+    bullet = [ln for ln in md.splitlines() if ln.startswith("- ") and "failed**" in ln]
+    assert bullet and "`boom`" not in bullet[0]             # the stray backtick was neutralized
+
+
+def test_pm_report_discloses_steps_never_reached_on_early_halt():
+    """STOP_ON_FAIL leaves steps < total; the report must surface the gap, not silently drop them."""
+    report = {"status": "fail", "dry_run": False, "total": 5, "redeemed_total": 0,
+              "counts": _pm_counts(ran=1, failed=1),
+              "steps": [{"task_id": "P0-T01", "skill": "cws-conform", "perk": "x", "status": "ran", "run_id": "a"},
+                        {"task_id": "P0-T02", "skill": "cws-conform", "perk": "x", "status": "failed",
+                         "run_id": "b", "detail": "boom"}]}
+    md = _pm_report(report, {}, set(), False)
+    assert "3 of 5 steps were never reached" in md
