@@ -165,6 +165,22 @@ def test_ledgercheck_refuses_schema_downgrade_and_survives_bad_seq():
     assert out and ("seq" in out[0] or "prev" in out[0])
 
 
+def test_ledgercheck_verifies_a_govd_provenance_ledger():
+    """The recursive SV-2 act (P1-T09): verify must recognise the {decision, events} run-ledger a governed
+    run writes — a sound record passes (a recorded refusal is still evidence); a malformed one is named."""
+    lv = _load("cws-ledgercheck", "verify", "cws_ledgerverify")
+    good = {"decision": "allow", "events": [
+        {"type": "granted", "step": "1"},
+        {"type": "step_result", "step": "1", "status": "ok", "exit": 0}]}
+    recs, bad, mode = lv.verify(good)
+    assert mode == "govd" and bad == [] and recs == 2
+    refused = {"decision": "allow", "events": [{"type": "tamper_refused", "step": "1"}]}
+    assert lv.verify(refused)[1] == []                          # a recorded refusal is evidence, not corruption
+    malformed = {"decision": "allow", "events": [{"type": "step_result", "step": "1"}]}  # no status
+    assert lv.verify(malformed)[1]                              # named broken
+    assert lv.verify({"decision": "allow", "events": "nope"})[1]  # events not a list
+
+
 def test_ledger_v2_writer_roundtrips_through_jsonl():
     """P1-T01 write path: genesis(run_id, plan_sha) + append produce a chain that survives a JSONL
     write/read round-trip and verifies; the genesis binds the origin."""
