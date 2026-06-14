@@ -8,6 +8,9 @@ The agent never runs the compiled bash directly — it calls executor.py, which:
     REFUSED on unwaived violations; approvable rules are waived only by an explicit `--approve <id>`,
     and every waiver is recorded to the run-ledger (running `oversight.py` first is pre-flight
     visibility, but the executor re-checks regardless — the gate cannot be skipped);
+  * RE-VERIFIES each step's snippet (the perk porter) against its blessed authenticity digest at the
+    instant of execution — a perk source mutated AFTER blessing but BEFORE the step runs refuses exactly
+    that step (snippet_refused, expected-vs-found recorded), closing the time-of-check-to-time-of-use gap;
   * REFUSES a step whose upstream steps have not been recorded as run (require_upstream);
   * registers every run — ts, step, exit, duration, output hash, output tail — to a persistent
     `run-ledger.json` under the record_store (the provenance chain);
@@ -28,8 +31,29 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 
 def sha(b): return hashlib.sha256(b if isinstance(b, bytes) else b.encode()).hexdigest()[:16]
+def sha256_full(b): return hashlib.sha256(b if isinstance(b, bytes) else b.encode()).hexdigest()
 def now(): return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 def rules(): return json.load(open(os.path.join(ROOT, "infra", "govern", "EXECUTOR_RULE.json")))
+
+
+def _blessed_snippets(script):
+    """For a compiled perk script, return ({snippet_filename: blessed_sha256}, snip_dir) — the perk's
+    authenticity digests from its skill's index.json (the same source the plan's snippet_shas are blessed
+    from). Returns ({}, None) for any non-compiler script, so the per-step check is a strict no-op there."""
+    snip = None
+    for line in open(script):
+        m = re.search(r"^SNIP=('([^']*)'|\"([^\"]*)\"|(\S+))", line)
+        if m:
+            snip = next(g for g in m.groups()[1:] if g is not None)
+            break
+    if not snip:
+        return {}, None
+    try:                                                     # index.json sits 3 dirs above <skill>/perks/<perk>/src
+        idx = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(snip))), "index.json")))
+        prefix = f"perks/{os.path.basename(os.path.dirname(snip))}/src/"
+        return {rel[len(prefix):]: h for rel, h in idx.get("files", {}).items() if rel.startswith(prefix)}, snip
+    except Exception:
+        return {}, snip
 
 
 def record_store_of(script):
@@ -95,7 +119,11 @@ def main():
 
     # which steps — both paths validate against the script's own --list
     listing = subprocess.run(["bash", script, "--list"], capture_output=True, text=True).stdout
-    declared = [ln.split("\t")[0].strip() for ln in listing.strip().splitlines() if ln.strip()]
+    rows = [ln.split("\t") for ln in listing.strip().splitlines() if ln.strip()]
+    declared = [r[0].strip() for r in rows]
+    step_tool = {r[0].strip(): r[1].strip() for r in rows if len(r) > 1}   # step -> tool, for snippet verify
+    blessed, snip = _blessed_snippets(script)                              # {} / None for non-compiler scripts
+    snip_verify = bool(snip and blessed and step_tool)
     if a.all:
         steps = declared
     elif a.step:
@@ -117,6 +145,21 @@ def main():
             if missing:
                 print(f"  [UPSTREAM] step {st} blocked — upstream not run: {', '.join(missing)} — REFUSED")
                 sys.exit(5)
+        # 3b. per-step snippet verification — re-hash THIS step's porter at time-of-USE, closing the gap
+        #     between the agent's up-front registry verify and the run (a post-bless mutation of the perk
+        #     source refuses EXACTLY this step, with expected-vs-found digests recorded as evidence)
+        if snip_verify and st in step_tool:
+            fname = step_tool[st] + ".sh"
+            want = blessed.get(fname)
+            fp = os.path.join(snip, fname)
+            found = sha256_full(open(fp, "rb").read()) if os.path.isfile(fp) else None
+            if want is not None and found != want:
+                print(f"  [SNIPPET] step {st} ({step_tool[st]}) snippet drift — REFUSED "
+                      f"(expected {want[:16]}…, found {(found or 'MISSING')[:16]}…)")
+                ledger["runs"].append({"ts": now(), "event": "snippet_refused", "step": str(st),
+                                       "tool": step_tool[st], "file": fname, "expected": want, "found": found})
+                json.dump(ledger, open(lpath, "w"), indent=2)
+                sys.exit(8)
         # 4. governed run + provenance record
         print(f"  [run] step {st}")
         t0 = time.time()
