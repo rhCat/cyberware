@@ -1,7 +1,7 @@
 """Reusable Ledger-v2 durability torture harness (P1-T02).
 
-Imported by the unit suite (fast scale) and, later, by the P1-T09 governed `torture` perk (full scale) —
-it is NOT a test_*.py, so pytest does not collect it. Each writer process appends via
+The durability proof for the Ledger-v2 chain: imported by the unit suite (fast scale) AND by the
+governed `cws-ledgercheck/torture` perk (P1-T09). Each writer process appends via
 `ledger.durable_append`, which re-reads the chain tail UNDER an exclusive lock and links from it, so N
 concurrent writers serialize into ONE valid prev-hash chain (never from a stale in-memory copy). The
 harness reads the result back (torn-tail-aware) and checks the durability acceptance: zero lost (count),
