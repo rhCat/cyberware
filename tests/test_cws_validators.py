@@ -84,6 +84,105 @@ def test_ledgercheck_accepts_recorded_refusal_events_as_evidence():
     assert lv.verify(unknown)[1]
 
 
+def _v2_chain():
+    from infra.cwp import ledger as L
+    chain = [L.genesis("run-A", "plan-1")]
+    L.append(chain, {"task_id": "T1", "verdict": "pass", "evidence_sha": "a"})
+    L.append(chain, {"task_id": "T2", "verdict": "pass", "evidence_sha": "b"})
+    return chain
+
+
+def test_ledgercheck_recomputes_a_v2_chain_and_names_tamper():
+    """SV-2 (P1-T01): the cryptographic prev-chain is RE-verified, not trusted — a mutated record breaks
+    the recompute and the first record that fails to chain is named."""
+    import copy
+    lv = _load("cws-ledgercheck", "verify", "cws_ledgerverify")
+    chain = _v2_chain()
+    assert lv.verify(chain)[1] == []                             # sound chain — list form
+    assert lv.verify({"schema": 2, "entries": chain})[1] == []  # sound chain — {entries} object form
+    tampered = copy.deepcopy(chain)
+    tampered[1]["evidence_sha"] = "MUTATED"                      # flip a field -> downstream prev no longer matches
+    bad = lv.verify(tampered)[1]
+    assert bad and "T2" in bad[0]
+
+
+def test_ledgercheck_nontransplant_needs_an_out_of_band_origin():
+    """The honest boundary: the SAME records re-linked under a different genesis are internally consistent,
+    so non-transplant can only be certified against an expected origin sourced OUT-OF-BAND."""
+    from infra.cwp import ledger as L
+    lv = _load("cws-ledgercheck", "verify", "cws_ledgerverify")
+    forged = [L.genesis("run-EVIL", "plan-EVIL")]               # attacker re-stamps the work under a new origin
+    L.append(forged, {"task_id": "T1", "verdict": "pass"})
+    L.append(forged, {"task_id": "T2", "verdict": "pass"})
+    assert lv.verify(forged)[1] == []                           # internally consistent -> passes without an anchor
+    bad = lv.verify(forged, expect_run_id="run-REAL", expect_plan_sha="plan-REAL")[1]
+    assert bad and "transplant" in bad[0]                       # pinned origin rejects the transplant
+
+
+def test_ledgercheck_rejects_headless_empty_and_double_genesis():
+    """A provenance chain must have exactly one leading genesis. A genesis-less ('decapitated') chain, an
+    empty chain, or a second genesis mid-chain must all read broken — not 'ok'."""
+    from infra.cwp import ledger as L
+    lv = _load("cws-ledgercheck", "verify", "cws_ledgerverify")
+    assert lv.verify([])[1]                                     # empty -> broken
+    headless = [{"type": "step", "task_id": "evil", "seq": 0, "prev": L.ZERO}]
+    L.append(headless, {"task_id": "evil2"})
+    assert lv.verify(headless)[1] and "genesis" in lv.verify(headless)[1][0]
+    dbl = _v2_chain()
+    dbl.append(L.genesis("run-X", "plan-X"))                    # a second genesis appended (its prev is ZERO)
+    assert lv.verify(dbl)[1]
+
+
+def test_ledgercheck_flags_a_deleted_middle_record_via_seq_gap():
+    """Deleting a genuine record and re-linking its successor leaves a non-contiguous seq (0,1,3); the
+    cryptographic check must catch the gap, not only the structural sibling."""
+    from infra.cwp import ledger as L
+    import copy
+    lv = _load("cws-ledgercheck", "verify", "cws_ledgerverify")
+    chain = [L.genesis("r", "p")]
+    L.append(chain, {"task_id": "t1"})
+    L.append(chain, {"task_id": "t2"})
+    L.append(chain, {"task_id": "t3"})
+    cut = copy.deepcopy(chain)
+    del cut[2]                                                   # drop t2
+    cut[2]["prev"] = L.link_digest(L.link_of(cut[1]), 2)        # repoint former t3 onto t1 (seqs now 0,1,3)
+    bad = lv.verify(cut)[1]
+    assert bad and "contiguous" in bad[0]
+
+
+def test_ledgercheck_refuses_schema_downgrade_and_survives_bad_seq():
+    """A chain can't pick its own (retired) digest: a schema-1 chain is refused without an explicit opt-in.
+    A non-integer seq reads broken, never an uncaught crash."""
+    from infra.cwp import ledger as L
+    lv = _load("cws-ledgercheck", "verify", "cws_ledgerverify")
+    legacy = {"schema": 1, "entries": [L.genesis("r", "p", schema=1)]}
+    L.append(legacy["entries"], {"task_id": "x"}, schema=1)
+    assert lv.verify(legacy)[1] and "legacy" in lv.verify(legacy)[1][0]          # refused by default
+    assert lv.verify(legacy, allow_legacy=True)[1] == []                         # audited with opt-in
+    bad_seq = _v2_chain()
+    bad_seq[1]["seq"] = "two"                                                     # type confusion must not crash
+    out = lv.verify(bad_seq)[1]
+    assert out and ("seq" in out[0] or "prev" in out[0])
+
+
+def test_ledger_v2_writer_roundtrips_through_jsonl():
+    """P1-T01 write path: genesis(run_id, plan_sha) + append produce a chain that survives a JSONL
+    write/read round-trip and verifies; the genesis binds the origin."""
+    from infra.cwp import ledger as L
+    import tempfile
+    chain = [L.genesis("run-Z", "plan-Z")]
+    L.append(chain, {"task_id": "A", "verdict": "pass"})
+    L.append(chain, {"task_id": "B", "verdict": "pass"})
+    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+        path = f.name
+    L.write_chain(path, chain)
+    entries, schema = L.read_chain(path)
+    assert schema == 2 and len(entries) == 3
+    assert L.verify_chain(entries, schema)[0] is True
+    assert entries[0]["run_id"] == "run-Z" and entries[0]["plan_sha"] == "plan-Z"
+    os.remove(path)
+
+
 # ── cws-modelcheck ───────────────────────────────────────────────────────────────────────────────
 
 def test_modelcheck_accepts_a_sound_blueprint_and_flags_a_deadlock():
