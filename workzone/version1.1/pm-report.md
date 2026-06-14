@@ -6,13 +6,13 @@
 
 **Status: ok** (tracking pass)
 
-**Playbook:** 15 of 90 steps redeemed — `███░░░░░░░░░░░░░░░░░` 17%
+**Playbook:** 16 of 90 steps redeemed — `████░░░░░░░░░░░░░░░░` 18%
 
-**Program:** 15 of 90 DAG tasks redeemed — `███░░░░░░░░░░░░░░░░░` 17%
+**Program:** 16 of 90 DAG tasks redeemed — `████░░░░░░░░░░░░░░░░` 18%
 
-`15 redeemed · 10 blocked:deps · 52 blocked:validator · 13 dry`
+`16 redeemed · 10 blocked:deps · 52 blocked:validator · 12 dry`
 
-Done-ledger: 15 pass entries (chain not re-verified here — see §7).
+Done-ledger: 16 pass entries (chain not re-verified here — see §7).
 
 ## 2. Milestones
 
@@ -20,7 +20,7 @@ Done-ledger: 15 pass entries (chain not re-verified here — see §7).
 |---|---|---|---|---|
 | **M0** — The spine stands — governed execution end to end (internal) | - | 4/15 | `P6-T05` | open |
 | **M1** — SV-1 — the protocol is real and portable | SV-1 | 7/7 | `P0-T18` | **closed** |
-| **M2** — SV-2 — evidence becomes tamper-evident | SV-2 | 3/8 | `P1-T09, P1-T10` | open |
+| **M2** — SV-2 — evidence becomes tamper-evident | SV-2 | 4/8 | `P1-T09, P1-T10` | open |
 | **M3** — SV-3 — execution becomes a kernel-enforced boundary  ◀ MVP | SV-3 | 3/10 | `P2-T08, P2-T09` | open |
 | **M4** — SV-4 — the registry and the engine publish and revoke themselves | SV-4 | 2/9 | `P3-T09, P3-T15` | open |
 | **M5** — SV-5 — workflows and the money's lifecycle are model-checked | SV-5 | 1/8 | `P4-T09` | open |
@@ -38,7 +38,6 @@ _Closure is the transitive dependency cone of each milestone's gate task(s), red
 | `P0-T16` | `cws-conform` | Truth-in-labeling docs pass |
 | `P1-T02` | `cws-ledgercheck` | Ledger durability: O_APPEND + fsync + flock + atomic snapshot |
 | `P1-T03` | `cws-ledgercheck` | Merkle checkpoints in Ledger v2 (M7) |
-| `P1-T04` | `cws-ledgercheck` | cyberware ledger verify + Go chain-checker (anchor) |
 | `P1-T05` | `cws-ledgercheck` | Per-step snippet verification at instant of execution |
 | `P1-T06` | `cws-ledgercheck` | Plan as sole source of step truth (delete --list execution) |
 | `P1-T07` | `cws-ledgercheck` | Crypto-shredding fields in records (M5) |
@@ -52,8 +51,8 @@ _Closure is the transitive dependency cone of each milestone's gate task(s), red
 
 | task | validator | waiting on |
 |---|---|---|
-| `P1-T09` | `cws-ledgercheck` | `P1-T02`, `P1-T04` |
-| `P1-T10` | `cws-mutate` | `P1-T04`, `P1-T05` |
+| `P1-T09` | `cws-ledgercheck` | `P1-T02` |
+| `P1-T10` | `cws-mutate` | `P1-T05` |
 | `P4-T03` | `cws-modelcheck` | `P4-T02` |
 | `P4-T04` | `cws-modelcheck` | `P4-T01` |
 | `P4-T05` | `cws-modelcheck` | `P4-T01` |

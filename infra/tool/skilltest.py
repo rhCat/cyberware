@@ -154,7 +154,12 @@ def main():
     ap.add_argument("--perk")
     ap.add_argument("--all", action="store_true")
     a = ap.parse_args()
-    cases = all_cases() if a.all else [(a.skill, a.perk)]
+    if a.all:
+        cases = all_cases()
+    elif a.skill and not a.perk:                              # --skill X alone -> every perk of X
+        cases = [(sk, pk) for sk, pk in all_cases() if sk == a.skill]
+    else:
+        cases = [(a.skill, a.perk)]
     bad = 0
     for sk, pk in cases:
         if not has_test(sk, pk):
