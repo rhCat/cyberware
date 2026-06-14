@@ -1,0 +1,8 @@
+# cyberware compute environment — declared dependencies (compiled to requirements.lock with hashes).
+# runtime: the crypto seam (DSSE/Ed25519). dev/CI: lint, types, test, SBOM.
+cryptography
+ruff
+mypy
+pytest
+pytest-cov
+cyclonedx-bom
