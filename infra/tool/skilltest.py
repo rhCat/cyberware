@@ -65,6 +65,9 @@ def run(skill, perk, root=ROOT):
     missing = [b for b in case.get("requires", []) if shutil.which(b) is None]
     if missing:
         return "skip", f"requires absent: {', '.join(missing)}"
+    for cmd in case.get("requires_cmd", []):                  # capability probes (e.g. openssl ed25519ph):
+        if subprocess.run(cmd, shell=True, capture_output=True).returncode != 0:  # skip (not fail) when the
+            return "skip", f"capability probe failed: {cmd}"  #   toolchain present can't do what the perk needs
 
     work = tempfile.mkdtemp(prefix=f"cwtest-{skill}-{perk}-")
     try:
