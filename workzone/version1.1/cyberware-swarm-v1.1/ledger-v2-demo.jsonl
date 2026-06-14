@@ -1,0 +1,3 @@
+{"plan_sha": "plan-sha-0xC0FFEE", "prev": "0000000000000000000000000000000000000000000000000000000000000000", "run_id": "p1-t01-demo-run", "schema": 2, "seq": 0, "type": "genesis"}
+{"evidence_sha": "11", "prev": "1ad1f02cbfc872176b30815ef5068f01fdd38828bcec6c75f4afa16c4e51da5f", "seq": 1, "task_id": "DEMO-A", "validator": "cws-ledgercheck", "verdict": "pass"}
+{"evidence_sha": "22", "prev": "09b43389c8f9c57438e84d2590e1ea2358c62c440755ce9cf5c534a40c480ea9", "seq": 2, "task_id": "DEMO-B", "validator": "cws-ledgercheck", "verdict": "pass"}
