@@ -9,7 +9,9 @@ network — and rejects four ways:
   * bad signature        — the grant was forged or tampered (DSSE/Ed25519 over the canonical PAE),
   * wrong type           — the envelope is not a grant,
   * outside the window   — now < nbf-skew (not yet valid) or now > exp+skew (expired); ±60s skew honored,
-  * replay               — the nonce was already spent (a monotonic, single-use nonce cache).
+  * malformed nonce      — the nonce is not a non-empty string (no replay protection is possible),
+  * replay               — the (issuer, nonce) pair was already spent (a monotonic single-use cache, scoped
+                           per issuer so one issuer can never spend/refuse another's nonces in a shared cache).
 
 This is the first brick of the kernel-enforced boundary: the token whose authenticity the OS-isolated exod
 (P2-T02) and sandbox (P2-T03) will enforce. The crypto here is platform-agnostic; the kernel enforcement is
@@ -19,7 +21,16 @@ from __future__ import annotations
 import base64
 import json
 
+from cryptography.hazmat.primitives import serialization
+
 from infra.cwp import sign
+
+
+def _issuer(public_key):
+    """The keyid of the VERIFYING key — the issuer identity the signature actually proves (not the
+    attacker-controllable keyid hint in the envelope). Replay scoping keys on this."""
+    raw = public_key.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    return sign.keyid(raw)
 
 GRANT_TYPE = "application/vnd.cyberware.grant+json"
 DEFAULT_SKEW = 60
@@ -28,7 +39,9 @@ DEFAULT_SKEW = 60
 def mint_grant(private_key, *, run_id, plan_sha, nbf, exp, nonce,
                snippet_shas=None, capabilities=None, credentials=None):
     """Issue a signed grant (a DSSE envelope). The body is the value-free capability claim; the signature
-    binds it so any holder can verify it offline."""
+    binds it so any holder can verify it offline. The nonce MUST be a non-empty string (the replay key)."""
+    if not (isinstance(nonce, str) and nonce):
+        raise ValueError("grant nonce must be a non-empty string")
     body = {"run_id": run_id, "plan_sha": plan_sha, "snippet_shas": snippet_shas or {},
             "capabilities": capabilities or [], "credentials": credentials or [],
             "nbf": int(nbf), "exp": int(exp), "nonce": nonce}
@@ -41,15 +54,18 @@ def grant_body(envelope):
 
 
 class NonceCache:
-    """A monotonic single-use nonce cache — the replay guard. A nonce verifies at most once."""
+    """A monotonic single-use nonce cache — the replay guard. A (issuer, nonce) pair verifies at most once.
+    Scoping by issuer (the verifying keyid) keeps one issuer from spending — and thereby refusing —
+    another issuer's nonces when a single cache is shared across issuers (e.g. one exod for all)."""
     def __init__(self):
         self._seen = set()
 
-    def spend(self, nonce):
-        """Return True if `nonce` is fresh (and record it); False if it was already spent."""
-        if nonce in self._seen:
+    def spend(self, issuer, nonce):
+        """Return True if (issuer, nonce) is fresh (and record it); False if it was already spent."""
+        key = (issuer, nonce)
+        if key in self._seen:
             return False
-        self._seen.add(nonce)
+        self._seen.add(key)
         return True
 
 
@@ -70,6 +86,9 @@ def verify_grant(public_key, envelope, *, now, nonce_cache=None, skew=DEFAULT_SK
         return False, "not_yet_valid"
     if now > exp + skew:
         return False, "expired"
-    if nonce_cache is not None and not nonce_cache.spend(body.get("nonce")):
+    nonce = body.get("nonce")
+    if not (isinstance(nonce, str) and nonce):                # None / array / object: no replay protection, refuse
+        return False, "malformed_nonce"
+    if nonce_cache is not None and not nonce_cache.spend(_issuer(public_key), nonce):
         return False, "replay"
     return True, "ok"
