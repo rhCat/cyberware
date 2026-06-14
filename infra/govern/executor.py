@@ -26,12 +26,12 @@ from __future__ import annotations
 import argparse, hashlib, json, os, re, subprocess, sys, time
 
 from infra.govern.oversight import scan
+from infra.govern.snippetverify import snippet_decision  # per-step TOCTOU decision (R3 mutation target)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def sha(b): return hashlib.sha256(b if isinstance(b, bytes) else b.encode()).hexdigest()[:16]
-def sha256_full(b): return hashlib.sha256(b if isinstance(b, bytes) else b.encode()).hexdigest()
 def now(): return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 def rules(): return json.load(open(os.path.join(ROOT, "infra", "govern", "EXECUTOR_RULE.json")))
 
@@ -148,18 +148,14 @@ def main():
         # 3b. per-step snippet verification — re-hash THIS step's porter at time-of-USE, closing the gap
         #     between the agent's up-front registry verify and the run (a post-bless mutation of the perk
         #     source refuses EXACTLY this step, with expected-vs-found digests recorded as evidence)
-        if snip_verify and st in step_tool:
-            fname = step_tool[st] + ".sh"
-            want = blessed.get(fname)
-            fp = os.path.join(snip, fname)
-            found = sha256_full(open(fp, "rb").read()) if os.path.isfile(fp) else None
-            if want is not None and found != want:
-                print(f"  [SNIPPET] step {st} ({step_tool[st]}) snippet drift — REFUSED "
-                      f"(expected {want[:16]}…, found {(found or 'MISSING')[:16]}…)")
-                ledger["runs"].append({"ts": now(), "event": "snippet_refused", "step": str(st),
-                                       "tool": step_tool[st], "file": fname, "expected": want, "found": found})
-                json.dump(ledger, open(lpath, "w"), indent=2)
-                sys.exit(8)
+        refuse, fname, want, found = snippet_decision(snip_verify, st, step_tool, blessed, snip)
+        if refuse:
+            print(f"  [SNIPPET] step {st} ({step_tool[st]}) snippet drift — REFUSED "
+                  f"(expected {want[:16]}…, found {(found or 'MISSING')[:16]}…)")
+            ledger["runs"].append({"ts": now(), "event": "snippet_refused", "step": str(st),
+                                   "tool": step_tool[st], "file": fname, "expected": want, "found": found})
+            json.dump(ledger, open(lpath, "w"), indent=2)
+            sys.exit(8)
         # 4. governed run + provenance record
         print(f"  [run] step {st}")
         t0 = time.time()
