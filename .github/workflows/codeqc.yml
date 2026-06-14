@@ -5,13 +5,21 @@ on:
   pull_request:
 permissions:
   contents: read
+  packages: read                  # pull the pinned compute image from ghcr
 jobs:
   codeqc:
     runs-on: ubuntu-latest
+    container:                      # run on the pinned, reproducible compute env (compute-image.yml -> ghcr):
+      image: ghcr.io/rhcat/cyberware-compute:latest   # python 3.12 · openssl 3.5 · go · java+TLA, so
+      credentials:                  # cws-conform/interop (ed25519ph) + cws-modelcheck (TLC) RUN, not skip
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4                  # main repo: the native runner token owns cyberware
+      - uses: actions/checkout@v4
         with:
-          persist-credentials: false                # don't leave a github.token extraheader that shadows the PAT
+          persist-credentials: false
+      - name: trust the mounted checkout (container runs as root)
+        run: git config --global --add safe.directory '*'
       - name: checkout the skillChip cartridge (submodule)
         env:                                         # PAT scoped read-only to skillChip; falls back for a public chip
           TOKEN: ${{ secrets.SUBMODULE_PAT || github.token }}
@@ -20,17 +28,8 @@ jobs:
           git -c "url.${AUTH}.insteadOf=git@github.com:" \
               -c "url.${AUTH}.insteadOf=https://github.com/" \
               submodule update --init --recursive --depth=1 skillChip
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - uses: actions/setup-go@v5         # the external anchor (verifiers/go) is built + diffed in CI
-        with:
-          go-version: "1.21"
-      - name: install
-        run: |
-          python -m pip install --upgrade pip
-          pip install ruff mypy pytest pytest-cov
-          pip install -r requirements.txt
+      - name: env provenance (the pinned toolchain we run on)
+        run: python3 --version && openssl version && go version && pip check
       - name: lint (ruff)
         run: ruff check infra
       - name: skill authenticity index
@@ -39,7 +38,7 @@ jobs:
         run: cd verifiers/go && go vet ./... && go test ./...
       - name: types (mypy)
         run: mypy infra || true
-      - name: test (pytest — incl. the cross-language conformance anchor)
+      - name: test (pytest — incl. the cross-language + cosign-interop anchors)
         run: |
           if [ -d tests ]; then pytest tests --cov=infra; else echo "no tests/ dir — skipping"; fi
 
@@ -49,10 +48,17 @@ jobs:
     # surface mutation-tested against its ratchet floor. Its own job so the slow mutation pass is
     # isolated from the fast suite and reads as a distinct gate.
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/rhcat/cyberware-compute:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: trust the mounted checkout (container runs as root)
+        run: git config --global --add safe.directory '*'
       - name: checkout the skillChip cartridge (submodule)
         env:
           TOKEN: ${{ secrets.SUBMODULE_PAT || github.token }}
@@ -61,12 +67,5 @@ jobs:
           git -c "url.${AUTH}.insteadOf=git@github.com:" \
               -c "url.${AUTH}.insteadOf=https://github.com/" \
               submodule update --init --recursive --depth=1 skillChip
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: install
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest
       - name: self-monitor (blueprints · authenticity · enforcement-surface mutation ratchet)
         run: python3 -m infra.tool.selfmonitor
