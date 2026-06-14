@@ -92,6 +92,10 @@ func main() {
 		runSig(verifyEnvelopePh)
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "chain" { // Ledger-v2 cold chain verify (P1-T04 anchor)
+		runChain()
+		return
+	}
 	dec := json.NewDecoder(os.Stdin)
 	dec.UseNumber() // preserve number tokens so int/float is classified exactly as Python's json does
 	var corpus []vector
