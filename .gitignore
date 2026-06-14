@@ -15,3 +15,4 @@ coverage.xml
 .mypy_cache/
 .ruff_cache/
 povd_logs/
+vendor/wheelhouse/*.whl
