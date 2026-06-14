@@ -59,7 +59,7 @@ type sigVector struct {
 	Env    sigEnvelope `json:"envelope"`
 }
 
-func runSig() {
+func runSig(verify func([]byte, sigEnvelope) bool) {
 	var vecs []sigVector
 	if err := json.NewDecoder(os.Stdin).Decode(&vecs); err != nil {
 		fmt.Fprintln(os.Stderr, "decode sig corpus:", err)
@@ -76,7 +76,7 @@ func runSig() {
 			fmt.Fprintf(os.Stderr, "sig vector %q: bad pubkey\n", v.Name)
 			os.Exit(1)
 		}
-		out = append(out, verdict{v.Name, verifyEnvelope(pub, v.Env)})
+		out = append(out, verdict{v.Name, verify(pub, v.Env)})
 	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetEscapeHTML(false)
@@ -84,8 +84,12 @@ func runSig() {
 }
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "sig" {
-		runSig()
+	if len(os.Args) > 1 && os.Args[1] == "sig" { // pure Ed25519 (cwp native)
+		runSig(verifyEnvelope)
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "phsig" { // Ed25519ph (cosign/sigstore DSSE — P0-T03 interop)
+		runSig(verifyEnvelopePh)
 		return
 	}
 	dec := json.NewDecoder(os.Stdin)
