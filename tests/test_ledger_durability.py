@@ -1,13 +1,13 @@
 """Ledger-v2 durability (P1-T02 / SV-2): concurrent appends serialize into one valid chain; a crash-
 truncated tail is recovered (mid-chain corruption is not); snapshots are atomic. Fast + deterministic —
-the full 16x5000 + kill-9 acceptance scale lives in tests/ledger_torture_harness.py (the P1-T09 perk).
+the full 16x5000 + kill-9 acceptance scale lives in infra/cwp/torture.py (the cws-ledgercheck/torture perk).
 """
 import json
 
 import pytest
 
 from infra.cwp import ledger as L
-from ledger_torture_harness import TortureConfig, run_concurrent_torture
+from infra.cwp.torture import TortureConfig, run_concurrent_torture
 
 
 def test_concurrent_appends_serialize_into_one_valid_chain(tmp_path):
