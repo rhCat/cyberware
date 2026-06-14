@@ -6,13 +6,13 @@
 
 **Status: ok** (tracking pass)
 
-**Playbook:** 19 of 90 steps redeemed — `████░░░░░░░░░░░░░░░░` 21%
+**Playbook:** 20 of 90 steps redeemed — `████░░░░░░░░░░░░░░░░` 22%
 
-**Program:** 19 of 90 DAG tasks redeemed — `████░░░░░░░░░░░░░░░░` 21%
+**Program:** 20 of 90 DAG tasks redeemed — `████░░░░░░░░░░░░░░░░` 22%
 
-`19 redeemed · 8 blocked:deps · 52 blocked:validator · 11 dry`
+`20 redeemed · 8 blocked:deps · 52 blocked:validator · 10 dry`
 
-Done-ledger: 19 pass entries (chain not re-verified here — see §7).
+Done-ledger: 20 pass entries (chain not re-verified here — see §7).
 
 ## 2. Milestones
 
@@ -20,7 +20,7 @@ Done-ledger: 19 pass entries (chain not re-verified here — see §7).
 |---|---|---|---|---|
 | **M0** — The spine stands — governed execution end to end (internal) | - | 5/15 | `P6-T05` | open |
 | **M1** — SV-1 — the protocol is real and portable | SV-1 | 7/7 | `P0-T18` | **closed** |
-| **M2** — SV-2 — evidence becomes tamper-evident | SV-2 | 7/8 | `P1-T09, P1-T10` | open |
+| **M2** — SV-2 — evidence becomes tamper-evident | SV-2 | 8/8 | `P1-T09, P1-T10` | **closed** |
 | **M3** — SV-3 — execution becomes a kernel-enforced boundary  ◀ MVP | SV-3 | 4/10 | `P2-T08, P2-T09` | open |
 | **M4** — SV-4 — the registry and the engine publish and revoke themselves | SV-4 | 2/9 | `P3-T09, P3-T15` | open |
 | **M5** — SV-5 — workflows and the money's lifecycle are model-checked | SV-5 | 1/8 | `P4-T09` | open |
@@ -40,7 +40,6 @@ _Closure is the transitive dependency cone of each milestone's gate task(s), red
 | `P1-T06` | `cws-ledgercheck` | Plan as sole source of step truth (delete --list execution) |
 | `P1-T07` | `cws-ledgercheck` | Crypto-shredding fields in records (M5) |
 | `P1-T08` | `cws-ledgercheck` | Transport tourniquet: bearer auth + TLS edge + rate limit (F5 partial) |
-| `P1-T10` | `cws-mutate` | Author cws-mutate skill + wire R3 enforcement surface |
 | `P4-T01` | `cws-modelcheck` | Week-one: invariants→TLC (aux flags + INVARIANT clauses) |
 | `P4-T02` | `cws-modelcheck` | Failure as first-class transitions (on_fail: to\|retry\|compensate) |
 
@@ -54,7 +53,7 @@ _Closure is the transitive dependency cone of each milestone's gate task(s), red
 | `P4-T04` | `cws-modelcheck` | `P4-T01` |
 | `P4-T05` | `cws-modelcheck` | `P4-T01` |
 | `P4-T06` | `cws-modelcheck` | `P4-T02`, `P4-T04` |
-| `P4-T07` | `cws-mutate` | `P4-T01`, `P1-T10` |
+| `P4-T07` | `cws-mutate` | `P4-T01` |
 | `P4-T08` | `cws-modelcheck` | `P4-T03`, `P4-T04`, `P4-T05` |
 | `P4-T09` | `cws-modelcheck` | `P4-T03`, `P4-T08` |
 | `P6-T07` | `cws-modelcheck` | `P6-T05`, `P4-T06`, `P3-T08` |
@@ -76,7 +75,7 @@ _Tracking pass — nothing was driven. Re-run without `DRY_RUN` to drive the rea
 
 - **52 steps blocked on unbuilt validators** — the validator skill must be authored before its tasks can be driven (§4).
 - **8 steps blocked on dependencies** — upstream tasks must redeem first (§4).
-- **Open milestones:** M0, M2, M3, M4, M5, M6 — the spine still ahead (§2 has the closure ratios).
+- **Open milestones:** M0, M3, M4, M5, M6 — the spine still ahead (§2 has the closure ratios).
 - **Chain caveat:** this report reads done-ledger `pass` entries without re-verifying the prev-hash chain; `cws-observe/status` re-verifies the chain — run it for the chain-trusted picture.
 
 ## 7. Verify it yourself
