@@ -97,7 +97,9 @@ const enc = encodeURIComponent;
 function el(tag, cls, text){ const e=document.createElement(tag); if(cls)e.className=cls; if(text!=null)e.textContent=text; return e; }
 const DEC = {allow:"b-allow", push_back:"b-push", reject:"b-reject"};
 function badge(d){ return el("span","badge "+(DEC[d]||""), d||"?"); }
-function fmt(ts){ if(!ts) return "-"; const m=String(ts).match(/T(\d\d:\d\d:\d\d)/); return m?m[1]:ts; }
+const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;   // the viewer's timezone
+// govd records UTC (ISO + 'Z'); render in the viewer's LOCAL tz so timestamps match the user's clock.
+function fmt(ts){ if(!ts) return "-"; const d=new Date(ts); return isNaN(d.getTime()) ? String(ts) : d.toLocaleTimeString(undefined, {hour12:false}); }
 function stepStates(seq, events){
   seq = seq||[]; events = events||[];
   const res={}, granted=new Set(), refused=new Set();
@@ -280,7 +282,7 @@ async function tick(){
     if(r.status===403){ dot.className="dot err"; sessionStorage.removeItem("govd_monitor_token"); token=""; askToken(); return; }
     state.snap=await r.json();
     if(state.selected){ const d=await fetch("/monitor/run/"+enc(state.selected)+"?token="+enc(token),{cache:"no-store"}); state.detail=d.ok?await d.json():null; }
-    dot.className="dot live"; stamp.textContent="updated "+fmt(state.snap.now);   // liveness ticks every poll…
+    dot.className="dot live"; stamp.textContent="updated "+fmt(state.snap.now)+" · "+LOCAL_TZ;   // local tz, ticks every poll…
     if(viewSig()!==lastSig) render();                                             // …but the DOM rebuilds ONLY on a real change
   }catch(e){ dot.className="dot err"; stamp.textContent="disconnected — retrying"; }
 }
