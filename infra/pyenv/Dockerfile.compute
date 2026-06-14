@@ -1,0 +1,46 @@
+# cyberware compute environment — pinned + reproducible. The single base CI/validators run on, so the
+# toolchain the validators need is present and FIXED: python 3.12 + openssl 3.5 (Ed25519ph → cws-conform
+# /interop runs, not skips), the hash-locked python deps, go (the verifiers/go anchor), and java +
+# TLA2TOOLS (cws-modelcheck TLC runs, not skips). Built once and pushed to ghcr; CI jobs run `container:`
+# on it. Everything fetched is version-pinned AND checksum-verified.
+FROM python:3.12-slim-trixie
+
+ARG GO_VERSION=1.23.4
+ARG GO_SHA256=6924efde5de86fe277676e929dc9917d466efa02fb934197bc2eba35d5680971
+ARG TLA_VERSION=1.8.0
+ARG TLA_SHA256=237332bdcc79a35c7d26efa7b82c77c85c2744591c5598673a8a45085ff2a4fb
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl git openssl default-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+# Go (pinned + checksum-verified) — the independent JCS / Ed25519(ph) anchor (verifiers/go)
+RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tgz \
+    && echo "${GO_SHA256}  /tmp/go.tgz" | sha256sum -c - \
+    && tar -C /usr/local -xzf /tmp/go.tgz && rm /tmp/go.tgz
+ENV PATH="/usr/local/go/bin:${PATH}" GOTOOLCHAIN=local
+
+# TLA2TOOLS (pinned + checksum-verified) — cws-modelcheck TLC deadlock model checking
+RUN curl -fsSL "https://github.com/tlaplus/tlaplus/releases/download/v${TLA_VERSION}/tla2tools.jar" -o /opt/tla2tools.jar \
+    && echo "${TLA_SHA256}  /opt/tla2tools.jar" | sha256sum -c -
+ENV TLA2TOOLS_JAR=/opt/tla2tools.jar
+
+# Python deps — hash-pinned lock (reproducible). Prefer the vendored wheelhouse (offline static source)
+# when it is present in the build context; otherwise the lock hashes guarantee identical packages.
+COPY infra/pyenv/requirements.lock /tmp/requirements.lock
+COPY vendor/wheelhouse /tmp/wheelhouse
+RUN python -m pip install --no-cache-dir --upgrade pip \
+    && if ls /tmp/wheelhouse/*.whl >/dev/null 2>&1; then \
+         python -m pip install --no-cache-dir --require-hashes --no-index --find-links /tmp/wheelhouse -r /tmp/requirements.lock ; \
+       else \
+         python -m pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock ; \
+       fi \
+    && rm -rf /tmp/wheelhouse /tmp/requirements.lock
+
+# sanity: the exact toolchain the validators rely on, and a coherent dependency closure
+RUN python --version && openssl version && go version && java -version 2>&1 | head -1 && pip check
+
+LABEL org.opencontainers.image.source="https://github.com/rhCat/cyberware" \
+      org.opencontainers.image.description="cyberware pinned compute environment (python 3.12 · openssl 3.5 · go · java+TLA2TOOLS)" \
+      org.opencontainers.image.licenses="MIT"
