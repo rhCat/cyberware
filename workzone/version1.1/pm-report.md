@@ -6,13 +6,13 @@
 
 **Status: ok** (tracking pass)
 
-**Playbook:** 25 of 90 steps redeemed — `██████░░░░░░░░░░░░░░` 28%
+**Playbook:** 26 of 90 steps redeemed — `██████░░░░░░░░░░░░░░` 29%
 
-**Program:** 25 of 90 DAG tasks redeemed — `██████░░░░░░░░░░░░░░` 28%
+**Program:** 26 of 90 DAG tasks redeemed — `██████░░░░░░░░░░░░░░` 29%
 
-`25 redeemed · 10 blocked:deps · 37 blocked:validator · 18 dry`
+`26 redeemed · 10 blocked:deps · 37 blocked:validator · 17 dry`
 
-Done-ledger: 25 pass entries (chain not re-verified here — see §7).
+Done-ledger: 26 pass entries (chain not re-verified here — see §7).
 
 ## 2. Milestones
 
@@ -42,7 +42,6 @@ _Closure is the transitive dependency cone of each milestone's gate task(s), red
 | `P1-T08` | `cws-ledgercheck` | Transport tourniquet: bearer auth + TLS edge + rate limit (F5 partial) |
 | `P2-T04` | `cws-redteam` | SandboxProfile community tier: gVisor/Firecracker (seam proof, R2) |
 | `P2-T05` | `cws-redteam` | Vault adapter: sops/age + env-stub (T12, R2) |
-| `P2-T06` | `cws-redteam` | Capability manifest enforcement (binds, netns, cgroup, seccomp) |
 | `P2-T09` | `cws-bench` | Author cws-bench skill (sandbox, channel overhead perks) |
 | `P2-T11` | `cws-redteam` | Legacy in-process path behind [UNGOVERNED-BOUNDARY] banner |
 | `P4-T01` | `cws-modelcheck` | Week-one: invariants→TLC (aux flags + INVARIANT clauses) |

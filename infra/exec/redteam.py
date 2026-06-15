@@ -26,6 +26,7 @@ import tempfile
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from infra.cwp import sign
+from infra.exec.capmanifest import CapabilityManifest, materialize, verify_materialized
 from infra.exec.exod import Exod, record_step_result
 from infra.exec.exodverify import STEP_RESULT_TYPE, result_body
 from infra.exec.grants import mint_grant
@@ -182,7 +183,27 @@ def _run_channel_attack(name, fn):
     return Outcome(name, bool(refused) and oracle_ok, f"{detail} oracle_ok={oracle_ok}", "channel")
 
 
-ATTACKS = tuple(_SANDBOX) + tuple(_CHANNEL)
+# ── the capability family — a sandbox must materialize its manifest EXACTLY (P2-T06), no kernel needed ──
+
+def _atk_cap_mismatch():
+    ws = tempfile.mkdtemp()
+    granted = CapabilityManifest(workspace=ws, ro_binds=("/usr", "/bin"))
+    wider = materialize(CapabilityManifest(workspace=ws, ro_binds=("/usr", "/bin", "/etc")))  # an ungranted bind
+    ok, reason = verify_materialized(wider, granted)
+    refused = (not ok) and reason == "ungranted_bind"
+    oracle_ok = verify_materialized(materialize(granted), granted)[0]   # a faithful sandbox is accepted
+    return refused, f"refuse_reason={reason}", oracle_ok
+
+
+_CAPABILITY = {"cap-mismatch": _atk_cap_mismatch}
+
+
+def _run_capability_attack(name, fn):
+    refused, detail, oracle_ok = fn()
+    return Outcome(name, bool(refused) and bool(oracle_ok), f"{detail} oracle_ok={oracle_ok}", "capability")
+
+
+ATTACKS = tuple(_SANDBOX) + tuple(_CHANNEL) + tuple(_CAPABILITY)
 
 
 def run_attack(name: str) -> Outcome:
@@ -191,6 +212,8 @@ def run_attack(name: str) -> Outcome:
         return _run_sandbox_attack(name, _SANDBOX[name])
     if name in _CHANNEL:
         return _run_channel_attack(name, _CHANNEL[name])
+    if name in _CAPABILITY:
+        return _run_capability_attack(name, _CAPABILITY[name])
     raise KeyError(f"unknown red-team behaviour: {name!r} (have {', '.join(ATTACKS)})")
 
 
