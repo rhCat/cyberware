@@ -1,0 +1,33 @@
+# cyberware EXEC environment — the compute image plus the kernel-sandbox toolchain. This is the Linux
+# image the SV-3 work is "driven in": infra/exec/sandbox.py (the bwrap SandboxProfile) and the cws-redteam
+# kernel corpus need a real Linux kernel with bubblewrap, which the macOS dev box cannot provide. Built on
+# the SAME pinned compute base (python 3.12 · openssl 3.5 · go · java+TLA · hash-locked deps) so the
+# governed loop, the validators, and the sandbox all share one reproducible toolchain.
+FROM ghcr.io/rhCat/cyberware-compute:latest
+
+ENV DEBIAN_FRONTEND=noninteractive
+# bubblewrap = the kernel boundary; util-linux/procps = the tools the redteam corpus probes it with.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        bubblewrap util-linux procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# sanity: the boundary tool is present (the build fails loudly if the base ever drops it)
+RUN bwrap --version
+
+LABEL org.opencontainers.image.source="https://github.com/rhCat/cyberware" \
+      org.opencontainers.image.description="cyberware exec environment (compute base + bubblewrap kernel sandbox)" \
+      org.opencontainers.image.licenses="MIT"
+
+# ── how to drive it ────────────────────────────────────────────────────────────────────────────────
+# The repo is mounted at runtime (like the compute image in CI), not COPYd, so iteration stays live:
+#
+#   docker run --rm --privileged -v "$PWD":/work -w /work <image> \
+#       python3 -m pytest tests/test_sandbox.py -q
+#
+# WHY --privileged: bwrap needs unprivileged user namespaces. On bare-metal Linux those work natively and
+# NO elevated privilege is required. Inside a container the runtime masks /proc and the namespace syscalls,
+# so the sandbox HOST (this container / exod) must hold them to in turn drop each STEP into an UNPRIVILEGED
+# namespace — the same trust shape as a privileged exod daemon confining an untrusted step. The step itself
+# always runs as nobody with an empty capability set; sandbox.py additionally masks /proc/sys read-only so
+# global kernel knobs stay refused even under a privileged host. Least-privilege alternative to --privileged:
+#   --security-opt seccomp=unconfined --security-opt apparmor=unconfined --cap-add SYS_ADMIN --cap-add SYS_CHROOT
