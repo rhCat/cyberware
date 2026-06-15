@@ -24,6 +24,38 @@
       "floor": 0.4,
       "target": 0.90,
       "note": "tamper-check + in-channel oversight + upstream gate; raise as test_executor.py tightens"
+    },
+    {
+      "module": "infra/cwp/chainverify.py",
+      "slice": "tests/test_chainverify.py",
+      "cap": 50,
+      "floor": 1.0,
+      "target": 0.90,
+      "note": "SV-2 Ledger-v2 chain verifier (verify_chain + link digests) — prose-clean core, both sides pinned"
+    },
+    {
+      "module": "infra/govern/snippetverify.py",
+      "slice": "tests/test_snippetverify.py",
+      "cap": 50,
+      "floor": 1.0,
+      "target": 0.90,
+      "note": "SV-2 per-step snippet TOCTOU decision — prose-clean core"
+    },
+    {
+      "module": "infra/exec/grantverify.py",
+      "slice": "tests/test_grantverify.py",
+      "cap": 50,
+      "floor": 1.0,
+      "target": 0.90,
+      "note": "SV-3 grant verifier (offline sig + window + run/plan binding + issuer-scoped replay) — prose-clean core"
+    },
+    {
+      "module": "infra/exec/exodverify.py",
+      "slice": "tests/test_exodverify.py",
+      "cap": 50,
+      "floor": 1.0,
+      "target": 0.90,
+      "note": "SV-3 exod step-result verifier (forged-status refusal + binding + replay) — prose-clean core"
     }
   ]
 }
