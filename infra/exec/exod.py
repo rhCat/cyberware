@@ -55,9 +55,11 @@ class Exod:
     def public_key(self):
         return self._sk.public_key()
 
-    def _sign_result(self, *, run_id, plan_sha, step, exit_code, status, output_sha, nonce):
+    def _sign_result(self, *, run_id, plan_sha, step, exit_code, status, output_sha, nonce, meter=None):
         body = {"run_id": run_id, "plan_sha": plan_sha, "step": step, "exit": exit_code,
                 "status": status, "output_sha": output_sha, "nonce": nonce, "ts": _now()}
+        if meter is not None:
+            body["meter"] = meter        # the attested meter (P2-T07): measured BY exod, inside the signature
         return sign.sign(body, self._sk, payload_type=STEP_RESULT_TYPE)
 
     def run_step(self, req: dict, *, now: int, required_capability: str = "run"):
@@ -95,11 +97,15 @@ class Exod:
         #    still-valid grant. This is the fast in-memory guard; the durable one is the ledger (result nonce).
         if gnonce is None or not self._grant_nonces.spend(_issuer(self._issuer_pub), gnonce):
             return refuse("grant:replay")
-        # 5. run confined + sign the authoritative outcome, bound to the grant nonce
+        # 5. run confined + sign the authoritative outcome, bound to the grant nonce, with an ATTESTED meter
+        #    (P2-T07): exod itself measures the step's wall time and signs it, so the meter originates from
+        #    exod and the agent cannot fabricate it — the proto-receipt a settlement plane will later trust.
+        t0 = time.perf_counter()
         p = self._runner(self._profile(req["workspace"]), req["argv"])
+        meter = {"wall_ms": round((time.perf_counter() - t0) * 1000, 3), "by": "exod"}
         status = "ok" if p.returncode == 0 else "error"
         return self._sign_result(run_id=run_id, plan_sha=plan_sha, step=step, exit_code=p.returncode,
-                                 status=status, output_sha=_sha(p.stdout or ""), nonce=rnonce)
+                                 status=status, output_sha=_sha(p.stdout or ""), nonce=rnonce, meter=meter)
 
     # ── the Unix-domain-socket channel — exod as a separate listening principal ──────────────────────
     def serve(self, socket_path: str, *, now_fn=lambda: int(time.time()), max_requests=None,
@@ -135,6 +141,13 @@ class Exod:
             srv.close()
             if os.path.exists(socket_path):
                 os.unlink(socket_path)
+
+
+def meter_of(envelope) -> dict | None:
+    """The attested meter exod signed into a step-result (P2-T07), or None. Read it only AFTER
+    verify_step_result confirms the envelope is exod's — the meter is trustworthy because it is inside the
+    signature, not because the caller reported it."""
+    return result_body(envelope).get("meter")
 
 
 def request_step(socket_path: str, req: dict, *, retries: int = 150) -> dict:
