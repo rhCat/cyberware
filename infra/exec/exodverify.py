@@ -14,7 +14,7 @@ import json
 from cryptography.hazmat.primitives import serialization
 
 from infra.cwp import sign
-from infra.exec.grantverify import NonceCache  # the issuer-scoped single-use replay guard (single source)
+from infra.exec.grantverify import NonceCache  # noqa: F401  (re-exported via exod.py; single source)
 
 STEP_RESULT_TYPE = "application/vnd.cyberware.step-result+json"
 _STATUSES = ("ok", "error", "refused")
