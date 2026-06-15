@@ -40,9 +40,12 @@ class NonceCache:
         return True
 
 
-def verify_grant(public_key, envelope, *, now, nonce_cache=None, skew=DEFAULT_SKEW):
+def verify_grant(public_key, envelope, *, now, nonce_cache=None, skew=DEFAULT_SKEW,
+                 expect_run_id=None, expect_plan_sha=None):
     # verify a grant OFFLINE. Returns (ok, reason). Signature is checked FIRST (a forged grant never reaches
-    # the time/replay checks); a fresh nonce is spent only after every other check passes.
+    # the time/replay checks); the grant's bound run_id/plan_sha must match the caller's expectation when one
+    # is supplied (a grant minted for one run never authorizes another); a fresh nonce is spent only after
+    # every other check passes (a grant that fails to match its run is NOT consumed).
     if not sign.verify(envelope, public_key):
         return False, "bad_signature"
     if envelope.get("payloadType") != GRANT_TYPE:
@@ -55,6 +58,10 @@ def verify_grant(public_key, envelope, *, now, nonce_cache=None, skew=DEFAULT_SK
         return False, "not_yet_valid"
     if now > exp + skew:
         return False, "expired"
+    if expect_run_id is not None and body.get("run_id") != expect_run_id:
+        return False, "wrong_run"
+    if expect_plan_sha is not None and body.get("plan_sha") != expect_plan_sha:
+        return False, "wrong_plan"
     nonce = body.get("nonce")
     if not (isinstance(nonce, str) and nonce):
         return False, "malformed_nonce"
