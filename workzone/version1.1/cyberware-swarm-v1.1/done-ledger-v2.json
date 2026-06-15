@@ -101,6 +101,42 @@
       "verdict": "pass",
       "evidence_sha": "94880d4cb4d09d8c15455263c35ef79a160d198e6ca0e8d8928f513385ac3918",
       "prev": "583504cd5e9e9f4c3c86b45f2a35ab40fbd25f5dcc56fac0a0768ef268042121"
+    },
+    {
+      "seq": 12,
+      "ts": "2026-06-15T17:34:11Z",
+      "task_id": "P2-T01",
+      "validator": "cws-redteam",
+      "verdict": "pass",
+      "evidence_sha": "85df5efce9b01ad9d2a822ce92603f3f1025802b4bee9fc290ebaa76c0f1917b",
+      "prev": "bc6861b0a18e01e8dbb7fc94ce201425ead881b298ae7773196eade6fdba5430"
+    },
+    {
+      "seq": 13,
+      "ts": "2026-06-15T17:34:11Z",
+      "task_id": "P2-T02",
+      "validator": "cws-redteam",
+      "verdict": "pass",
+      "evidence_sha": "cfc216b5023c0d1cd7f8be66e85ab65d48ac4cb1f029f7289dcfbbcbfe7e4ce3",
+      "prev": "bf5842ef28c68dca68c5b6e9e04a099c998cf15534a938eb89361357e149d7a2"
+    },
+    {
+      "seq": 14,
+      "ts": "2026-06-15T17:34:11Z",
+      "task_id": "P2-T03",
+      "validator": "cws-redteam",
+      "verdict": "pass",
+      "evidence_sha": "b0c4cd91c352cfc5728f4d9d1191b7f5b5328f01f8c960c99188cd007ebbf14b",
+      "prev": "9bb4fc4f42f1f29c30811112cd7789ea5957828342977cf97bd6080dd6ab90ab"
+    },
+    {
+      "seq": 15,
+      "ts": "2026-06-15T17:34:11Z",
+      "task_id": "P2-T08",
+      "validator": "cws-redteam",
+      "verdict": "pass",
+      "evidence_sha": "9405e7a073f23c96a8513e85bbdd7b6f32ac378320a7f3c1f0b5c14c95da535e",
+      "prev": "825edc48970eac68b155e0721f9a63d72e1414dd591a8c09b2796c06231a711e"
     }
   ]
 }
