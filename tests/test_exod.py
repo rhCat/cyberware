@@ -259,12 +259,14 @@ def test_slowloris_client_does_not_wedge_the_listener():
                          daemon=True)
     t.start()
     try:
-        for _ in range(100):
-            if os.path.exists(sp):
-                break
-            time.sleep(0.02)
         c = _s.socket(_s.AF_UNIX, _s.SOCK_STREAM)
-        c.connect(sp)
+        for _ in range(200):                                      # the socket file exists at bind(), but
+            try:                                                  # only accepts after listen() — retry past
+                c.connect(sp); break                              # the race (same as request_step)
+            except (ConnectionRefusedError, FileNotFoundError):
+                time.sleep(0.02)
+        else:
+            raise RuntimeError("could not connect to the exod socket")
         c.sendall(b'{"partial": "no newline')                     # open + withhold the newline forever
         t.join(timeout=3)
         assert not t.is_alive()                                   # the listener timed out + reaped, not wedged

@@ -6,7 +6,7 @@
 #
 # A step-result is the ONLY status the ledger trusts. exod signs it with its own principal key; this surface
 # decides whether a presented result actually came over exod's channel. A status that does not verify is a
-# forged self-report and is refused — the spine no longer believes the executor about its own exit code.
+# forged self-report, refused — the spine no longer believes the executor about its own exit code.
 from __future__ import annotations
 import base64
 import json
@@ -34,7 +34,7 @@ def result_body(envelope):
 def verify_step_result(public_key, envelope, *, expect_run_id=None, expect_plan_sha=None, nonce_cache=None):
     # verify a step-result came over exod's channel. Returns (ok, reason). The signature is checked FIRST: a
     # status not signed by exod (a forged self-report) is refused as "forged_status" before any field is
-    # read, and a fresh nonce is spent only after every other check passes.
+    # read; a fresh nonce is spent only after every other check passes.
     if not sign.verify(envelope, public_key):
         return False, "forged_status"
     if envelope.get("payloadType") != STEP_RESULT_TYPE:
