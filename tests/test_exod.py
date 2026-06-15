@@ -21,7 +21,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from infra.cwp import sign
-from infra.exec.exod import Exod, record_step_result, request_step
+from infra.exec.exod import Exod, meter_of, record_step_result, request_step
 from infra.exec.exodverify import STEP_RESULT_TYPE, NonceCache, result_body, verify_step_result
 from infra.exec.grants import mint_grant
 from infra.exec.sandbox import is_available
@@ -204,6 +204,15 @@ def test_grant_binds_the_approved_snippet():
     assert result_body(wrong)["status"] == "refused" and stub.calls == []     # un-granted snippet refused
     good = exod.run_step({**base, "snippet_sha": "sha-approved", "nonce": "r2"}, now=1000)
     assert result_body(good)["status"] == "ok" and len(stub.calls) == 1       # the refusal did NOT burn the grant
+
+
+def test_result_carries_an_exod_attested_meter():
+    isk, ipub = _kp()
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=_Stub(rc=0, out="x"))
+    env = exod.run_step(_req(isk), now=1000)
+    assert verify_step_result(exod.public_key, env, expect_run_id="R1")[0]   # the meter is inside the signature
+    meter = meter_of(env)
+    assert meter is not None and meter["by"] == "exod" and isinstance(meter["wall_ms"], (int, float))
 
 
 def test_result_is_bound_to_the_grant_nonce():
