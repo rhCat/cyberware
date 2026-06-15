@@ -146,6 +146,15 @@
       "verdict": "pass",
       "evidence_sha": "026052b901dd771217c3438ea752cac7be629a4af59fd5b5b1bede6aab80191c",
       "prev": "4d90b88c5b58215eebc3ef080d3ccb0f6f8f97f6837653115d471c6499d0c80d"
+    },
+    {
+      "seq": 17,
+      "ts": "2026-06-15T23:18:08Z",
+      "task_id": "P2-T06",
+      "validator": "cws-redteam",
+      "verdict": "pass",
+      "evidence_sha": "0875b8d713bc7d5cdedd8194ad9858a61e69766c836927e3949f3c839abac0af",
+      "prev": "21fed0205a6208e01d4d3f840cb5088be8704838d7ec853455953a498bc37e6e"
     }
   ]
 }
