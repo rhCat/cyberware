@@ -67,6 +67,16 @@ def test_malformed_nonce_and_arm():
         assert G.verify_grant(pk, _mint(sk, 990, 1100, nonce=bad), now=1000) == (False, "malformed_nonce")
 
 
+def test_run_and_plan_binding_both_ways():
+    sk, pk = _kp()
+    env = _mint(sk, 990, 1100)                                   # body run_id="r", plan_sha="p"
+    assert G.verify_grant(pk, env, now=1000, expect_run_id="r") == (True, "ok")          # match -> ok
+    assert G.verify_grant(pk, env, now=1000, expect_run_id="x") == (False, "wrong_run")  # mismatch -> refuse
+    assert G.verify_grant(pk, env, now=1000, expect_plan_sha="p") == (True, "ok")
+    assert G.verify_grant(pk, env, now=1000, expect_plan_sha="x") == (False, "wrong_plan")
+    assert G.verify_grant(pk, env, now=1000, expect_run_id="r", expect_plan_sha="p") == (True, "ok")
+
+
 def test_replay_and_cross_issuer():
     skA, pkA = _kp()
     skB, pkB = _kp()
