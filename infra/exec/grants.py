@@ -1,39 +1,23 @@
 #!/usr/bin/env python3
 """infra/exec/grants.py — Ed25519-DSSE signed capability grants (SV-3 spine, P2-T01).
 
-A grant is the capability token govd issues and (later) the exod execution daemon verifies before a step
+A grant is the capability token govd issues and (later) the OS-isolated exod daemon verifies before a step
 runs: a DSSE envelope over the canonical bytes of {run_id, plan_sha, snippet_shas, capabilities,
-credentials, nbf, exp, nonce}. Verification is OFFLINE — only the issuer's public key + the envelope, no
-network — and rejects four ways:
+credentials, nbf, exp, nonce}. The VERIFICATION surface (offline signature check + ±60s skew window +
+issuer-scoped replay cache, refusing bad_signature / wrong_type / malformed_window / not_yet_valid /
+expired / malformed_nonce / replay) lives in grantverify.py — a prose-clean executable core that is the R3
+mutation target (cws-mutate / mut-grant-verify) and the single source of truth. This module mints grants
+and re-exports the verifier so callers keep one import site.
 
-  * bad signature        — the grant was forged or tampered (DSSE/Ed25519 over the canonical PAE),
-  * wrong type           — the envelope is not a grant,
-  * outside the window   — now < nbf-skew (not yet valid) or now > exp+skew (expired); ±60s skew honored,
-  * malformed nonce      — the nonce is not a non-empty string (no replay protection is possible),
-  * replay               — the (issuer, nonce) pair was already spent (a monotonic single-use cache, scoped
-                           per issuer so one issuer can never spend/refuse another's nonces in a shared cache).
-
-This is the first brick of the kernel-enforced boundary: the token whose authenticity the OS-isolated exod
-(P2-T02) and sandbox (P2-T03) will enforce. The crypto here is platform-agnostic; the kernel enforcement is
-not (Linux bwrap/seccomp), so it lands later in the compute image.
+The crypto here is platform-agnostic; the KERNEL enforcement of the grant (the OS-isolated exod, P2-T02,
+and the bwrap/seccomp sandbox, P2-T03) is Linux-only and lands later in the compute image.
 """
 from __future__ import annotations
-import base64
-import json
-
-from cryptography.hazmat.primitives import serialization
 
 from infra.cwp import sign
-
-
-def _issuer(public_key):
-    """The keyid of the VERIFYING key — the issuer identity the signature actually proves (not the
-    attacker-controllable keyid hint in the envelope). Replay scoping keys on this."""
-    raw = public_key.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
-    return sign.keyid(raw)
-
-GRANT_TYPE = "application/vnd.cyberware.grant+json"
-DEFAULT_SKEW = 60
+from infra.exec.grantverify import (  # noqa: F401  (single source of truth for the verify surface)
+    DEFAULT_SKEW, GRANT_TYPE, NonceCache, grant_body, verify_grant,
+)
 
 
 def mint_grant(private_key, *, run_id, plan_sha, nbf, exp, nonce,
@@ -46,49 +30,3 @@ def mint_grant(private_key, *, run_id, plan_sha, nbf, exp, nonce,
             "capabilities": capabilities or [], "credentials": credentials or [],
             "nbf": int(nbf), "exp": int(exp), "nonce": nonce}
     return sign.sign(body, private_key, payload_type=GRANT_TYPE)
-
-
-def grant_body(envelope):
-    """The decoded grant claim (the canonical JSON payload) — does NOT verify the signature."""
-    return json.loads(base64.b64decode(envelope["payload"]))
-
-
-class NonceCache:
-    """A monotonic single-use nonce cache — the replay guard. A (issuer, nonce) pair verifies at most once.
-    Scoping by issuer (the verifying keyid) keeps one issuer from spending — and thereby refusing —
-    another issuer's nonces when a single cache is shared across issuers (e.g. one exod for all)."""
-    def __init__(self):
-        self._seen = set()
-
-    def spend(self, issuer, nonce):
-        """Return True if (issuer, nonce) is fresh (and record it); False if it was already spent."""
-        key = (issuer, nonce)
-        if key in self._seen:
-            return False
-        self._seen.add(key)
-        return True
-
-
-def verify_grant(public_key, envelope, *, now, nonce_cache=None, skew=DEFAULT_SKEW):
-    """Verify a grant OFFLINE. Returns (ok, reason). reason is 'ok' on success, else the refusal class.
-    The signature is checked FIRST (a forged grant never reaches the time/replay checks). When a
-    nonce_cache is supplied, a replayed nonce is refused (and a fresh one is spent only after every other
-    check passes, so a refused grant never burns its nonce)."""
-    if not sign.verify(envelope, public_key):
-        return False, "bad_signature"
-    if envelope.get("payloadType") != GRANT_TYPE:
-        return False, "wrong_type"
-    body = grant_body(envelope)
-    nbf, exp = body.get("nbf"), body.get("exp")
-    if not isinstance(nbf, int) or not isinstance(exp, int):
-        return False, "malformed_window"
-    if now < nbf - skew:
-        return False, "not_yet_valid"
-    if now > exp + skew:
-        return False, "expired"
-    nonce = body.get("nonce")
-    if not (isinstance(nonce, str) and nonce):                # None / array / object: no replay protection, refuse
-        return False, "malformed_nonce"
-    if nonce_cache is not None and not nonce_cache.spend(_issuer(public_key), nonce):
-        return False, "replay"
-    return True, "ok"

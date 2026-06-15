@@ -1,6 +1,6 @@
 # cyberware v1.1 — pm report
 
-*Snapshot: 2026-06-14.* Tracking pass (`DRY_RUN`): the plan classified, nothing fired. Progress is redeemed, not asserted — see §7.
+*Snapshot: 2026-06-15.* Tracking pass (`DRY_RUN`): the plan classified, nothing fired. Progress is redeemed, not asserted — see §7.
 
 ## 1. Roll-up
 
