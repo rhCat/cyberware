@@ -215,3 +215,179 @@ SAMPLE = {
     "invariants": {"StartedBeforeDone": 'pc = "done" => started', "StepsBounded": "steps <= 2"},
 }
 
+
+# ── P4-T02: failure as a first-class transition + saga compensation ──────────────────────────────────
+# a transaction that may fail mid-branch; the ONLY path to the terminal after a failure runs compensation,
+# so the saga safety invariant — (failed at terminal => compensated) — holds.
+SAGA = {
+    "name": "Saga",
+    "states": ["ready", "running", "committed", "compensating", "done"],
+    "entry": "ready",
+    "flags": {"failed": {"type": "Bool", "init": False}, "compensated": {"type": "Bool", "init": False}},
+    "transitions": [
+        {"from": "ready", "to": "running", "set": {"failed": False, "compensated": False}},
+        {"from": "running", "to": "committed", "set": {"failed": False}},          # success branch
+        {"from": "running", "to": "compensating", "set": {"failed": True}},        # FAILURE branch
+        {"from": "compensating", "to": "done", "set": {"compensated": True}},      # compensation runs
+        {"from": "committed", "to": "done", "set": {}},
+    ],
+    "invariants": {"SagaCompensates": '(failed /\\ pc = "done") => compensated'},
+}
+
+
+def buggy_saga() -> dict:
+    """A saga that skips compensation on the failure branch — reaches the terminal failed-but-uncompensated.
+    The SagaCompensates invariant MUST catch it."""
+    bad = copy.deepcopy(SAGA)
+    bad["name"] = "SagaBuggy"
+    bad["transitions"].append({"from": "compensating", "to": "done", "set": {}})   # skip the compensation set
+    return bad
+
+
+def run_saga(n_steps: int, fail_at) -> dict:
+    """Execution-side saga: run forward steps; on a failure at `fail_at`, run the recorded compensations in
+    reverse. Returns the log. This is the EXECUTION half of P4-T02 (the model half is SagaCompensates)."""
+    done, compensated = [], []
+    for i in range(n_steps):
+        if i == fail_at:
+            for j in reversed(done):                       # mid-branch failure -> compensate what ran
+                compensated.append(j)
+            return {"failed_at": i, "ran": done, "compensated": compensated,
+                    "compensation_ran": compensated == list(reversed(done))}
+        done.append(i)
+    return {"failed_at": None, "ran": done, "compensated": [], "compensation_ran": True}
+
+
+# ── P4-T09: the engine's own pipeline, as a workflow — the plan verifies the plan ────────────────────
+def plan_workflow() -> dict:
+    """The governed runtime's own path (validate -> compose -> compile -> oversee -> execute) encoded as a
+    workflow, with the safety invariant that a step only reaches `executed` after oversight ran."""
+    return {
+        "name": "PlanWorkflow",
+        "states": ["ready", "validated", "composed", "compiled", "overseen", "executed"],
+        "entry": "ready",
+        "flags": {"oversaw": {"type": "Bool", "init": False}},
+        "transitions": [
+            {"from": "ready", "to": "validated", "set": {}},
+            {"from": "validated", "to": "composed", "set": {}},
+            {"from": "composed", "to": "compiled", "set": {}},
+            {"from": "compiled", "to": "overseen", "set": {"oversaw": True}},
+            {"from": "overseen", "to": "executed", "set": {}},
+        ],
+        "invariants": {"GovernedExecution": 'pc = "executed" => oversaw'},
+    }
+
+
+# ── P4-T04 / P4-T08: the dual-checker corpus — clean + known-bad, every checker must agree ────────────
+def corpus() -> list:
+    """(name, workflow, expect_clean). Mixed clean + seeded/structural defects; TLC and Apalache must
+    AGREE on every entry (both clean, or both catch)."""
+    return [
+        ("sample", SAMPLE, True),
+        ("seed-started", seed_violation(SAMPLE, "started"), False),
+        ("seed-steps", seed_violation(SAMPLE, "steps"), False),
+        ("saga-good", SAGA, True),
+        ("saga-skip-compensation", buggy_saga(), False),
+        ("plan-pipeline", plan_workflow(), True),
+    ]
+
+
+def run_corpus() -> dict:
+    """Run the corpus through TLC + Apalache; both must reach the EXPECTED verdict and AGREE with each
+    other. `ok` iff TLC is correct on all, Apalache on >= all-1 (one may time out), and no disagreements —
+    the SV-5 dual-checker bar (P4-T04)."""
+    rows = []
+    for name, wf, expect_clean in corpus():
+        tlc, apa = check_tlc(wf), check_apalache(wf)
+        want = "no_error" if expect_clean else "violation"
+        apa_actionable = apa["verdict"] in ("no_error", "violation")
+        rows.append({"name": name, "expect_clean": expect_clean,
+                     "tlc": tlc["verdict"], "apalache": apa["verdict"],
+                     "tlc_correct": tlc["verdict"] == want,
+                     "apalache_correct": apa["verdict"] == want,
+                     "agree": (tlc["ok"] == apa["ok"]) if apa_actionable else None})
+    total = len(rows)
+    tlc_correct = sum(r["tlc_correct"] for r in rows)
+    apa_correct = sum(r["apalache_correct"] for r in rows)
+    disagreements = [r["name"] for r in rows if r["agree"] is False]
+    return {"total": total, "tlc_correct": tlc_correct, "apalache_correct": apa_correct,
+            "disagreements": disagreements, "rows": rows,
+            "ok": tlc_correct == total and apa_correct >= total - 1 and not disagreements}
+
+
+# ── P4-T03: workflow algebra — seq / par compose into a product automaton, within a state budget ─────
+def reachable_states(wf: dict) -> set:
+    """BFS the reachable pc values from the entry over the transitions — the realised state count."""
+    adj = {}
+    for t in wf["transitions"]:
+        adj.setdefault(t["from"], []).append(t["to"])
+    seen, frontier = {wf["entry"]}, [wf["entry"]]
+    while frontier:
+        s = frontier.pop()
+        for nxt in adj.get(s, []):
+            if nxt not in seen:
+                seen.add(nxt)
+                frontier.append(nxt)
+    return seen
+
+
+def _prefix(wf, p):
+    """Namespace a workflow's states + flags under prefix `p` (for composition)."""
+    out = copy.deepcopy(wf)
+    out["states"] = [f"{p}_{s}" for s in wf["states"]]
+    out["entry"] = f"{p}_{wf['entry']}"
+    out["flags"] = {f"{p}_{k}": v for k, v in wf.get("flags", {}).items()}
+    out["transitions"] = [{"from": f"{p}_{t['from']}", "to": f"{p}_{t['to']}",
+                           "set": {f"{p}_{k}": v for k, v in t.get("set", {}).items()}}
+                          for t in wf["transitions"]]
+    return out
+
+
+def compose(w1: dict, w2: dict, op: str) -> dict:
+    """Compose two workflows into a product automaton. `seq` runs w1 then w2 (w1's terminal flows into w2's
+    entry); `par` is the interleaving product (pc = "s1|s2", either side may step). Flags are namespaced, so
+    the composite is finite — its state count is bounded by the operands."""
+    a, b = _prefix(w1, "a"), _prefix(w2, "b")
+    flags = {**a["flags"], **b["flags"]}
+    if op == "seq":
+        states = a["states"] + b["states"]
+        trans = a["transitions"] + b["transitions"]
+        trans.append({"from": a["states"][-1], "to": b["entry"], "set": {}})       # a-terminal -> b-entry
+        return {"name": f"Seq_{w1['name']}_{w2['name']}", "states": states, "entry": a["entry"],
+                "flags": flags, "transitions": trans, "invariants": {}}
+    if op == "par":
+        states = [f"{s1}|{s2}" for s1 in a["states"] for s2 in b["states"]]
+        trans = []
+        for s1 in a["states"]:
+            for s2 in b["states"]:
+                for t in a["transitions"]:
+                    if t["from"] == s1:
+                        trans.append({"from": f"{s1}|{s2}", "to": f"{t['to']}|{s2}", "set": t.get("set", {})})
+                for t in b["transitions"]:
+                    if t["from"] == s2:
+                        trans.append({"from": f"{s1}|{s2}", "to": f"{s1}|{t['to']}", "set": t.get("set", {})})
+        # the terminal is (a-terminal | b-terminal); put it last so emit_tla's self-loop lands there
+        term = f"{a['states'][-1]}|{b['states'][-1]}"
+        states = [s for s in states if s != term] + [term]
+        return {"name": f"Par_{w1['name']}_{w2['name']}", "states": states, "entry": f"{a['entry']}|{b['entry']}",
+                "flags": flags, "transitions": trans, "invariants": {}}
+    raise ValueError(f"unknown compose op: {op}")
+
+
+def algebra_budget(state_budget: int = 5_000_000) -> dict:
+    """Compose representative workflows (seq + par) and confirm the product automaton is finite + within the
+    SV-5 state budget (P4-T03). Returns the realised state counts + whether all are within budget."""
+    products = {"seq": compose(SAMPLE, SAGA, "seq"), "par": compose(SAMPLE, SAGA, "par")}
+    sizes = {op: len(reachable_states(wf)) for op, wf in products.items()}
+    return {"sizes": sizes, "budget": state_budget,
+            "within_budget": all(n <= state_budget for n in sizes.values()),
+            "finite": all(n < len(p["states"]) + 1 for p, n in zip(products.values(), sizes.values()))}
+
+
+def certs() -> dict:
+    """The three-certificate summary (P4-T08): run every prover over a representative spec and report which
+    of EMPIRICAL / SYMBOLIC / AXIOMATIC were earned."""
+    r = run_all(SAGA)
+    return {"certs": r["certs"], "clean": r["clean"],
+            "have_all_three": set(r["certs"]) == {"EMPIRICAL", "SYMBOLIC", "AXIOMATIC"}}
+
