@@ -33,3 +33,34 @@ def test_seeded_violation_is_caught_by_the_bounded_checkers():
     by = {x["prover"]: x["verdict"] for x in r["results"]}
     assert by["tlc"] == "violation" and by["apalache"] == "violation"   # both independently catch it
     assert not r["clean"]
+
+
+def test_corpus_dual_checker_agrees():
+    r = W.run_corpus()                                          # TLC + Apalache over 6 specs
+    assert r["ok"], r
+    assert r["tlc_correct"] == r["total"] and r["apalache_correct"] >= r["total"] - 1
+    assert r["disagreements"] == []                            # the two checkers never disagree
+
+
+def test_three_certificates_earned():
+    c = W.certs()
+    assert c["have_all_three"], c                              # EMPIRICAL + SYMBOLIC + AXIOMATIC
+
+
+def test_saga_model_and_execution():
+    # model: the good saga holds, the skip-compensation variant is caught
+    assert W.check_tlc(W.SAGA)["verdict"] == "no_error"
+    assert W.check_tlc(W.buggy_saga())["verdict"] == "violation"
+    # execution: a mid-branch failure runs the compensations
+    assert W.run_saga(3, fail_at=1)["compensation_ran"] is True
+
+
+def test_workflow_algebra_product_automaton_within_budget():
+    b = W.algebra_budget()
+    assert b["within_budget"] and b["finite"]
+    par = W.compose(W.SAMPLE, W.SAGA, "par")
+    assert W.check_tlc(par)["verdict"] == "no_error"           # the product automaton is deadlock-free
+
+
+def test_plan_as_workflow_is_clean():
+    assert W.check_tlc(W.plan_workflow())["verdict"] == "no_error"   # the plan verifies the plan (P4-T09)
