@@ -41,8 +41,8 @@ asserted). The on-ramp (`cws-create` / `cws-addperk`) authors new skills; the re
 
 | skill | grades (validation class) | notes |
 |---|---|---|
-| **cws-conform** | SV-1 protocol conformance (V-EXT) | canonical-hash + DSSE/cosign-interop verdicts vs the Go anchor |
-| **cws-ledgercheck** | SV-2 ledger soundness (V-GOV) | Ledger-v2 chain re-verify · durability torture · govd-provenance |
+| **cws-conform** | SV-1 protocol conformance (V-EXT) | canonical-hash + DSSE/cosign-interop verdicts vs the Go anchor; CWP message-`schemas` (2020-12) corpus |
+| **cws-ledgercheck** | SV-2 ledger soundness (V-GOV) | Ledger-v2 chain re-verify · Go `anchor` · durability `torture` · crypto-shred `erasure` · Merkle `checkpoint` |
 | **cws-mutate** | gate strength (V-MUT) | a gate that survives its own deletion was never a gate — R3 mutation gates |
 | **cws-modelcheck** | blueprint safety (V-PROP) | TLC deadlock / invariant model-checking |
 | **cws-redteam** | SV-3 execution boundary (V-RED) | the ≥12-attack expected-refusal corpus through exod+sandbox (the M3 gate) |
