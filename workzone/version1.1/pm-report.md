@@ -6,13 +6,13 @@
 
 **Status: ok** (tracking pass)
 
-**Playbook:** 30 of 90 steps redeemed — `███████░░░░░░░░░░░░░` 33%
+**Playbook:** 31 of 90 steps redeemed — `███████░░░░░░░░░░░░░` 34%
 
-**Program:** 30 of 90 DAG tasks redeemed — `███████░░░░░░░░░░░░░` 33%
+**Program:** 31 of 90 DAG tasks redeemed — `███████░░░░░░░░░░░░░` 34%
 
-`30 redeemed · 10 blocked:deps · 37 blocked:validator · 13 dry`
+`31 redeemed · 10 blocked:deps · 37 blocked:validator · 12 dry`
 
-Done-ledger: 30 pass entries (chain not re-verified here — see §7).
+Done-ledger: 31 pass entries (chain not re-verified here — see §7).
 
 ## 2. Milestones
 
@@ -39,7 +39,6 @@ _Closure is the transitive dependency cone of each milestone's gate task(s), red
 | `P2-T04` | `cws-redteam` | SandboxProfile community tier: gVisor/Firecracker (seam proof, R2) |
 | `P2-T05` | `cws-redteam` | Vault adapter: sops/age + env-stub (T12, R2) |
 | `P2-T09` | `cws-bench` | Author cws-bench skill (sandbox, channel overhead perks) |
-| `P2-T11` | `cws-redteam` | Legacy in-process path behind [UNGOVERNED-BOUNDARY] banner |
 | `P4-T01` | `cws-modelcheck` | Week-one: invariants→TLC (aux flags + INVARIANT clauses) |
 | `P4-T02` | `cws-modelcheck` | Failure as first-class transitions (on_fail: to\|retry\|compensate) |
 | `P5-T01` | `cws-bench` | Store interface: sqlite-WAL → Postgres adapter (R2) + JSONL reconciler |
