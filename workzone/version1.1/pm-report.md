@@ -6,13 +6,13 @@
 
 **Status: ok** (tracking pass)
 
-**Playbook:** 29 of 90 steps redeemed — `██████░░░░░░░░░░░░░░` 32%
+**Playbook:** 30 of 90 steps redeemed — `███████░░░░░░░░░░░░░` 33%
 
-**Program:** 29 of 90 DAG tasks redeemed — `██████░░░░░░░░░░░░░░` 32%
+**Program:** 30 of 90 DAG tasks redeemed — `███████░░░░░░░░░░░░░` 33%
 
-`29 redeemed · 10 blocked:deps · 37 blocked:validator · 14 dry`
+`30 redeemed · 10 blocked:deps · 37 blocked:validator · 13 dry`
 
-Done-ledger: 29 pass entries (chain not re-verified here — see §7).
+Done-ledger: 30 pass entries (chain not re-verified here — see §7).
 
 ## 2. Milestones
 
@@ -33,7 +33,6 @@ _Closure is the transitive dependency cone of each milestone's gate task(s), red
 | task | validator | title |
 |---|---|---|
 | `P0-T13` | `cws-conform` | Reproducible engine build baseline (M1/T28) |
-| `P0-T15` | `cws-conform` | KeyStore adapter seam (file + PKCS#11 stub, R2) |
 | `P0-T16` | `cws-conform` | Truth-in-labeling docs pass |
 | `P1-T06` | `cws-ledgercheck` | Plan as sole source of step truth (delete --list execution) |
 | `P1-T08` | `cws-ledgercheck` | Transport tourniquet: bearer auth + TLS edge + rate limit (F5 partial) |
