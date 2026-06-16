@@ -6,13 +6,13 @@
 
 **Status: ok** (tracking pass)
 
-**Playbook:** 27 of 90 steps redeemed — `██████░░░░░░░░░░░░░░` 30%
+**Playbook:** 28 of 90 steps redeemed — `██████░░░░░░░░░░░░░░` 31%
 
-**Program:** 27 of 90 DAG tasks redeemed — `██████░░░░░░░░░░░░░░` 30%
+**Program:** 28 of 90 DAG tasks redeemed — `██████░░░░░░░░░░░░░░` 31%
 
-`27 redeemed · 10 blocked:deps · 37 blocked:validator · 16 dry`
+`28 redeemed · 10 blocked:deps · 37 blocked:validator · 15 dry`
 
-Done-ledger: 27 pass entries (chain not re-verified here — see §7).
+Done-ledger: 28 pass entries (chain not re-verified here — see §7).
 
 ## 2. Milestones
 
@@ -37,7 +37,6 @@ _Closure is the transitive dependency cone of each milestone's gate task(s), red
 | `P0-T16` | `cws-conform` | Truth-in-labeling docs pass |
 | `P1-T03` | `cws-ledgercheck` | Merkle checkpoints in Ledger v2 (M7) |
 | `P1-T06` | `cws-ledgercheck` | Plan as sole source of step truth (delete --list execution) |
-| `P1-T07` | `cws-ledgercheck` | Crypto-shredding fields in records (M5) |
 | `P1-T08` | `cws-ledgercheck` | Transport tourniquet: bearer auth + TLS edge + rate limit (F5 partial) |
 | `P2-T04` | `cws-redteam` | SandboxProfile community tier: gVisor/Firecracker (seam proof, R2) |
 | `P2-T05` | `cws-redteam` | Vault adapter: sops/age + env-stub (T12, R2) |
