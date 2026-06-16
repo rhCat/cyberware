@@ -54,6 +54,7 @@ where it cannot be proved, the checker **MUST** record an honest `Unproved` rath
 
 ---
 
-*Enforced by: `cws-modelcheck` (deadlock-freedom + the known-bad corpus, structural + EMPIRICAL today),
-the in-skill self-tests (the data plane runs through the real channel), and — for the abstraction↔code
+*Enforced by: F8 / `cws-modelcheck` — deadlock-freedom + the known-bad corpus (structural + EMPIRICAL
+today), with invariants→TLC (P4-V01) and failure-as-transitions (P4-V06) the model-check criteria; the
+in-skill self-tests (P0-T06, the data plane runs through the real channel); and — for the abstraction↔code
 refinement — `alchemy/concord` once that validator lands (the blueprint-concordance gate).*
