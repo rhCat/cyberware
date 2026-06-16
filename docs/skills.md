@@ -4,7 +4,9 @@ Tool skills (operational pathways) — not design/taste skills. They live on the
 swappable skill cartridge, a separate repo vendored as the `skillChip/` submodule). Each runs through the
 governed pipeline (`validate → compose → compile → oversight → executor`), ships a `blueprint.{drawio,svg}`,
 pins every file in an `index.json` (authenticity), and carries a per-perk `test/case.json` that proves it
-through the real channel. **22 skills** — discover them at `GET /catalog` or `./govd-client --discover`.
+through the real channel. **32 skills** — discover them at `GET /catalog` or `./govd-client --discover`.
+The table below is the **general tool** catalog; the **v1.1 validator family** (which grades the build
+against the plan) is listed separately under [Validators](#validators).
 
 | skill | perks | tools | notes / guard |
 |---|---|---|---|
@@ -30,6 +32,28 @@ through the real channel. **22 skills** — discover them at `GET /catalog` or `
 | **ssh** | `check` · `run` | ssh | connectivity check (read-only) · vetted remote command (destructive → approve; key via `*_FILE`). |
 | **cws-create** | `evaluate` · `scaffold` | python3 · scaffold.py | **the on-ramp** — classify a candidate skill (execution / design / transformable / unclear) and, if it fits, scaffold it into cyberware format. |
 | **cws-addperk** | `evaluate` · `apply` | python3 · git · gh | add a perk to an existing skill, governed — evaluate (exists / generalizable / scope), then branch → formulate + validate → open a PR (merge through the agent). |
+
+## Validators
+
+The v1.1 build is **graded by its own skills** — each plan task is `validated_by` one of these, and a task
+is *redeemed* on the tamper-evident done-ledger only when a governed validator run proves it passed (never
+asserted). The on-ramp (`cws-create` / `cws-addperk`) authors new skills; the rest grade the ladder:
+
+| skill | grades (validation class) | notes |
+|---|---|---|
+| **cws-conform** | SV-1 protocol conformance (V-EXT) | canonical-hash + DSSE/cosign-interop verdicts vs the Go anchor |
+| **cws-ledgercheck** | SV-2 ledger soundness (V-GOV) | Ledger-v2 chain re-verify · durability torture · govd-provenance |
+| **cws-mutate** | gate strength (V-MUT) | a gate that survives its own deletion was never a gate — R3 mutation gates |
+| **cws-modelcheck** | blueprint safety (V-PROP) | TLC deadlock / invariant model-checking |
+| **cws-redteam** | SV-3 execution boundary (V-RED) | the ≥12-attack expected-refusal corpus through exod+sandbox (the M3 gate) |
+| **cws-bench** | SV-3 overhead budgets (V-BENCH) | per-step bwrap p95 from exod's attested meters |
+| **cws-observe** | progress by redemption | `status` (classify the DAG vs the plan) · `redeem` (the only done-ledger writer) |
+| **cws-pm** | composite operator | drives a playbook of validators + tracks the board (pm.json / pm.md) |
+| **harden-pyenv** | reproducible env | hash-locked deps · SBOM · the pinned compute image |
+| **cws-redteam-sw** | SV-1/SV-2 software-tier red-team | the precursor corpus (not the M3 kernel gate) |
+
+The execution-boundary validators (`cws-redteam`, `cws-bench`) are described in
+[architecture.md](architecture.md#the-kernel-enforced-execution-boundary-sv-3).
 
 ## Choosing a perk
 

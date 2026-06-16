@@ -76,6 +76,14 @@ The agent channels **all** work through `executor.py`. It is the chokepoint:
 If the compiled script or a step's output was altered to bypass governance, the executor sees the drift
 and refuses. That is the enforcement layer — the runtime *is* the rule.
 
+`executor.py` enforces this **in software**. The security ladder's **SV-3** rung makes the boundary
+**kernel-enforced**: `infra/exec/` adds signed capability **grants**, the **exod** daemon (a separate OS
+principal whose Ed25519 signature is the *only* status the ledger trusts — replacing the executor's
+self-report), and a **bwrap SandboxProfile** that runs each step inside unshared kernel namespaces. The
+refusals then hold **with the in-process scan disabled** — proven by the `cws-redteam` corpus (≥12 attacks
+refused) and budgeted by `cws-bench`. See
+[architecture.md](docs/architecture.md#the-kernel-enforced-execution-boundary-sv-3).
+
 ## Quickstart
 
 ```sh
