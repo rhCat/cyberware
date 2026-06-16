@@ -170,6 +170,41 @@ their tests need **Linux + bubblewrap**; they SKIP on a non-Linux host and run i
 anywhere. The microVM tier of the sandbox (Firecracker / cloud-hypervisor) needs `/dev/kvm`; where that is
 absent it is reported skipped, never faked (see `workzone/version1.1/KNOWN-BLOCKERS.md`).
 
+## The provenance ledger (Ledger-v2, SV-2)
+
+Evidence is **tamper-evident**, not merely trusted. A Ledger-v2 chain (`infra/cwp/ledger.py` +
+`chainverify.py`) is a prev-hash chain: a **genesis** entry binds the chain to its origin (`run_id`,
+`plan_sha`); each later record's `prev` is the RFC-8785 digest of the prior link, and `verify_chain`
+recomputes every `prev` under the schema major — a flipped field or a transplanted genesis breaks the
+recompute and the offending record is named. An independent **Go cold-verifier** (`verifiers/go/chain.go`)
+reproduces the verdict from the same canonical bytes, so the chain is externally anchored, not
+self-attesting. The write path is **crash-safe** (`durable_append`: one `flock` across read-tip → heal a
+torn tail → append → fsync; atomic snapshots via tmp + `os.replace` + dir-fsync), so N concurrent writers
+serialize into a single valid chain. Two capabilities sit on top:
+
+- **Crypto-shredding** (`shred.py`, P1-T07) — a record's *subject* fields are sealed with a per-record
+  AES-256-GCM DEK (dek-id bound as AAD); the ledger stores only ciphertext, so the chain covers the
+  ciphertext and **still verifies after a key is destroyed**. Dropping a record's DEK makes that subject
+  permanently unrecoverable while every other record is untouched — the right-to-erasure made
+  cryptographic: *shred the key, not the chain.*
+- **Merkle checkpoints** (`checkpoint.py`, P1-T03) — a checkpoint entry every `interval` records carries a
+  Merkle root over its window. **Cold-verify** trusts the last audited checkpoint and re-links only the
+  tail after it — **O(tail), not O(chain)** — so verifying a million-entry chain from its last checkpoint
+  is window-bounded (≤ 2 s); a **periodic audit** recomputes every checkpoint's root and catches a forged
+  one.
+
+`cws-ledgercheck` grades all of it (`verify` · `anchor` (Go cross-check) · `torture` (concurrency) ·
+`erasure` · `checkpoint`); `cws-observe/redeem` is the only writer of the prev-hash-chained **done-ledger**.
+
+## The wire protocol (CWP)
+
+The claim / plan / grant / step / verdict messages between the agent and govd are the **Cyberware
+Protocol** (`docs/SPEC.md`, `spec/cwp-core.md`): every message is a `{cwp, type, body, sig}` envelope over a
+closed, signed message set. The protocol is **machine-checkable** — `spec/schemas/` carries a JSON Schema
+(2020-12) per message type, encoding invariants like *value-free body* (a value smuggled into a claim body
+fails its schema) and the closed error-reason enum; `cws-conform/schemas` validates a conformance corpus
+against them (every valid instance passes, every negative is rejected).
+
 ## Authenticity — the skill's identity
 
 Each skill's `index.json` pins the sha256 of every file in that skill plus a roll-up `skill_sha`
