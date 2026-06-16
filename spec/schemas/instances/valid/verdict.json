@@ -1,0 +1,14 @@
+{
+  "cwp": "1.0",
+  "type": "verdict",
+  "body": {
+    "decision": "push_back",
+    "reasons": [
+      "oversight_refused"
+    ]
+  },
+  "sig": {
+    "keyid": "ed25519:0123456789abcdef",
+    "sig": "MEUCIQ..."
+  }
+}

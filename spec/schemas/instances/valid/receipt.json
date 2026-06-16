@@ -1,0 +1,22 @@
+{
+  "cwp": "1.0",
+  "type": "receipt",
+  "body": {
+    "run_id": "R1",
+    "exec_sig": {
+      "keyid": "ed25519:0123456789abcdef",
+      "sig": "MEUCIQ..."
+    },
+    "gov_sig": {
+      "keyid": "ed25519:0123456789abcdef",
+      "sig": "MEUCIQ..."
+    },
+    "meters": {
+      "wall_ms": 3.5
+    }
+  },
+  "sig": {
+    "keyid": "ed25519:0123456789abcdef",
+    "sig": "MEUCIQ..."
+  }
+}

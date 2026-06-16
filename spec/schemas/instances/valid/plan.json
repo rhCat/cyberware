@@ -1,0 +1,18 @@
+{
+  "cwp": "1.0",
+  "type": "plan",
+  "body": {
+    "sequence": [
+      "py_lint"
+    ],
+    "snippet_shas": {
+      "py_lint.sh": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "wrapper": "step1(){ :; }",
+    "plan_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "sig": {
+    "keyid": "ed25519:0123456789abcdef",
+    "sig": "MEUCIQ..."
+  }
+}

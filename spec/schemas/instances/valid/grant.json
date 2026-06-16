@@ -1,0 +1,22 @@
+{
+  "cwp": "1.0",
+  "type": "grant",
+  "body": {
+    "run_id": "R1",
+    "plan_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "step": "1",
+    "nbf": 1000,
+    "exp": 1100,
+    "nonce": "g-1",
+    "capabilities": [
+      "run"
+    ],
+    "snippet_shas": {
+      "1": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "sig": {
+    "keyid": "ed25519:0123456789abcdef",
+    "sig": "MEUCIQ..."
+  }
+}

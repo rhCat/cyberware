@@ -1,0 +1,9 @@
+{
+  "cwp": "1.0",
+  "type": "claim",
+  "body": {
+    "skill": "x",
+    "perk": "y",
+    "var_keys": []
+  }
+}

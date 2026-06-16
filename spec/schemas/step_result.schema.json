@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberware.dev/spec/schemas/step_result.schema.json",
+  "title": "CWP step_result message",
+  "type": "object",
+  "required": [
+    "cwp",
+    "type",
+    "body",
+    "sig"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cwp": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "type": {
+      "const": "step_result"
+    },
+    "body": {
+      "type": "object",
+      "description": "the recorded outcome; idempotent by (run_id, step).",
+      "required": [
+        "run_id",
+        "step",
+        "plan_sha",
+        "status"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "step": {
+          "type": "string"
+        },
+        "plan_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "error",
+            "refused"
+          ]
+        },
+        "exit": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "output_sha": {
+          "type": "string"
+        },
+        "nonce": {
+          "type": "string"
+        },
+        "meter": {
+          "type": "object",
+          "properties": {
+            "wall_ms": {
+              "type": "number"
+            },
+            "by": {
+              "type": "string"
+            }
+          }
+        },
+        "ts": {
+          "type": "string"
+        }
+      }
+    },
+    "sig": {
+      "type": "object",
+      "required": [
+        "keyid",
+        "sig"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "keyid": {
+          "type": "string",
+          "pattern": "^ed25519:[0-9a-f]{16}$"
+        },
+        "sig": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

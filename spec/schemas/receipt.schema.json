@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberware.dev/spec/schemas/receipt.schema.json",
+  "title": "CWP receipt message",
+  "type": "object",
+  "required": [
+    "cwp",
+    "type",
+    "body",
+    "sig"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cwp": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "type": {
+      "const": "receipt"
+    },
+    "body": {
+      "type": "object",
+      "description": "the dual-signed record of a completed run (exod execution+meters + govd governance).",
+      "required": [
+        "run_id",
+        "exec_sig",
+        "gov_sig"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "exec_sig": {
+          "type": "object",
+          "required": [
+            "keyid",
+            "sig"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "keyid": {
+              "type": "string",
+              "pattern": "^ed25519:[0-9a-f]{16}$"
+            },
+            "sig": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "gov_sig": {
+          "type": "object",
+          "required": [
+            "keyid",
+            "sig"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "keyid": {
+              "type": "string",
+              "pattern": "^ed25519:[0-9a-f]{16}$"
+            },
+            "sig": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "meters": {
+          "type": "object"
+        }
+      }
+    },
+    "sig": {
+      "type": "object",
+      "required": [
+        "keyid",
+        "sig"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "keyid": {
+          "type": "string",
+          "pattern": "^ed25519:[0-9a-f]{16}$"
+        },
+        "sig": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

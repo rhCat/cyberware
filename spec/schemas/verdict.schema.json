@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberware.dev/spec/schemas/verdict.schema.json",
+  "title": "CWP verdict message",
+  "type": "object",
+  "required": [
+    "cwp",
+    "type",
+    "body",
+    "sig"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cwp": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "type": {
+      "const": "verdict"
+    },
+    "body": {
+      "type": "object",
+      "description": "govd -> agent; the governance decision for a claim.",
+      "required": [
+        "decision"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "decision": {
+          "enum": [
+            "allow",
+            "push_back",
+            "reject"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "unknown_type",
+              "unsupported_cwp",
+              "bad_sig",
+              "unknown_key_id",
+              "value_in_body",
+              "no_grant",
+              "plan_sha_mismatch",
+              "nonce_replay",
+              "expired",
+              "revoked",
+              "oversight_refused",
+              "tamper",
+              "upstream_missing",
+              "approval_required"
+            ]
+          }
+        }
+      }
+    },
+    "sig": {
+      "type": "object",
+      "required": [
+        "keyid",
+        "sig"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "keyid": {
+          "type": "string",
+          "pattern": "^ed25519:[0-9a-f]{16}$"
+        },
+        "sig": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
