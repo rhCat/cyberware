@@ -203,6 +203,26 @@ def _run_capability_attack(name, fn):
     return Outcome(name, bool(refused) and bool(oracle_ok), f"{detail} oracle_ok={oracle_ok}", "capability")
 
 
+# ── the honesty family — an ungoverned path must announce itself, never masquerade as governed (P2-T11) ──
+
+def _atk_ungoverned_banner():
+    import io
+
+    from infra.exec import legacy
+    buf = io.StringIO()
+    for _ in range(3):
+        r = legacy.run_in_process(["true"], reason="redteam", log=buf)
+    every_run = buf.getvalue().count(legacy.BANNER) == 3                      # the banner fires on EVERY run
+    tagged = (r["governed"] is False) and (legacy.BANNER in r["banner"])      # the result says "ungoverned"
+    governed_sig = {"payloadType": "application/vnd.cyberware.step-result+json"}
+    distinction = legacy.is_governed(governed_sig) and not legacy.is_governed(r)  # governed vs ungoverned, honest
+    held = every_run and tagged and distinction
+    return held, f"banners={buf.getvalue().count(legacy.BANNER)}/3 governed={r['governed']}", distinction
+
+
+_CAPABILITY["ungoverned-banner"] = _atk_ungoverned_banner
+
+
 ATTACKS = tuple(_SANDBOX) + tuple(_CHANNEL) + tuple(_CAPABILITY)
 
 
