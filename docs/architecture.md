@@ -21,8 +21,15 @@ The chip is located by `infra/registry.py` (`registry.SKILLCHIP`): the hardcoded
 
 - **`infra/govern/`** — the pipeline (`validator`, `composer`, `compiler`, `oversight`, `executor`,
   `runlog`) **and the service plane** (`govd`, `govd_client`).
+- **`infra/exec/`** — the **kernel-enforced execution boundary** (SV-3): signed capability `grants`, the
+  `exod` daemon (a separate principal whose signature is the only status the ledger trusts), the bwrap
+  `sandbox` SandboxProfile, the `capmanifest` capability-manifest check, exod-attested `meters`, and the
+  `redteam` / `bench` adversarial + overhead corpora. See [the section below](#the-kernel-enforced-execution-boundary-sv-3).
+- **`infra/cwp/`** — the wire/cryptographic primitives: RFC-8785 `canonical`ization, Ed25519/DSSE `sign`,
+  the Ledger-v2 `chainverify` chain, `cosign` interop.
 - **`infra/tool/`** — registry tooling: `visualize` (blueprint → drawio/SVG), `skill_index`
-  (authenticity), `skilltest` (in-skill self-tests), `scaffold` (new skills).
+  (authenticity), `skilltest` (in-skill self-tests), `scaffold` (new skills), `selfmonitor` (the standing
+  self-validation gate — the ouroboros).
 - **`infra/document/`** — the framework's own formal artifacts (the pipeline blueprint, the rule files).
 
 ## A skill is a package
@@ -110,6 +117,59 @@ run, a `.bk` mismatch, a missing upstream step). govd extends the same idea acro
 per-run session token gates the WebSocket and the ledger read; a `step_result` is recorded only after a
 `grant` for that exact step with the blessed `plan_sha`.
 
+## The kernel-enforced execution boundary (SV-3)
+
+`executor.py` enforces the boundary **in software** — a static scan plus a tamper-check. The security
+ladder's SV-3 rung makes the boundary **kernel-enforced**: the same governed step runs inside an OS sandbox
+under a *separate principal*, so the refusals hold **with the in-process scan disabled** — the boundary is
+the Linux kernel and a signature, not a scanner. This is `infra/exec/`:
+
+- **Signed grants** (`grants.py` / `grantverify.py`) — a capability token is an Ed25519/DSSE envelope over
+  `{run_id, plan_sha, snippet_shas, capabilities, credentials, nbf, exp, nonce}`. It is verified **offline**
+  and is **bound to the request**: a grant minted for one run/plan authorizes *only* that run/plan, carries
+  exactly the capabilities it names, is single-use (nonce), and expires (±60 s skew). One grant can never be
+  laundered into authority over a different step or command.
+
+- **exod** (`exod.py` / `exodverify.py`) — the **execution daemon, a separate OS principal** (a UDS
+  listener with its own Ed25519 identity). It verifies a grant against the request, runs the step inside the
+  sandbox, and returns a step-result **signed by exod**. The run-ledger trusts a status **only** if exod's
+  signature verifies — a forged self-report (any status not on exod's channel) is refused **and recorded**.
+  This *replaces the executor's own "ok"/"error" self-report*: the spine no longer believes the executor
+  about its own exit code. The signed result is bound to the grant nonce, so a replayed grant is detected at
+  the ledger even across a daemon restart.
+
+- **SandboxProfile** (`sandbox.py`) — the bwrap (bubblewrap) core profile: every namespace unshared
+  (user / pid / net / ipc / uts / cgroup), a read-only system tree, **one** writable workspace, the step
+  dropped to an unprivileged uid, `/proc/sys` masked read-only and the live-kernel files shadowed (the runc
+  `maskedPaths` doctrine). There is **no content inspection** in the path — confinement is purely the
+  kernel, so "kernel-enforced" is literal.
+
+- **Capability manifests** (`capmanifest.py`) — a manifest is the *declared* grant of a sandbox; the
+  sandbox must **materialize it exactly** (the bwrap command mounts the declared binds, no more and no
+  fewer). An ungranted bind, a dropped bind, or a flipped network **refuses** — a tampered profile cannot
+  silently widen a step's reach.
+
+- **Attested meters** (`exod` `meter_of`) — exod measures each step's wall time and **signs it** into the
+  result. The meter the (future) settlement plane bills is the one the isolated principal attested, never
+  the agent's stopwatch.
+
+Two chip validators grade this boundary, and redeem the P2 cone on the cryptographic done-ledger:
+
+- **`cws-redteam`** (V-RED, the M3 gate) — a ≥12-behaviour **expected-refusal** corpus. Each perk mounts a
+  real attack (filesystem escape, network egress, mount, sysrq reboot, a forged status, a replayed/expired/
+  cross-run/tampered grant, a capability-manifest mismatch, …) **through exod**, with the software scan off,
+  and exits `0` **iff the boundary held** — the attack was refused *and* a benign-control oracle was
+  accepted (so a silently no-op gate fails the corpus instead of passing it).
+- **`cws-bench`** (V-BENCH) — the overhead meter, read from exod's attested meters: per-step bwrap
+  `p95 ≤ 100 ms`.
+
+**Platform.** The boundary is the Linux kernel, so `infra/exec/sandbox.py`, the cws-redteam corpus, and
+their tests need **Linux + bubblewrap**; they SKIP on a non-Linux host and run in the exec image
+(`infra/exec/Dockerfile.exec`, `docker run --privileged` so the sandbox host can drop each step into an
+*unprivileged* namespace). The grant/exod/meter/capability layers are platform-agnostic and unit-tested
+anywhere. The microVM tier of the sandbox (Firecracker / cloud-hypervisor) needs `/dev/kvm`; where that is
+absent it is reported skipped, never faked (see `workzone/version1.1/KNOWN-BLOCKERS.md`).
+
 ## Authenticity — the skill's identity
 
 Each skill's `index.json` pins the sha256 of every file in that skill plus a roll-up `skill_sha`
@@ -135,6 +195,15 @@ are pinned in `index.json`, the proof is **part of the skill's tamper-evident id
 from the tool. `tests/test_skill_selftests.py` discovers every case, runs it, and enforces the invariant
 that **every skill self-proves**; non-hermetic perks (network, live service, repo-mutating) ship a `skip`
 case so the skill still carries — and documents — its proof.
+
+Beyond per-skill proof, the engine grades **itself** — the **ouroboros** (`infra/tool/selfmonitor.py`, a
+standing CI gate). Three checks, all redeemable evidence: every chip blueprint **and** the engine's own
+pipeline blueprint is deadlock-free; every skill + the chip manifest is authentic (`skill_index --check`);
+and an **enforcement-surface mutation ratchet** runs `cws-mutate` over each gate module against a recorded
+`floor` (`infra/govern/selfmonitor_policy.json`) that may only *rise* — so the gate protects the very tests
+that earn it. The ratchet covers the governed-channel gates (govd / oversight / executor) and the
+prose-clean verify cores of the whole ladder: `chainverify` (SV-2 chain), `snippetverify` (SV-2 TOCTOU),
+`grantverify` and `exodverify` (SV-3). "Building is running" turned on the framework itself.
 
 ## The blueprint (L++)
 
