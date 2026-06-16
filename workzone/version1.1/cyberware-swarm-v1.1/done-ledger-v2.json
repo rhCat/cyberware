@@ -209,6 +209,69 @@
       "verdict": "pass",
       "evidence_sha": "f0d05fc02db5f91e31e360a2d7610fe0158f7ef2eea51d3ab95c1cf32cba44d1",
       "prev": "83725a0f8c158e4f7a4684129fd4a9e67adbadadd632769e7077e903ddcd40f2"
+    },
+    {
+      "seq": 24,
+      "ts": "2026-06-16T22:32:37Z",
+      "task_id": "P4-T01",
+      "validator": "cws-modelcheck",
+      "verdict": "pass",
+      "evidence_sha": "dbce860840852aa4ce5f29a5aae5c079c7c4c78dd85a4660b6ba7ef487980490",
+      "prev": "30933e9e6ff7244692a36afd01beb13407d70f08ce012e88560c5d5783bcdb8e"
+    },
+    {
+      "seq": 25,
+      "ts": "2026-06-16T22:32:37Z",
+      "task_id": "P4-T04",
+      "validator": "cws-modelcheck",
+      "verdict": "pass",
+      "evidence_sha": "dbce860840852aa4ce5f29a5aae5c079c7c4c78dd85a4660b6ba7ef487980490",
+      "prev": "1256c7f203f5ff1c31102902c617392fec46264192a8c52d09e0ede3685d871a"
+    },
+    {
+      "seq": 26,
+      "ts": "2026-06-16T22:32:37Z",
+      "task_id": "P4-T05",
+      "validator": "cws-modelcheck",
+      "verdict": "pass",
+      "evidence_sha": "dbce860840852aa4ce5f29a5aae5c079c7c4c78dd85a4660b6ba7ef487980490",
+      "prev": "833061c903ec956ae9ebbcc4ab00a7d77449636d6534b3a6a57df45f821434bc"
+    },
+    {
+      "seq": 27,
+      "ts": "2026-06-16T22:32:37Z",
+      "task_id": "P4-T08",
+      "validator": "cws-modelcheck",
+      "verdict": "pass",
+      "evidence_sha": "dbce860840852aa4ce5f29a5aae5c079c7c4c78dd85a4660b6ba7ef487980490",
+      "prev": "0cb92505fcf43e557c2ed6ecc42786517937c804dd2d9ffe8ee1e7cf842aad7e"
+    },
+    {
+      "seq": 28,
+      "ts": "2026-06-16T22:32:37Z",
+      "task_id": "P4-T02",
+      "validator": "cws-modelcheck",
+      "verdict": "pass",
+      "evidence_sha": "8d569cec308bfe3bb09180f05c5b0eab6e9deddbc99be04d719590f3491a5ba7",
+      "prev": "59b82cc459f1ef326ee2048615339f2e169a11baefb4574c2ea8c330b359e203"
+    },
+    {
+      "seq": 29,
+      "ts": "2026-06-16T22:32:37Z",
+      "task_id": "P4-T03",
+      "validator": "cws-modelcheck",
+      "verdict": "pass",
+      "evidence_sha": "5719eb47dbb5b107cd4965aed8153163eed9774c1a6511d69ce55a96997f020d",
+      "prev": "951799ef7814d50180990cb450d087dc7666432d60ad9ff5c883745613bb46b4"
+    },
+    {
+      "seq": 30,
+      "ts": "2026-06-16T22:32:37Z",
+      "task_id": "P4-T09",
+      "validator": "cws-modelcheck",
+      "verdict": "pass",
+      "evidence_sha": "f56b430662e1bfb19b541e30f16705b58436b26c4897454a5901fa57822793e4",
+      "prev": "e9339cfbc9a540ddddda87105b0e3071e31cd55bf5637b30e97f04f05558e659"
     }
   ]
 }
