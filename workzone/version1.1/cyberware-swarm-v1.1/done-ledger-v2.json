@@ -164,6 +164,15 @@
       "verdict": "pass",
       "evidence_sha": "a6afcc50d4ebe6a429da04d8fd416016f1035d2ae28e9212acd364fadfedefb2",
       "prev": "d0e9bfbb2df1c541cbd50d033fb8804a8ac768be42e9be3fa6a53fd541c7f209"
+    },
+    {
+      "seq": 19,
+      "ts": "2026-06-16T04:29:10Z",
+      "task_id": "P1-T07",
+      "validator": "cws-ledgercheck",
+      "verdict": "pass",
+      "evidence_sha": "29df4a2e0ae34ad2e608aaa2a4f19414c5d2085cae164010cda942b9b380358c",
+      "prev": "06d4c7eb1a241c80ff2c0bbdd9791a72e9f1bc4683830bb91e7359396c5757b7"
     }
   ]
 }
