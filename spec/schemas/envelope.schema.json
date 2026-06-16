@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberware.dev/spec/schemas/envelope.schema.json",
+  "title": "CWP envelope",
+  "type": "object",
+  "required": [
+    "cwp",
+    "type",
+    "body",
+    "sig"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cwp": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "type": {
+      "enum": [
+        "claim",
+        "plan",
+        "grant",
+        "step_request",
+        "step_result",
+        "verdict",
+        "approval",
+        "receipt",
+        "revocation"
+      ]
+    },
+    "body": {
+      "type": "object"
+    },
+    "sig": {
+      "type": "object",
+      "required": [
+        "keyid",
+        "sig"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "keyid": {
+          "type": "string",
+          "pattern": "^ed25519:[0-9a-f]{16}$"
+        },
+        "sig": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

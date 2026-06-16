@@ -1,0 +1,13 @@
+{
+  "cwp": "1.0",
+  "type": "approval",
+  "body": {
+    "operation": "sqlite/exec",
+    "key_id": "ed25519:0123456789abcdef",
+    "challenge": "abc"
+  },
+  "sig": {
+    "keyid": "ed25519:0123456789abcdef",
+    "sig": "MEUCIQ..."
+  }
+}

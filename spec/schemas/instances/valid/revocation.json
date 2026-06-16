@@ -1,0 +1,13 @@
+{
+  "cwp": "1.0",
+  "type": "revocation",
+  "body": {
+    "target": "key",
+    "id": "ed25519:0123456789abcdef",
+    "reason": "compromised"
+  },
+  "sig": {
+    "keyid": "ed25519:0123456789abcdef",
+    "sig": "MEUCIQ..."
+  }
+}
