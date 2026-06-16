@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberware.dev/spec/schemas/grant.schema.json",
+  "title": "CWP grant message",
+  "type": "object",
+  "required": [
+    "cwp",
+    "type",
+    "body",
+    "sig"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cwp": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "type": {
+      "const": "grant"
+    },
+    "body": {
+      "type": "object",
+      "description": "govd -> agent; authorization for one step, bound to (run_id, step, plan_sha).",
+      "required": [
+        "run_id",
+        "plan_sha",
+        "step",
+        "nbf",
+        "exp",
+        "nonce"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "plan_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "step": {
+          "type": "string"
+        },
+        "nbf": {
+          "type": "integer"
+        },
+        "exp": {
+          "type": "integer"
+        },
+        "nonce": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "snippet_shas": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "credentials": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "sig": {
+      "type": "object",
+      "required": [
+        "keyid",
+        "sig"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "keyid": {
+          "type": "string",
+          "pattern": "^ed25519:[0-9a-f]{16}$"
+        },
+        "sig": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

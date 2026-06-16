@@ -1,0 +1,66 @@
+{
+  "valid": [
+    {
+      "file": "valid/claim.json",
+      "type": "claim"
+    },
+    {
+      "file": "valid/plan.json",
+      "type": "plan"
+    },
+    {
+      "file": "valid/grant.json",
+      "type": "grant"
+    },
+    {
+      "file": "valid/step_request.json",
+      "type": "step_request"
+    },
+    {
+      "file": "valid/step_result.json",
+      "type": "step_result"
+    },
+    {
+      "file": "valid/verdict.json",
+      "type": "verdict"
+    },
+    {
+      "file": "valid/approval.json",
+      "type": "approval"
+    },
+    {
+      "file": "valid/receipt.json",
+      "type": "receipt"
+    },
+    {
+      "file": "valid/revocation.json",
+      "type": "revocation"
+    }
+  ],
+  "invalid": [
+    {
+      "file": "invalid/claim-value-in-body.json",
+      "type": "claim"
+    },
+    {
+      "file": "invalid/grant-no-nonce.json",
+      "type": "grant"
+    },
+    {
+      "file": "invalid/step_result-bad-status.json",
+      "type": "step_result"
+    },
+    {
+      "file": "invalid/envelope-unknown-type.json",
+      "type": "envelope"
+    },
+    {
+      "file": "invalid/claim-no-sig.json",
+      "type": "claim"
+    },
+    {
+      "file": "invalid/verdict-bad-reason.json",
+      "type": "verdict"
+    }
+  ]
+}

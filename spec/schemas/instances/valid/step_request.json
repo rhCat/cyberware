@@ -1,0 +1,13 @@
+{
+  "cwp": "1.0",
+  "type": "step_request",
+  "body": {
+    "run_id": "R1",
+    "step": "1",
+    "plan_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "sig": {
+    "keyid": "ed25519:0123456789abcdef",
+    "sig": "MEUCIQ..."
+  }
+}

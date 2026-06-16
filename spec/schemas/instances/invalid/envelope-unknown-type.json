@@ -1,0 +1,9 @@
+{
+  "cwp": "1.0",
+  "type": "frobnicate",
+  "body": {},
+  "sig": {
+    "keyid": "ed25519:0123456789abcdef",
+    "sig": "MEUCIQ..."
+  }
+}

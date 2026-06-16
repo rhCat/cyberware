@@ -1,0 +1,16 @@
+{
+  "cwp": "1.0",
+  "type": "claim",
+  "body": {
+    "skill": "py_qc",
+    "perk": "lint",
+    "var_keys": [
+      "PROJECT_DIR",
+      "LINT_TARGET"
+    ]
+  },
+  "sig": {
+    "keyid": "ed25519:0123456789abcdef",
+    "sig": "MEUCIQ..."
+  }
+}

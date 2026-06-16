@@ -1,18 +1,18 @@
 # cyberware v1.1 — pm report
 
-*Snapshot: 2026-06-15.* Tracking pass (`DRY_RUN`): the plan classified, nothing fired. Progress is redeemed, not asserted — see §7.
+*Snapshot: 2026-06-16.* Tracking pass (`DRY_RUN`): the plan classified, nothing fired. Progress is redeemed, not asserted — see §7.
 
 ## 1. Roll-up
 
 **Status: ok** (tracking pass)
 
-**Playbook:** 26 of 90 steps redeemed — `██████░░░░░░░░░░░░░░` 29%
+**Playbook:** 27 of 90 steps redeemed — `██████░░░░░░░░░░░░░░` 30%
 
-**Program:** 26 of 90 DAG tasks redeemed — `██████░░░░░░░░░░░░░░` 29%
+**Program:** 27 of 90 DAG tasks redeemed — `██████░░░░░░░░░░░░░░` 30%
 
-`26 redeemed · 10 blocked:deps · 37 blocked:validator · 17 dry`
+`27 redeemed · 10 blocked:deps · 37 blocked:validator · 16 dry`
 
-Done-ledger: 26 pass entries (chain not re-verified here — see §7).
+Done-ledger: 27 pass entries (chain not re-verified here — see §7).
 
 ## 2. Milestones
 
@@ -32,7 +32,6 @@ _Closure is the transitive dependency cone of each milestone's gate task(s), red
 
 | task | validator | title |
 |---|---|---|
-| `P0-T05` | `cws-conform` | Author JSON Schemas (2020-12) for every CWP message |
 | `P0-T13` | `cws-conform` | Reproducible engine build baseline (M1/T28) |
 | `P0-T15` | `cws-conform` | KeyStore adapter seam (file + PKCS#11 stub, R2) |
 | `P0-T16` | `cws-conform` | Truth-in-labeling docs pass |

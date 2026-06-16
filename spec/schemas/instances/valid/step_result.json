@@ -1,0 +1,21 @@
+{
+  "cwp": "1.0",
+  "type": "step_result",
+  "body": {
+    "run_id": "R1",
+    "step": "1",
+    "plan_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "status": "ok",
+    "exit": 0,
+    "output_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "nonce": "g-1",
+    "meter": {
+      "wall_ms": 3.5,
+      "by": "exod"
+    }
+  },
+  "sig": {
+    "keyid": "ed25519:0123456789abcdef",
+    "sig": "MEUCIQ..."
+  }
+}
