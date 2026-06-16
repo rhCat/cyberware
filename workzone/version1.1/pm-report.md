@@ -6,13 +6,13 @@
 
 **Status: ok** (tracking pass)
 
-**Playbook:** 31 of 90 steps redeemed — `███████░░░░░░░░░░░░░` 34%
+**Playbook:** 32 of 90 steps redeemed — `███████░░░░░░░░░░░░░` 36%
 
-**Program:** 31 of 90 DAG tasks redeemed — `███████░░░░░░░░░░░░░` 34%
+**Program:** 32 of 90 DAG tasks redeemed — `███████░░░░░░░░░░░░░` 36%
 
-`31 redeemed · 10 blocked:deps · 37 blocked:validator · 12 dry`
+`32 redeemed · 10 blocked:deps · 37 blocked:validator · 11 dry`
 
-Done-ledger: 31 pass entries (chain not re-verified here — see §7).
+Done-ledger: 32 pass entries (chain not re-verified here — see §7).
 
 ## 2. Milestones
 
@@ -33,7 +33,6 @@ _Closure is the transitive dependency cone of each milestone's gate task(s), red
 | task | validator | title |
 |---|---|---|
 | `P0-T13` | `cws-conform` | Reproducible engine build baseline (M1/T28) |
-| `P0-T16` | `cws-conform` | Truth-in-labeling docs pass |
 | `P1-T06` | `cws-ledgercheck` | Plan as sole source of step truth (delete --list execution) |
 | `P1-T08` | `cws-ledgercheck` | Transport tourniquet: bearer auth + TLS edge + rate limit (F5 partial) |
 | `P2-T04` | `cws-redteam` | SandboxProfile community tier: gVisor/Firecracker (seam proof, R2) |
