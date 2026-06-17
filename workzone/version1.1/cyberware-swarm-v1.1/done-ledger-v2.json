@@ -344,6 +344,51 @@
       "verdict": "pass",
       "evidence_sha": "77a11c7a703b1c9359894880d13253130ed96675db0fdd043d407a3d4862b308",
       "prev": "c04dbeb247e109badfc7c427784610c32ebdf6b28dd79216920783fb08f36499"
+    },
+    {
+      "seq": 39,
+      "ts": "2026-06-17T00:44:33Z",
+      "task_id": "P3-T13",
+      "validator": "cws-release",
+      "verdict": "pass",
+      "evidence_sha": "f2d2c96b550550b3f7d70d141b783b6e07e4f20a15ad11308810833a8408708f",
+      "prev": "927c9770cd7a24a000d12ac6c538fc16861c6848320998130c4e4a95b5d715ab"
+    },
+    {
+      "seq": 40,
+      "ts": "2026-06-17T00:44:33Z",
+      "task_id": "P3-T12",
+      "validator": "cws-release",
+      "verdict": "pass",
+      "evidence_sha": "9afcc4537ec602073e0314337df6087bfc09eb43bf05dbf9044d5ead91c6ab3e",
+      "prev": "00e788dfa4cbaeab7c54559db40074d163925b558aa8ac6e0268d5f877714b8a"
+    },
+    {
+      "seq": 41,
+      "ts": "2026-06-17T00:44:33Z",
+      "task_id": "P3-T06",
+      "validator": "cws-release",
+      "verdict": "pass",
+      "evidence_sha": "9d3ad89c4f14357f200c9f671a1c2a0662a1e466ee2b2550a3c56a58f6fa2d8d",
+      "prev": "241dcf9eea8946658606d80ee49cc0ac2f46fc36b9f573c98bced971cc547707"
+    },
+    {
+      "seq": 42,
+      "ts": "2026-06-17T00:44:34Z",
+      "task_id": "P3-T14",
+      "validator": "cws-release",
+      "verdict": "pass",
+      "evidence_sha": "ca2bf906fb7f4864721ba4fa2f2229711dd4ca19bf1d32b4980289dff1a9ce1b",
+      "prev": "8df8be76d0f75d4e8292898f0a7e7bafdd3356e98b6dec7beaf7911bacda3ad4"
+    },
+    {
+      "seq": 43,
+      "ts": "2026-06-17T00:44:34Z",
+      "task_id": "P3-T07",
+      "validator": "cws-release",
+      "verdict": "pass",
+      "evidence_sha": "dcaee1bdf23475194f3b06b519452ef223471c4f47eec3a61fceb973009fe488",
+      "prev": "8efe8b3a906b6ccd7e189f49b65ba0cd0162cec448a1af27b01356a4e9fb6648"
     }
   ]
 }
