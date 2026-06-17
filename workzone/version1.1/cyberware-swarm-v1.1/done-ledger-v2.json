@@ -317,6 +317,33 @@
       "verdict": "pass",
       "evidence_sha": "7bfc57746443b8944175e18a6da9b22e9a8b96beb1f94cb426c26c01e1d0f514",
       "prev": "796d2d6b4262ea58a1a4a6deee89b919cffc7232657fff8d8a1a4ed54e9f4a0e"
+    },
+    {
+      "seq": 36,
+      "ts": "2026-06-17T00:35:52Z",
+      "task_id": "P3-T03",
+      "validator": "cws-release",
+      "verdict": "pass",
+      "evidence_sha": "ec83291e08d45466e6ea0b7d9355a4a5b079dbb7441834e3bb1658d91c89e1d0",
+      "prev": "15165b2ef2a6638728de07ea49704080b753293541e7b61062c536cbc57b4fc4"
+    },
+    {
+      "seq": 37,
+      "ts": "2026-06-17T00:35:52Z",
+      "task_id": "P3-T10",
+      "validator": "cws-release",
+      "verdict": "pass",
+      "evidence_sha": "a835f2122835798a80bbf5b0d507e3d74d141dd7d7bab141561122264f652f88",
+      "prev": "133e7ec5265d6542642bcdd68293430e0e64a623cab7565795a58f38e8a40187"
+    },
+    {
+      "seq": 38,
+      "ts": "2026-06-17T00:35:52Z",
+      "task_id": "P3-T04",
+      "validator": "cws-release",
+      "verdict": "pass",
+      "evidence_sha": "77a11c7a703b1c9359894880d13253130ed96675db0fdd043d407a3d4862b308",
+      "prev": "c04dbeb247e109badfc7c427784610c32ebdf6b28dd79216920783fb08f36499"
     }
   ]
 }
