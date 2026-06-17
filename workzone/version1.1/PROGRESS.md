@@ -7,14 +7,19 @@ is asserted that the machinery cannot redeem. The **live** board is [`pm-report.
 ## 1. Where we are, in one paragraph
 
 The platform **grades and builds itself against the plan**, milestone by milestone up the SV-1 → SV-6
-security ladder. **M0 (the spine)**, **SV-1 (M1)**, **SV-2 (M2)**, **SV-4 (M4)**, and **SV-5 (M5)** are
-**closed** — and **M0 closed (15/15)** with the settlement engine: a governed run can now be claimed,
-blessed, executed under attestation, priced by a funded quote, and **settled** as a balanced posting set on
-the reward ledger. **SV-6 (M6)** — *the work pays for the work, the ladder closes* — is at **16/21** (the
-money's lifecycle: a scale-4 HALF_EVEN `Money` type with a float-ban, a double-entry reward ledger that stays
-zero-sum across a 10k-settlement storm, a signed funded quote, and a settlement engine where a mutant receipt
-settles nothing — built + adversarially verified, with per-quote escrow + a spent-quote idempotency guard).
-**SV-3 (M3)** is at **9/10**. SV-4 — *the registry and the engine publish and revoke themselves* — closed (9/9) with the
+security ladder — and **the ladder is closed**. **M0 (the spine), SV-1 (M1), SV-2 (M2), SV-4 (M4), SV-5
+(M5), and SV-6 (M6) are all closed**; only **SV-3 (M3)** remains open at **9/10**, on a single hardware
+ceiling (the microVM perf budget needs `/dev/kvm`, absent on the dev box — see
+[`KNOWN-BLOCKERS.md`](KNOWN-BLOCKERS.md) B1). **SV-6 (M6) — *the work pays for the work, the ladder closes*
+— closed (21/21):** the money's lifecycle from type to ledger to quote to engine to market — a scale-4
+HALF_EVEN `Money` with a float-ban, a double-entry reward ledger that stays zero-sum across a 10k-settlement
+storm, a signed funded quote (per-quote escrow), a settlement engine where a mutant receipt settles nothing
+(spent-quote idempotency), a manipulation-resistant FMV index, an m-of-n dispute lifecycle, and **the
+capstone**: cyberware's own redeemed development milestones settle as internal-credit bounties and the plan's
+completion is a dual-signed, TSA-anchored receipt that **verifies offline** — *development entered its own
+economy.* **63 of 90 tasks** are redeemed on the prev-hash-chained done-ledger (never asserted; the live
+board is [`pm-report.md`](pm-report.md)). The whole money cone was adversarially verified before redeem — the
+reviews caught a cross-quote double-pay and an FMV bimodal-manipulation hole, both fixed. SV-4 — *the registry and the engine publish and revoke themselves* — closed (9/9) with the
 `cws-release` skill (publisher signing, offline transparency proofs, engine attestation + mutual handshake,
 the governed release receipt, the signed revocation feed + in-flight enforcement + availability-grace tiers,
 key-rotation, dual-DSSE + in-toto receipts, TSA time anchors, WebAuthn approval, publish-time manifest lint,
@@ -77,6 +82,8 @@ round). The complete task-by-task picture + the M0–M6 milestone closures are t
 | **SV-3 / M3** | signed grants (P2-T01), exod (P2-T02), SandboxProfile (P2-T03), capability manifest (P2-T06), attested meters (P2-T07), the kernel red-team corpus (P2-T08) — **9/10** |
 | **SV-4 / M4** | the `cws-release` skill — publisher signing (P3-T01), offline transparency proofs (P3-T02), engine attestation (P3-T05), governed release receipt (P3-T15), revocation feed (P3-T03) + in-flight enforcement (P3-T13) + availability tiers (P3-T12), key-rotation drill (P3-T06), dual-DSSE receipts (P3-T14), TSA time anchors (P3-T07), WebAuthn approval (P3-T04), publish-time manifest lint (P3-T10), **Citrinitas publish gate (P3-T09)**; plus the **`alchemy`** concordance validator — extract/conserve/classify/concord (P3-T08) — **closed (9/9)** |
 | **SV-5 / M5** | workflow model-checking across **three provers** — TLC (empirical) + Apalache (symbolic) + TLAPS (axiomatic): emitter, saga, algebra, corpus, plan-as-workflow (P4-T01..T09) — **closed (8/8)** |
+| **SV-6 / M6** | the money's lifecycle (`infra/settle/`) + `cws-settle-sim` — `Money` (P6-T01), reward ledger (P6-T02), quote (P6-T04), settlement engine (P6-T05), FMV (P6-T11), disputes (P6-T12), simulate (P6-T18), ancestor royalties (P6-T19), and **the capstone** (P6-T21): real milestones settle as bounties, the plan-completion receipt verifies offline — **closed (21/21), THE LADDER CLOSES** |
+| **M0 / spine** | governed execution end to end — closed by the settlement engine (P6-T05): claim → grant → exod → priced quote → settled posting set — **closed (15/15)** |
 
 ## 4. The operating model
 
