@@ -7,20 +7,29 @@ is asserted that the machinery cannot redeem. The **live** board is [`pm-report.
 ## 1. Where we are, in one paragraph
 
 The platform **grades and builds itself against the plan**, milestone by milestone up the SV-1 → SV-6
-security ladder. **SV-1 (M1)** and **SV-2 (M2)** are closed; **SV-3 (M3)** — *execution becomes a
-kernel-enforced boundary* — is at **9/10**: the boundary is built, adversarially hardened, redeemed on the
-chain, and self-monitored. **29 of 90 tasks** are redeemed (each by a governed validator run recorded in the
-prev-hash-chained done-ledger, never asserted). The one open brick of M3 is a hardware ceiling, not a code
-gap — the microVM perf budget needs `/dev/kvm`, absent on the dev box (see
-[`KNOWN-BLOCKERS.md`](KNOWN-BLOCKERS.md)).
+security ladder. **SV-1 (M1)** and **SV-2 (M2)** are closed; **SV-5 (M5)** — *workflows and the money's
+lifecycle are model-checked* — is **closed** (8/8, three independent provers: TLC + Apalache + TLAPS);
+**SV-3 (M3)** — *execution becomes a kernel-enforced boundary* — is at **9/10**; and **SV-4 (M4)** — *the
+registry and the engine publish and revoke themselves* — is at **7/9** (the `cws-release` skill: publisher
+signing, offline transparency proofs, engine attestation + mutual handshake, the governed release receipt,
+the signed revocation feed + in-flight enforcement + availability-grace tiers, key-rotation, dual-DSSE +
+in-toto receipts, TSA time anchors, WebAuthn approval, publish-time manifest lint, and reproducible engine
+builds). **52 of 90 tasks** are redeemed (each by a governed validator run recorded in the prev-hash-chained
+done-ledger, never asserted — the live board is [`pm-report.md`](pm-report.md)). The two open bricks of SV-4
+are the `alchemy` concordance validator (P3-T08) and its Citrinitas publish gate (P3-T09) — and these are
+**not** blocked: their engines were built in the putrefactio phase and need only a file-mode wrapper skill
+(see [`KNOWN-BLOCKERS.md`](KNOWN-BLOCKERS.md) B3). M3's one open brick is a hardware ceiling — the microVM
+perf budget needs `/dev/kvm`, absent on the dev box (B1).
 
 ## 2. What has been built
 
-- **The validator family (12 cws-* skills)** grades the build: `cws-conform` (SV-1 protocol — canonical
-  hashing, DSSE/cosign interop, CWP message-schemas), `cws-ledgercheck` (SV-2 — chain re-verify, Go anchor,
-  durability torture, crypto-shred erasure, Merkle checkpoints), `cws-mutate` (gate strength), `cws-modelcheck`
-  (TLC), `cws-redteam` + `cws-bench` (SV-3 — the kernel boundary), `cws-observe` (redemption), `cws-pm`
-  (the board), `harden-pyenv` (the pinned compute image).
+- **The validator family (13 cws-* skills)** grades the build: `cws-conform` (SV-1 protocol — canonical
+  hashing, DSSE/cosign interop, CWP message-schemas, **reproducible engine build**), `cws-ledgercheck` (SV-2 —
+  chain re-verify, Go anchor, durability torture, crypto-shred erasure, Merkle checkpoints), `cws-mutate`
+  (gate strength), `cws-modelcheck` (SV-5 — **TLC + Apalache + TLAPS**, the 3-prover stack), `cws-redteam` +
+  `cws-bench` (SV-3 — the kernel boundary), **`cws-release`** (SV-4 — publisher signing, transparency, engine
+  attestation, governed receipts, revocation, key-rotation, TSA anchors, WebAuthn approval, manifest lint),
+  `cws-observe` (redemption), `cws-pm` (the board), `harden-pyenv` (the pinned compute image).
 - **The SV-3 execution boundary** (`infra/exec/`) — signed request-bound **grants**, the **exod** daemon (a
   separate principal whose signature is the only status the ledger trusts), the bwrap **SandboxProfile**,
   **capability manifests** (materialize-exactly), and exod-**attested meters**. Kernel-proven in docker
@@ -30,6 +39,18 @@ gap — the microVM perf budget needs `/dev/kvm`, absent on the dev box (see
   (`checkpoint.py`, window-bounded cold-verify).
 - **The protocol made machine-checkable** — `spec/schemas/`: a 2020-12 JSON Schema per CWP message type over
   the `{cwp,type,body,sig}` envelope.
+- **The SV-4 release-transparency layer** (`infra/cwp/{release,translog,engineattest,publish,revocation,
+  revoke_inflight,feed_tiers,keyrotation,receipts,tsa,webauthn,manifestlint,reprobuild}.py`) — every artifact
+  is publisher-signed against a **pinned TUF root** and refused at three entry points; releases are entered in
+  an **offline Merkle transparency log** (no live Rekor); the engine is **attested with a mutual handshake**
+  (1-byte tamper → unattested); the governed receipt is **dual-signed + transparency-logged**; revocation is a
+  **signed monotonic feed** enforced **in-flight** (boundary halt vs critical kill) under **availability-grace
+  tiers**; keys rotate with a **cross-signed overlap**; high-value receipts carry **offline TSA anchors**;
+  destructive grants require an **offline WebAuthn approval** bound to `sha256(JCS(doc))`; and the engine
+  builds **byte-identically** on two independent builders.
+- **The SV-5 model-checking layer** (`infra/cwp/workflow.py`) — workflows emit typed TLA+ checked by **three
+  independent provers** (TLC empirical, Apalache symbolic, TLAPS axiomatic); the saga compensations, the
+  product-automaton algebra, a dual-checker corpus, and the plan-as-workflow all verify.
 - **The ouroboros** (`infra/tool/selfmonitor.py`) — a standing CI gate: every blueprint deadlock-free, the
   chip authentic, and a mutation ratchet over 7 enforcement surfaces (govd/oversight/executor + the
   chain/snippet/grant/exod verify cores) that may only rise.
@@ -40,15 +61,17 @@ by a 3-lens probe).
 
 ## 3. What has been redeemed
 
-29 of 90 tasks, on the prev-hash-chained `cyberware-swarm-v1.1/done-ledger-v2.json`. The complete
-task-by-task picture + the M0–M6 milestone closures are the **live** board
-([`pm-report.md`](pm-report.md)); re-verify the chain with `cws-observe/status`. Highlights this cycle:
+52 of 90 tasks, on the prev-hash-chained `cyberware-swarm-v1.1/done-ledger-v2.json` (chain re-verified each
+round). The complete task-by-task picture + the M0–M6 milestone closures are the **live** board
+([`pm-report.md`](pm-report.md)); re-verify the chain with `cws-observe/status`. Highlights:
 
 | rung | redeemed |
 |---|---|
-| **SV-1 / M1** | the CWP protocol + canonicalizer + Go anchor + cosign interop (P0-T02/03/04/07/08/17/18); **CWP JSON Schemas (P0-T05)** |
+| **SV-1 / M1** | the CWP protocol + canonicalizer + Go anchor + cosign interop (P0-T02/03/04/07/08/17/18); **CWP JSON Schemas (P0-T05)**; **reproducible engine build (P0-T13)** |
 | **SV-2 / M2** | Ledger-v2 chain + Go anchor + durability + snippet TOCTOU + R3 mutation gates (P1-T01/02/04/05/09/10); **crypto-shredding (P1-T07)**, **Merkle checkpoints (P1-T03)** |
 | **SV-3 / M3** | signed grants (P2-T01), exod (P2-T02), SandboxProfile (P2-T03), capability manifest (P2-T06), attested meters (P2-T07), the kernel red-team corpus (P2-T08) — **9/10** |
+| **SV-4 / M4** | the `cws-release` skill — publisher signing (P3-T01), offline transparency proofs (P3-T02), engine attestation (P3-T05), governed release receipt (P3-T15), revocation feed (P3-T03) + in-flight enforcement (P3-T13) + availability tiers (P3-T12), key-rotation drill (P3-T06), dual-DSSE receipts (P3-T14), TSA time anchors (P3-T07), WebAuthn approval (P3-T04), publish-time manifest lint (P3-T10) — **7/9** (open: `alchemy` P3-T08 + Citrinitas P3-T09) |
+| **SV-5 / M5** | workflow model-checking across **three provers** — TLC (empirical) + Apalache (symbolic) + TLAPS (axiomatic): emitter, saga, algebra, corpus, plan-as-workflow (P4-T01..T09) — **closed (8/8)** |
 
 ## 4. The operating model
 
