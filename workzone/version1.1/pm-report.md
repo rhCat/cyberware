@@ -6,13 +6,13 @@
 
 **Status: ok** (tracking pass)
 
-**Playbook:** 52 of 90 steps redeemed — `████████████░░░░░░░░` 58%
+**Playbook:** 54 of 90 steps redeemed — `████████████░░░░░░░░` 60%
 
-**Program:** 52 of 90 DAG tasks redeemed — `████████████░░░░░░░░` 58%
+**Program:** 54 of 90 DAG tasks redeemed — `████████████░░░░░░░░` 60%
 
-`52 redeemed · 5 blocked:deps · 22 blocked:validator · 11 dry`
+`54 redeemed · 6 blocked:deps · 19 blocked:validator · 11 dry`
 
-Done-ledger: 52 pass entries (chain not re-verified here — see §7).
+Done-ledger: 54 pass entries (chain not re-verified here — see §7).
 
 ## 2. Milestones
 
@@ -22,9 +22,9 @@ Done-ledger: 52 pass entries (chain not re-verified here — see §7).
 | **M1** — SV-1 — the protocol is real and portable | SV-1 | 7/7 | `P0-T18` | **closed** |
 | **M2** — SV-2 — evidence becomes tamper-evident | SV-2 | 8/8 | `P1-T09, P1-T10` | **closed** |
 | **M3** — SV-3 — execution becomes a kernel-enforced boundary  ◀ MVP | SV-3 | 9/10 | `P2-T08, P2-T09` | open |
-| **M4** — SV-4 — the registry and the engine publish and revoke themselves | SV-4 | 7/9 | `P3-T09, P3-T15` | open |
+| **M4** — SV-4 — the registry and the engine publish and revoke themselves | SV-4 | 9/9 | `P3-T09, P3-T15` | **closed** |
 | **M5** — SV-5 — workflows and the money's lifecycle are model-checked | SV-5 | 8/8 | `P4-T09` | **closed** |
-| **M6** — SV-6 — the work pays for the work  (the ladder closes) | SV-6 | 11/21 | `P6-T21` | open |
+| **M6** — SV-6 — the work pays for the work  (the ladder closes) | SV-6 | 12/21 | `P6-T21` | open |
 
 _Closure is the transitive dependency cone of each milestone's gate task(s), redeemed against the done-ledger — the same roll-up `cws-observe/status` computes._
 
@@ -50,15 +50,15 @@ _Closure is the transitive dependency cone of each milestone's gate task(s), red
 
 | task | validator | waiting on |
 |---|---|---|
-| `P3-T09` | `cws-release` | `P3-T08` |
 | `P3-T11` | `cws-release` | `P2-T04` |
 | `P5-T03` | `cws-bench` | `P1-T08` |
-| `P6-T07` | `cws-modelcheck` | `P6-T05`, `P4-T06`, `P3-T08` |
+| `P6-T07` | `cws-modelcheck` | `P6-T05`, `P4-T06` |
+| `P6-T09` | `alchemy` | `P6-T08` |
 | `P6-T16` | `cws-bench` | `P6-T02`, `P6-T03` |
+| `P6-T19` | `alchemy` | `P6-T05` |
 
 **Blocked on validator**
 
-- **`alchemy`** — not built · blocks: `P3-T08`, `P6-T09`, `P6-T19`
 - **`cws-chaos`** — not built · blocks: `P2-T10`, `P5-T04`, `P6-T17`
 - **`cws-settle-sim`** — not built · blocks: `P6-T01`, `P6-T02`, `P6-T03`, `P6-T04`, `P6-T05`, `P6-T06`, `P6-T08`, `P6-T10`, `P6-T11`, `P6-T12`, `P6-T13`, `P6-T14`, `P6-T15`, `P6-T18`, `P6-T20`, `P6-T21`
 
@@ -68,9 +68,9 @@ _Tracking pass — nothing was driven. Re-run without `DRY_RUN` to drive the rea
 
 ## 6. Honest status — what is not yet redeemed
 
-- **22 steps blocked on unbuilt validators** — the validator skill must be authored before its tasks can be driven (§4).
-- **5 steps blocked on dependencies** — upstream tasks must redeem first (§4).
-- **Open milestones:** M0, M3, M4, M6 — the spine still ahead (§2 has the closure ratios).
+- **19 steps blocked on unbuilt validators** — the validator skill must be authored before its tasks can be driven (§4).
+- **6 steps blocked on dependencies** — upstream tasks must redeem first (§4).
+- **Open milestones:** M0, M3, M6 — the spine still ahead (§2 has the closure ratios).
 - **Chain caveat:** this report reads done-ledger `pass` entries without re-verifying the prev-hash chain; `cws-observe/status` re-verifies the chain — run it for the chain-trusted picture.
 
 ## 7. Verify it yourself

@@ -37,10 +37,18 @@ Not a blocker, a platform note: the bwrap boundary (`infra/exec/sandbox.py`, the
 the plain compute CI image, and RUNS in the exec image (`infra/exec/Dockerfile.exec`, `docker run
 --privileged`). All such tests are green there (67/67 last certified). This is by design, not a gap.
 
-## B3 — concordance (alchemy, P3-T08) — NOT a blocker; engines exist, wrapper pending
+## B3 — concordance (alchemy, P3-T08 / P3-T09) — RESOLVED & REDEEMED (SV-4 closed 9/9)
 
-**Status:** the v1.1 plan review flagged "concordance ontology" as the one true blocker. It is **resolved as
-a build dependency**: the concordance engines were built in the **putrefactio phase** and are present locally
+**Status:** ✅ **closed.** The v1.1 plan review flagged "concordance ontology" as the one true blocker. It was
+**resolved by reuse**: the concordance engines built in the **putrefactio phase** were wrapped into the
+file-mode `alchemy` skill (extract/conserve/classify/concord) + the `cws-release/citrinitas` publish gate,
+both redeemed on the chain (done-ledger-v2 seq 44–45) and **adversarially verified** before redeem (a
+4-skeptic review caught a `chip_wide_concord` self-comparison tautology, which was replaced with a
+pinned-declared drift gate that discriminates each run). Scope documented honestly in `alchemy/SKILL.md`
+(block-order containment, not full-CFG equivalence; cross-language concord deferred). The historical detail
+below is retained for context.
+
+**History (resolved):** the concordance engines were built in the **putrefactio phase** and are present locally
 — `~/hunyuan/alembic` (declared-blueprint engine + `cargo alembic --synthesize` L++ emitter, plus the
 `citrinitas-phase2` binary that backs P3-T09) and `~/hunyuan/putrefactio` (the analysis layer + `laws/`).
 P3-T08's deliverable is explicit: *wraps pinned alembic + putrefactio in **file-mode** (no warehouse dep)*.
