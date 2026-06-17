@@ -7,8 +7,14 @@ is asserted that the machinery cannot redeem. The **live** board is [`pm-report.
 ## 1. Where we are, in one paragraph
 
 The platform **grades and builds itself against the plan**, milestone by milestone up the SV-1 → SV-6
-security ladder. **SV-1 (M1)**, **SV-2 (M2)**, **SV-4 (M4)**, and **SV-5 (M5)** are **closed**; **SV-3 (M3)**
-is at **9/10**. SV-4 — *the registry and the engine publish and revoke themselves* — closed (9/9) with the
+security ladder. **M0 (the spine)**, **SV-1 (M1)**, **SV-2 (M2)**, **SV-4 (M4)**, and **SV-5 (M5)** are
+**closed** — and **M0 closed (15/15)** with the settlement engine: a governed run can now be claimed,
+blessed, executed under attestation, priced by a funded quote, and **settled** as a balanced posting set on
+the reward ledger. **SV-6 (M6)** — *the work pays for the work, the ladder closes* — is at **16/21** (the
+money's lifecycle: a scale-4 HALF_EVEN `Money` type with a float-ban, a double-entry reward ledger that stays
+zero-sum across a 10k-settlement storm, a signed funded quote, and a settlement engine where a mutant receipt
+settles nothing — built + adversarially verified, with per-quote escrow + a spent-quote idempotency guard).
+**SV-3 (M3)** is at **9/10**. SV-4 — *the registry and the engine publish and revoke themselves* — closed (9/9) with the
 `cws-release` skill (publisher signing, offline transparency proofs, engine attestation + mutual handshake,
 the governed release receipt, the signed revocation feed + in-flight enforcement + availability-grace tiers,
 key-rotation, dual-DSSE + in-toto receipts, TSA time anchors, WebAuthn approval, publish-time manifest lint,

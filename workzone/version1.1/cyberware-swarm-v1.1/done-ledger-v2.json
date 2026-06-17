@@ -407,6 +407,42 @@
       "verdict": "pass",
       "evidence_sha": "54d1ef0a68411bd85f2cbcb655b72f445a562db93b858d5a51348271a3aa6d2f",
       "prev": "57a24c66fb1a83689747fb0f6e6621eaa38a2fde75f866e1417113ef79932b45"
+    },
+    {
+      "seq": 46,
+      "ts": "2026-06-17T13:14:05Z",
+      "task_id": "P6-T01",
+      "validator": "cws-settle-sim",
+      "verdict": "pass",
+      "evidence_sha": "82d2030ff39aef3f7066aacf8b284593590ca5eaa22cac69e74de71f1120646a",
+      "prev": "d5776c9d58646367f9cd79f058dd654d50d31800398c0e3720ad79fb6ea49549"
+    },
+    {
+      "seq": 47,
+      "ts": "2026-06-17T13:14:07Z",
+      "task_id": "P6-T02",
+      "validator": "cws-settle-sim",
+      "verdict": "pass",
+      "evidence_sha": "719b46462419ed5c640a1699321650763562421b651c5d8a793823d161ce25ee",
+      "prev": "843c1c2d1c2eae402a21e7359600fd294dbeb70be398c4aafe375b99be65f598"
+    },
+    {
+      "seq": 48,
+      "ts": "2026-06-17T13:14:07Z",
+      "task_id": "P6-T04",
+      "validator": "cws-settle-sim",
+      "verdict": "pass",
+      "evidence_sha": "7f91284be806c1f61a345d3057be7e3f4c3f4faa17795bc153c95ec50cdaec91",
+      "prev": "bad66be18a6bc12db5057067fcb9fef86aba7ec9285f376eab35a663a9fb78a8"
+    },
+    {
+      "seq": 49,
+      "ts": "2026-06-17T13:14:08Z",
+      "task_id": "P6-T05",
+      "validator": "cws-settle-sim",
+      "verdict": "pass",
+      "evidence_sha": "5bb68d9e4e8ace7e1065a630436ba212f416d3a088107ee76b339c5a5e3ec130",
+      "prev": "6406a6ea65e2fecf5cb01f432165e1170b03225821e306eca39ed10a54570d4c"
     }
   ]
 }
