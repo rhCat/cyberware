@@ -7,19 +7,18 @@ is asserted that the machinery cannot redeem. The **live** board is [`pm-report.
 ## 1. Where we are, in one paragraph
 
 The platform **grades and builds itself against the plan**, milestone by milestone up the SV-1 → SV-6
-security ladder. **SV-1 (M1)** and **SV-2 (M2)** are closed; **SV-5 (M5)** — *workflows and the money's
-lifecycle are model-checked* — is **closed** (8/8, three independent provers: TLC + Apalache + TLAPS);
-**SV-3 (M3)** — *execution becomes a kernel-enforced boundary* — is at **9/10**; and **SV-4 (M4)** — *the
-registry and the engine publish and revoke themselves* — is at **7/9** (the `cws-release` skill: publisher
-signing, offline transparency proofs, engine attestation + mutual handshake, the governed release receipt,
-the signed revocation feed + in-flight enforcement + availability-grace tiers, key-rotation, dual-DSSE +
-in-toto receipts, TSA time anchors, WebAuthn approval, publish-time manifest lint, and reproducible engine
-builds). **52 of 90 tasks** are redeemed (each by a governed validator run recorded in the prev-hash-chained
-done-ledger, never asserted — the live board is [`pm-report.md`](pm-report.md)). The two open bricks of SV-4
-are the `alchemy` concordance validator (P3-T08) and its Citrinitas publish gate (P3-T09) — and these are
-**not** blocked: their engines were built in the putrefactio phase and need only a file-mode wrapper skill
-(see [`KNOWN-BLOCKERS.md`](KNOWN-BLOCKERS.md) B3). M3's one open brick is a hardware ceiling — the microVM
-perf budget needs `/dev/kvm`, absent on the dev box (B1).
+security ladder. **SV-1 (M1)**, **SV-2 (M2)**, **SV-4 (M4)**, and **SV-5 (M5)** are **closed**; **SV-3 (M3)**
+is at **9/10**. SV-4 — *the registry and the engine publish and revoke themselves* — closed (9/9) with the
+`cws-release` skill (publisher signing, offline transparency proofs, engine attestation + mutual handshake,
+the governed release receipt, the signed revocation feed + in-flight enforcement + availability-grace tiers,
+key-rotation, dual-DSSE + in-toto receipts, TSA time anchors, WebAuthn approval, publish-time manifest lint,
+reproducible engine builds, and the **Citrinitas publish gate**) plus the **`alchemy` concordance validator**
+(extract / conserve / classify / concord), the file-mode wrapper over the pinned putrefactio + alembic engines
+— the long-flagged "concordance ontology" blocker, resolved by reuse and **adversarially verified** before
+redeem. SV-5 closed (8/8) with three independent provers (TLC + Apalache + TLAPS). **54 of 90 tasks** are
+redeemed (each by a governed validator run recorded in the prev-hash-chained done-ledger, never asserted —
+the live board is [`pm-report.md`](pm-report.md)). M3's one open brick is a hardware ceiling — the microVM
+perf budget needs `/dev/kvm`, absent on the dev box (see [`KNOWN-BLOCKERS.md`](KNOWN-BLOCKERS.md) B1).
 
 ## 2. What has been built
 
@@ -70,7 +69,7 @@ round). The complete task-by-task picture + the M0–M6 milestone closures are t
 | **SV-1 / M1** | the CWP protocol + canonicalizer + Go anchor + cosign interop (P0-T02/03/04/07/08/17/18); **CWP JSON Schemas (P0-T05)**; **reproducible engine build (P0-T13)** |
 | **SV-2 / M2** | Ledger-v2 chain + Go anchor + durability + snippet TOCTOU + R3 mutation gates (P1-T01/02/04/05/09/10); **crypto-shredding (P1-T07)**, **Merkle checkpoints (P1-T03)** |
 | **SV-3 / M3** | signed grants (P2-T01), exod (P2-T02), SandboxProfile (P2-T03), capability manifest (P2-T06), attested meters (P2-T07), the kernel red-team corpus (P2-T08) — **9/10** |
-| **SV-4 / M4** | the `cws-release` skill — publisher signing (P3-T01), offline transparency proofs (P3-T02), engine attestation (P3-T05), governed release receipt (P3-T15), revocation feed (P3-T03) + in-flight enforcement (P3-T13) + availability tiers (P3-T12), key-rotation drill (P3-T06), dual-DSSE receipts (P3-T14), TSA time anchors (P3-T07), WebAuthn approval (P3-T04), publish-time manifest lint (P3-T10) — **7/9** (open: `alchemy` P3-T08 + Citrinitas P3-T09) |
+| **SV-4 / M4** | the `cws-release` skill — publisher signing (P3-T01), offline transparency proofs (P3-T02), engine attestation (P3-T05), governed release receipt (P3-T15), revocation feed (P3-T03) + in-flight enforcement (P3-T13) + availability tiers (P3-T12), key-rotation drill (P3-T06), dual-DSSE receipts (P3-T14), TSA time anchors (P3-T07), WebAuthn approval (P3-T04), publish-time manifest lint (P3-T10), **Citrinitas publish gate (P3-T09)**; plus the **`alchemy`** concordance validator — extract/conserve/classify/concord (P3-T08) — **closed (9/9)** |
 | **SV-5 / M5** | workflow model-checking across **three provers** — TLC (empirical) + Apalache (symbolic) + TLAPS (axiomatic): emitter, saga, algebra, corpus, plan-as-workflow (P4-T01..T09) — **closed (8/8)** |
 
 ## 4. The operating model

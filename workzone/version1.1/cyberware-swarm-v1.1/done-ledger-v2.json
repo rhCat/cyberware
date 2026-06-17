@@ -389,6 +389,24 @@
       "verdict": "pass",
       "evidence_sha": "dcaee1bdf23475194f3b06b519452ef223471c4f47eec3a61fceb973009fe488",
       "prev": "8efe8b3a906b6ccd7e189f49b65ba0cd0162cec448a1af27b01356a4e9fb6648"
+    },
+    {
+      "seq": 44,
+      "ts": "2026-06-17T01:30:30Z",
+      "task_id": "P3-T08",
+      "validator": "alchemy",
+      "verdict": "pass",
+      "evidence_sha": "d4fca4e4d4e482e1bc995773d34e8170c4cdaa8030b4d29738cea77f02c5361e",
+      "prev": "34ece805b175c9662c0d88a05d213cf11c9cd59bb846377b485c2fc6c558fa68"
+    },
+    {
+      "seq": 45,
+      "ts": "2026-06-17T01:30:30Z",
+      "task_id": "P3-T09",
+      "validator": "cws-release",
+      "verdict": "pass",
+      "evidence_sha": "54d1ef0a68411bd85f2cbcb655b72f445a562db93b858d5a51348271a3aa6d2f",
+      "prev": "57a24c66fb1a83689747fb0f6e6621eaa38a2fde75f866e1417113ef79932b45"
     }
   ]
 }
