@@ -6,13 +6,13 @@
 
 **Status: ok** (tracking pass)
 
-**Playbook:** 63 of 90 steps redeemed — `██████████████░░░░░░` 70%
+**Playbook:** 65 of 90 steps redeemed — `██████████████░░░░░░` 72%
 
-**Program:** 63 of 90 DAG tasks redeemed — `██████████████░░░░░░` 70%
+**Program:** 65 of 90 DAG tasks redeemed — `██████████████░░░░░░` 72%
 
-`63 redeemed · 8 blocked:deps · 3 blocked:validator · 16 dry`
+`65 redeemed · 9 blocked:deps · 16 dry`
 
-Done-ledger: 63 pass entries (chain not re-verified here — see §7).
+Done-ledger: 65 pass entries (chain not re-verified here — see §7).
 
 ## 2. Milestones
 
@@ -57,6 +57,7 @@ _Closure is the transitive dependency cone of each milestone's gate task(s), red
 |---|---|---|
 | `P3-T11` | `cws-release` | `P2-T04` |
 | `P5-T03` | `cws-bench` | `P1-T08` |
+| `P5-T04` | `cws-chaos` | `P5-T01` |
 | `P6-T03` | `cws-settle-sim` | `P4-T06` |
 | `P6-T07` | `cws-modelcheck` | `P4-T06` |
 | `P6-T09` | `alchemy` | `P6-T08` |
@@ -66,7 +67,7 @@ _Closure is the transitive dependency cone of each milestone's gate task(s), red
 
 **Blocked on validator**
 
-- **`cws-chaos`** — not built · blocks: `P2-T10`, `P5-T04`, `P6-T17`
+_None._
 
 ## 5. What this run drove
 
@@ -74,8 +75,7 @@ _Tracking pass — nothing was driven. Re-run without `DRY_RUN` to drive the rea
 
 ## 6. Honest status — what is not yet redeemed
 
-- **3 steps blocked on unbuilt validators** — the validator skill must be authored before its tasks can be driven (§4).
-- **8 steps blocked on dependencies** — upstream tasks must redeem first (§4).
+- **9 steps blocked on dependencies** — upstream tasks must redeem first (§4).
 - **Open milestones:** M3 — the spine still ahead (§2 has the closure ratios).
 - **Chain caveat:** this report reads done-ledger `pass` entries without re-verifying the prev-hash chain; `cws-observe/status` re-verifies the chain — run it for the chain-trusted picture.
 
