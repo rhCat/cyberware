@@ -6,13 +6,13 @@
 
 **Status: ok** (tracking pass)
 
-**Playbook:** 58 of 90 steps redeemed — `█████████████░░░░░░░` 64%
+**Playbook:** 63 of 90 steps redeemed — `██████████████░░░░░░` 70%
 
-**Program:** 58 of 90 DAG tasks redeemed — `█████████████░░░░░░░` 64%
+**Program:** 63 of 90 DAG tasks redeemed — `██████████████░░░░░░` 70%
 
-`58 redeemed · 11 blocked:deps · 3 blocked:validator · 18 dry`
+`63 redeemed · 8 blocked:deps · 3 blocked:validator · 16 dry`
 
-Done-ledger: 58 pass entries (chain not re-verified here — see §7).
+Done-ledger: 63 pass entries (chain not re-verified here — see §7).
 
 ## 2. Milestones
 
@@ -24,7 +24,7 @@ Done-ledger: 58 pass entries (chain not re-verified here — see §7).
 | **M3** — SV-3 — execution becomes a kernel-enforced boundary  ◀ MVP | SV-3 | 9/10 | `P2-T08, P2-T09` | open |
 | **M4** — SV-4 — the registry and the engine publish and revoke themselves | SV-4 | 9/9 | `P3-T09, P3-T15` | **closed** |
 | **M5** — SV-5 — workflows and the money's lifecycle are model-checked | SV-5 | 8/8 | `P4-T09` | **closed** |
-| **M6** — SV-6 — the work pays for the work  (the ladder closes) | SV-6 | 16/21 | `P6-T21` | open |
+| **M6** — SV-6 — the work pays for the work  (the ladder closes) | SV-6 | 21/21 | `P6-T21` | **closed** |
 
 _Closure is the transitive dependency cone of each milestone's gate task(s), redeemed against the done-ledger — the same roll-up `cws-observe/status` computes._
 
@@ -46,10 +46,8 @@ _Closure is the transitive dependency cone of each milestone's gate task(s), red
 | `P6-T06` | `cws-settle-sim` | reward verify (chain + per-record zero + global zero + receipt cross-check) |
 | `P6-T08` | `cws-settle-sim` | Attested meters become settleable + provider-receipt capture (6b) |
 | `P6-T10` | `cws-settle-sim` | Market modes: bounty + reverse auction (6c) |
-| `P6-T11` | `cws-settle-sim` | FMV indices: trimmed VWM + admission rules + signed publication (6c) |
-| `P6-T12` | `cws-settle-sim` | Disputes: window + bonds + m-of-n via approval artifacts (6d) |
+| `P6-T13` | `cws-settle-sim` | Derived reputation scores (signed, third-party reproducible) (6d) |
 | `P6-T14` | `cws-settle-sim` | Stripe SettlementAdapter + internal-credits adapter (T21, R2 seam) |
-| `P6-T19` | `alchemy` | Repatriate the ancestor as priced perks (M11 closing move) |
 
 ## 4. Blocked
 
@@ -62,12 +60,9 @@ _Closure is the transitive dependency cone of each milestone's gate task(s), red
 | `P6-T03` | `cws-settle-sim` | `P4-T06` |
 | `P6-T07` | `cws-modelcheck` | `P4-T06` |
 | `P6-T09` | `alchemy` | `P6-T08` |
-| `P6-T13` | `cws-settle-sim` | `P6-T12` |
 | `P6-T15` | `cws-settle-sim` | `P6-T14` |
 | `P6-T16` | `cws-bench` | `P6-T03` |
-| `P6-T18` | `cws-settle-sim` | `P6-T11`, `P6-T12` |
 | `P6-T20` | `cws-settle-sim` | `P3-T16` |
-| `P6-T21` | `cws-settle-sim` | `P6-T11`, `P6-T18`, `P6-T19` |
 
 **Blocked on validator**
 
@@ -80,8 +75,8 @@ _Tracking pass — nothing was driven. Re-run without `DRY_RUN` to drive the rea
 ## 6. Honest status — what is not yet redeemed
 
 - **3 steps blocked on unbuilt validators** — the validator skill must be authored before its tasks can be driven (§4).
-- **11 steps blocked on dependencies** — upstream tasks must redeem first (§4).
-- **Open milestones:** M3, M6 — the spine still ahead (§2 has the closure ratios).
+- **8 steps blocked on dependencies** — upstream tasks must redeem first (§4).
+- **Open milestones:** M3 — the spine still ahead (§2 has the closure ratios).
 - **Chain caveat:** this report reads done-ledger `pass` entries without re-verifying the prev-hash chain; `cws-observe/status` re-verifies the chain — run it for the chain-trusted picture.
 
 ## 7. Verify it yourself
