@@ -290,6 +290,15 @@
       "verdict": "pass",
       "evidence_sha": "29f5972b306ff98ebc803ecf35d08b34a7c6917143652114c59f5ab97dfb3fa3",
       "prev": "99d7cbcbbe2728e83a711fa0f5183d30eba21e6047caca427a285c1213f32040"
+    },
+    {
+      "seq": 33,
+      "ts": "2026-06-17T00:16:50Z",
+      "task_id": "P0-T13",
+      "validator": "cws-conform",
+      "verdict": "pass",
+      "evidence_sha": "0d7daa8f39e906087828cd5966749974a3879793a8695617fa2d25b1fa28dbc0",
+      "prev": "67fa2664b1b3cd8d0f6c41dae3e1bb82cfdfbd96bc2afff749e60160be1db660"
     }
   ]
 }
