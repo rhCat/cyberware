@@ -180,6 +180,13 @@ def run_governed(base_url, ledger, approve=(), registry=None):
     if problem:
         return {"run_id": verdict["run_id"], "decision": "allow",
                 "error": f"registry mismatch ({registry}): {problem}"}
+    # Defense-in-depth beyond the per-snippet hashes: the agent's WHOLE skill closure must match its committed
+    # authenticity index — skill_index.verify flags changed/missing/UNTRACKED files — so a sha-matching porter
+    # can't smuggle an untracked sibling that a blessed porter then `source`s. Same authority govd trusts.
+    ok, drift = skill_index.verify(plan["skill"], registry)
+    if not ok:
+        return {"run_id": verdict["run_id"], "decision": "allow",
+                "error": f"registry authenticity failed ({registry}): {drift[:5]}"}
     run, sh, env = _prepare(plan, ledger, registry)
 
     ws_host, ws_port = verdict["ws"].split("://", 1)[1].split("/", 1)[0].rsplit(":", 1)
