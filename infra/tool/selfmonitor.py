@@ -49,6 +49,25 @@ def check_authenticity():
     return r.returncode == 0, tail
 
 
+def check_no_stubs():
+    """(ok, offenders): no PERMITTED skill ships scaffold-default placeholder metadata — a blueprint
+    description still reading 'TODO describe what this skill does', or a perks.json summary literally 'TODO'.
+    These slip in from `scaffold.py` and contradict the real SKILL.md; this gate is the root-cause guard so
+    they can't recur. (Scans the data files only — `cws-addperk`'s own scaffold-template code is not a skill
+    blueprint, so its intentional TODO markers are not flagged.)"""
+    offenders = []
+    for s in si.all_skills():
+        bp = os.path.join(si.SKILLS, s, "blueprint.json")
+        if os.path.isfile(bp) and "TODO describe what this skill does" in json.load(open(bp)).get("description", ""):
+            offenders.append(f"{s}/blueprint.json: placeholder description")
+        pj = os.path.join(si.SKILLS, s, "perks.json")
+        if os.path.isfile(pj):
+            for p in (json.load(open(pj)) or {}).get("perks", []):
+                if (p.get("summary") or "").strip() == "TODO":
+                    offenders.append(f"{s}/perks.json: perk '{p.get('id')}' summary is TODO")
+    return not offenders, offenders
+
+
 def mutation_score(module, slice_, cap):
     """Drive the chip's cws-mutate core over `module` with `slice_` as the test; return its report dict."""
     rs = tempfile.mkdtemp(prefix="selfmon-mut-")
@@ -102,6 +121,11 @@ def main():
     aok, adetail = check_authenticity()
     print(f"[ {'ok' if aok else 'FAIL'} ] authenticity — {adetail}")
     failed = failed or not aok
+
+    sok, stubs = check_no_stubs()
+    print(f"[ {'ok' if sok else 'FAIL'} ] no scaffold stubs — "
+          + ("none" if sok else f"{len(stubs)} placeholder(s): {stubs[:5]}"))
+    failed = failed or not sok
 
     if not a.no_mutation:
         rows, mfail = check_mutation()

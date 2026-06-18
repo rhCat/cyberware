@@ -1,0 +1,62 @@
+"""S4 — the skillChip load set is manifest-authoritative (the cartridge model): enumeration reads the root
+manifest's PERMITTED roster, never a directory scan. An undeclared dir on disk does not load; a declared-but-
+absent skill is dropped; a skill is loadable iff permitted AND present; and the roster is mutated explicitly
+(--scan / --add / --remove), never auto-absorbed. Pure stdlib."""
+from __future__ import annotations
+import os
+import shutil
+
+from infra.tool import skill_index as si
+
+
+def _mini_chip(tmp_path, skills=("git_ops", "fs")):
+    """A throwaway chip: copy a couple real skills + seed the manifest by scan (the bootstrap path)."""
+    chip = tmp_path / "chip"
+    chip.mkdir()
+    for s in skills:
+        shutil.copytree(os.path.join(si.SKILLS, s), chip / s)
+    si.write_manifest(str(chip), roster=si.scan_skills(str(chip)))
+    return str(chip)
+
+
+def test_load_set_is_the_manifest_not_the_directory(tmp_path):
+    chip = _mini_chip(tmp_path, ("git_ops", "fs"))
+    assert sorted(si.all_skills(chip)) == ["fs", "git_ops"]
+    # drop an UNDECLARED dir on disk → it must NOT be enumerated (not permitted)
+    shutil.copytree(os.path.join(si.SKILLS, "markdown"), os.path.join(chip, "markdown"))
+    assert "markdown" not in si.all_skills(chip)                 # present but not in the manifest → ignored
+    assert si.loadable("markdown", chip) == (False, "not_permitted")
+    assert si.loadable("fs", chip) == (True, "ok")
+
+
+def test_declared_but_absent_is_dropped_from_the_load_set(tmp_path):
+    chip = _mini_chip(tmp_path, ("git_ops", "fs"))
+    shutil.rmtree(os.path.join(chip, "fs"))                      # permitted in the manifest, but gone from disk
+    assert si.all_skills(chip) == ["git_ops"]                   # absent skill dropped
+    assert si.loadable("fs", chip) == (False, "absent")
+
+
+def test_repin_does_not_auto_absorb_a_stray_dir(tmp_path):
+    chip = _mini_chip(tmp_path, ("git_ops", "fs"))
+    shutil.copytree(os.path.join(si.SKILLS, "markdown"), os.path.join(chip, "markdown"))
+    si.write_manifest(str(chip))                                # plain re-pin: refresh shas, do NOT absorb markdown
+    assert "markdown" not in si.permitted_skills(chip)
+    # explicit --add semantics: only an intentional roster op permits it
+    si.write_manifest(str(chip), roster=sorted(set(si.permitted_skills(chip)) | {"markdown"}))
+    assert "markdown" in si.permitted_skills(chip) and "markdown" in si.all_skills(chip)
+
+
+def test_scan_seeds_a_fresh_chip(tmp_path):
+    chip = tmp_path / "fresh"
+    chip.mkdir()
+    for s in ("git_ops", "fs", "markdown"):
+        shutil.copytree(os.path.join(si.SKILLS, s), chip / s)
+    # no manifest yet → all_skills bootstraps by scan
+    assert sorted(si.all_skills(str(chip))) == ["fs", "git_ops", "markdown"]
+    si.write_manifest(str(chip), roster=si.scan_skills(str(chip)))
+    assert sorted(si.permitted_skills(str(chip))) == ["fs", "git_ops", "markdown"]
+
+
+def test_the_real_chip_is_36_and_authentic():
+    assert len(si.all_skills()) == 36
+    assert set(si.all_skills()) == set(si.permitted_skills())    # permitted == present, no drift

@@ -3,7 +3,6 @@ unrecoverable while the prev-hash chain still verifies and every other record is
 from __future__ import annotations
 
 import base64
-import json
 
 import pytest
 from cryptography.exceptions import InvalidTag
