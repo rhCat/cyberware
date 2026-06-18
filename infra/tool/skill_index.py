@@ -74,10 +74,55 @@ def verify(skill, skills_dir=None):
     return (not problems), problems
 
 
-def all_skills(skills_dir=None):
+def scan_skills(skills_dir=None):
+    """A DIRECTORY SCAN for skill dirs (any carrying a perks.json). This is the ONLY place that lists the
+    chip directory, and it is used ONLY to SEED a fresh chip's roster (`--chip --scan`) or as a no-manifest
+    bootstrap — NEVER as the runtime load set. Routing the load set through a dir scan is what let foreign
+    dirs ride along; the manifest is the authority instead (see `all_skills`)."""
     skills_dir = skills_dir or SKILLS
-    return sorted(d for d in os.listdir(skills_dir)                       # a real skill carries a perks.json —
-                  if os.path.isfile(os.path.join(skills_dir, d, "perks.json")))   # skips .git, the manifest, README
+    return sorted(d for d in os.listdir(skills_dir)
+                  if os.path.isfile(os.path.join(skills_dir, d, "perks.json")))
+
+
+def permitted_skills(skills_dir=None):
+    """The cartridge's PERMIT LIST: the skills the root manifest (index.json) declares. Empty if no manifest
+    (a fresh chip). This is the authority for what may load — an on-disk dir not in here is not permitted."""
+    skills_dir = skills_dir or SKILLS
+    mp = os.path.join(skills_dir, MANIFEST)
+    if not os.path.isfile(mp):
+        return []
+    return sorted(s.get("skill") for s in (json.load(open(mp)) or {}).get("skills", []) if s.get("skill"))
+
+
+def is_present(skill, skills_dir=None):
+    """True iff the skill is actually on disk — a dir carrying a perks.json."""
+    skills_dir = skills_dir or SKILLS
+    return os.path.isfile(os.path.join(skills_dir, skill, "perks.json"))
+
+
+def loadable(skill, skills_dir=None):
+    """(ok, reason) — a skill may load iff it is PERMITTED (declared in the manifest) AND PRESENT (on disk).
+    reason ∈ {ok, not_permitted, absent}. The two-part check the cartridge model requires."""
+    skills_dir = skills_dir or SKILLS
+    if not permitted_skills(skills_dir):
+        return (is_present(skill, skills_dir), "ok" if is_present(skill, skills_dir) else "absent")  # no manifest yet
+    if skill not in permitted_skills(skills_dir):
+        return False, "not_permitted"
+    if not is_present(skill, skills_dir):
+        return False, "absent"
+    return True, "ok"
+
+
+def all_skills(skills_dir=None):
+    """The authoritative runtime load set: the manifest's PERMITTED skills that are also PRESENT on disk —
+    NOT a directory scan. An undeclared dir (not permitted) never loads; a declared-but-absent skill is
+    dropped from the load set. With NO manifest (a fresh chip), falls back ONCE to a directory scan to
+    bootstrap. The root index.json is the authority — `os.listdir` is confined to `scan_skills`."""
+    skills_dir = skills_dir or SKILLS
+    permitted = permitted_skills(skills_dir)
+    if not permitted:                                    # fresh chip, no manifest yet — bootstrap by scan
+        return scan_skills(skills_dir)
+    return [s for s in permitted if is_present(s, skills_dir)]
 
 
 def skill_sha(skill, skills_dir=None):
@@ -113,21 +158,28 @@ def catalog(skills_dir=None):
     return {"skills": skills, "count": len(skills)}
 
 
-def chip_manifest(skills_dir=None):
-    """The chip-level manifest: every skill + its skill_sha, plus a roll-up chip_sha. cyberware retrieves
-    this one file (`<skillChip>/index.json`) to discover + verify the whole chip as a unit."""
+def chip_manifest(skills_dir=None, roster=None):
+    """The chip-level manifest: every skill in the cartridge + its skill_sha, plus a roll-up chip_sha.
+    `roster` is the explicit member list to pin; default re-pins the CURRENTLY-permitted set (`all_skills`),
+    so a re-pin refreshes shas WITHOUT absorbing an undeclared on-disk dir. cyberware retrieves this one file
+    (`<skillChip>/index.json`) to discover + verify the whole cartridge as a unit."""
     skills_dir = skills_dir or SKILLS
+    members = sorted(roster) if roster is not None else all_skills(skills_dir)
     entries = []
-    for s in all_skills(skills_dir):
+    for s in members:
         idx = json.load(open(os.path.join(skills_dir, s, INDEX))) if os.path.isfile(os.path.join(skills_dir, s, INDEX)) else {}
         entries.append({"skill": s, "skill_sha": idx.get("skill_sha"), "file_count": idx.get("file_count")})
     roll = canonical.digest({e["skill"]: e["skill_sha"] for e in entries})
-    return {"chip": "skillChip", "count": len(entries), "skills": entries, "chip_sha": roll}
+    # version + cartridge marker: the manifest is the authoritative roster (cartridge model). The dev chip is
+    # the full feedstock (cartridge:false); a single-skill/roster cut by `cartridge.compile` sets cartridge:true.
+    # chip_sha is the roll-up over skill_shas ONLY, so these descriptive fields never shift the chip identity.
+    return {"chip": "skillChip", "version": 1, "cartridge": False,
+            "count": len(entries), "skills": entries, "chip_sha": roll}
 
 
-def write_manifest(skills_dir=None):
+def write_manifest(skills_dir=None, roster=None):
     skills_dir = skills_dir or SKILLS
-    m = chip_manifest(skills_dir)
+    m = chip_manifest(skills_dir, roster)
     open(os.path.join(skills_dir, MANIFEST), "w").write(json.dumps(m, indent=2) + "\n")
     return m
 
@@ -151,7 +203,10 @@ def main():
     ap = argparse.ArgumentParser(description="generate / check the skillChip's sha256 authenticity indexes")
     ap.add_argument("--skill")
     ap.add_argument("--all", action="store_true")
-    ap.add_argument("--chip", action="store_true", help="(re)write just the chip-level manifest (index.json)")
+    ap.add_argument("--chip", action="store_true", help="(re)write the chip manifest (index.json) over the permitted roster")
+    ap.add_argument("--add", nargs="+", metavar="SKILL", help="with --chip: add skill(s) to the permitted roster (must be present)")
+    ap.add_argument("--remove", nargs="+", metavar="SKILL", help="with --chip: remove skill(s) from the permitted roster")
+    ap.add_argument("--scan", action="store_true", help="with --chip: SEED the roster from a directory scan (bootstrap a fresh chip)")
     ap.add_argument("--check", action="store_true", help="verify files match the indexes + the chip manifest (no writes)")
     a = ap.parse_args()
     skills = [a.skill] if a.skill else all_skills()
@@ -169,7 +224,18 @@ def main():
         sys.exit(1 if drift else 0)
 
     if a.chip:
-        m = write_manifest()
+        roster = None
+        if a.scan:
+            roster = scan_skills()                       # bootstrap: seed the roster from disk (explicit)
+        elif a.add or a.remove:
+            roster = set(permitted_skills() or scan_skills())
+            for s in (a.add or []):
+                if not is_present(s):
+                    sys.exit(f"skill_index: cannot add absent skill {s}")
+                roster.add(s)
+            roster -= set(a.remove or [])
+            roster = sorted(roster)
+        m = write_manifest(roster=roster)
         print(f"skill_index: wrote chip manifest — {m['count']} skills · chip_sha {m['chip_sha'][:16]}")
         return
 

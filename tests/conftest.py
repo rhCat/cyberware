@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))   # so `from infra.govern import …` / `from infr
 
 from infra import registry  # noqa: E402
 from infra.govern import runlog  # noqa: E402
+from infra.tool import skill_index  # noqa: E402
 
 TOOL_MODULES = {"scaffold", "visualize", "skill_index"}   # everything else lives under infra.govern
 
@@ -30,10 +31,14 @@ def run_cli(module: str, *args, **kw):
 
 
 def all_perks():
-    """Every (skill, perk) pair in the registry — the parametrize source for per-perk tests."""
+    """Every (skill, perk) pair in the registry — the parametrize source for per-perk tests. Enumerated from
+    the PERMITTED roster (the manifest), not a directory glob, so a stray dir scaffolded into the chip during
+    a run is never collected (no phantom parametrize ids)."""
     out = []
-    for pj in sorted(Path(registry.SKILLCHIP).glob("*/perks.json")):
-        sk = pj.parent.name
+    for sk in skill_index.all_skills(str(registry.SKILLCHIP)):
+        pj = Path(registry.SKILLCHIP) / sk / "perks.json"
+        if not pj.is_file():
+            continue
         for p in json.loads(pj.read_text())["perks"]:
             out.append((sk, p["id"]))
     return out
