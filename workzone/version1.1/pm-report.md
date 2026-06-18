@@ -1,6 +1,6 @@
 # cyberware v1.1 — pm report
 
-*Snapshot: 2026-06-17.* Tracking pass (`DRY_RUN`): the plan classified, nothing fired. Progress is redeemed, not asserted — see §7.
+*Snapshot: 2026-06-18.* Tracking pass (`DRY_RUN`) regenerated through `govd` (the cws-pm porter ran governed). Progress is redeemed, not asserted — and this round `cws-observe/status` re-verified the prev-hash chain **ok** (65 redeemed), so the counts below are chain-trusted, not just raw `pass` entries. See §7.
 
 ## 1. Roll-up
 
@@ -77,7 +77,7 @@ _Tracking pass — nothing was driven. Re-run without `DRY_RUN` to drive the rea
 
 - **9 steps blocked on dependencies** — upstream tasks must redeem first (§4).
 - **Open milestones:** M3 — the spine still ahead (§2 has the closure ratios).
-- **Chain caveat:** this report reads done-ledger `pass` entries without re-verifying the prev-hash chain; `cws-observe/status` re-verifies the chain — run it for the chain-trusted picture.
+- **Chain:** `cws-pm` itself reads done-ledger `pass` entries without re-verifying the prev-hash chain, but this round `cws-observe/status` was run alongside it and re-verified the v1+v2 chain **ok** (65 redeemed, milestone cones intact) — so this snapshot is chain-trusted. (Invocation note: pass `cws-observe` the **v1** `done-ledger.json` path; it auto-discovers the sibling `done-ledger-v2.json` and verifies the cross-reference. Passing the v2 file directly mis-reads its genesis record as a broken link.)
 
 ## 7. Verify it yourself
 
