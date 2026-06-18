@@ -20,6 +20,7 @@ import json
 import os
 import shutil
 
+from infra import registry
 from infra.cwp import canonical
 from infra.tool import skill_index
 
@@ -38,7 +39,7 @@ def compile(skills, out_dir: str, source=None) -> dict:
         raise ValueError("a cartridge must declare at least one skill")
     os.makedirs(out_dir, exist_ok=True)
     for sk in skills:
-        src = os.path.join(source, sk)
+        src = registry.skill_dir(sk, source)                 # resolve in the source chip — flat OR source-grouped
         if not os.path.isfile(os.path.join(src, "perks.json")):
             raise ValueError(f"no such skill in the source chip: {sk}")
         ok, drift = skill_index.verify(sk, source)

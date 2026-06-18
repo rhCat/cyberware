@@ -45,9 +45,14 @@ def skill_files(skill_dir):
 # Every path-taking helper resolves `skills_dir or SKILLS` at CALL time (not as a default arg) so the
 # module-global SKILLS stays monkeypatchable, while callers can point at a different registry explicitly.
 
+def _sd(skill, skills_dir=None):
+    """The skill's directory, resolved flat OR source-grouped (`<chip>/<source>/<skill>`) via the registry."""
+    return registry.skill_dir(skill, skills_dir or SKILLS)
+
+
 def build_index(skill, skills_dir=None):
     skills_dir = skills_dir or SKILLS
-    files = {rel: sha256_file(ap) for rel, ap in sorted(skill_files(os.path.join(skills_dir, skill)).items())}
+    files = {rel: sha256_file(ap) for rel, ap in sorted(skill_files(_sd(skill, skills_dir)).items())}
     roll = canonical.digest(files)
     return {"skill": skill, "skill_sha": roll, "file_count": len(files), "files": files}
 
@@ -55,14 +60,14 @@ def build_index(skill, skills_dir=None):
 def write_index(skill, skills_dir=None):
     skills_dir = skills_dir or SKILLS
     idx = build_index(skill, skills_dir)
-    open(os.path.join(skills_dir, skill, INDEX), "w").write(json.dumps(idx, indent=2) + "\n")
+    open(os.path.join(_sd(skill, skills_dir), INDEX), "w").write(json.dumps(idx, indent=2) + "\n")
     return idx
 
 
 def verify(skill, skills_dir=None):
     """(ok, problems) comparing the skill's files on disk to its committed index.json."""
     skills_dir = skills_dir or SKILLS
-    sd = os.path.join(skills_dir, skill)
+    sd = _sd(skill, skills_dir)
     ip = os.path.join(sd, INDEX)
     if not os.path.isfile(ip):
         return False, ["no index.json — run --skill " + skill]
@@ -75,13 +80,25 @@ def verify(skill, skills_dir=None):
 
 
 def scan_skills(skills_dir=None):
-    """A DIRECTORY SCAN for skill dirs (any carrying a perks.json). This is the ONLY place that lists the
-    chip directory, and it is used ONLY to SEED a fresh chip's roster (`--chip --scan`) or as a no-manifest
-    bootstrap — NEVER as the runtime load set. Routing the load set through a dir scan is what let foreign
-    dirs ride along; the manifest is the authority instead (see `all_skills`)."""
+    """A DIRECTORY SCAN for skill dirs (any carrying a perks.json), across BOTH layouts — flat
+    (`<chip>/<skill>`, e.g. a compiled cartridge) and source-grouped (`<chip>/<source>/<skill>`, the dev
+    feed-stock). This is the ONLY place that lists the chip directory, and it is used ONLY to SEED a fresh
+    chip's roster (`--chip --scan`) or as a no-manifest bootstrap — NEVER as the runtime load set. Routing
+    the load set through a dir scan is what let foreign dirs ride along; the manifest is the authority
+    instead (see `all_skills`)."""
     skills_dir = skills_dir or SKILLS
-    return sorted(d for d in os.listdir(skills_dir)
-                  if os.path.isfile(os.path.join(skills_dir, d, "perks.json")))
+    found = set()
+    for d in sorted(os.listdir(skills_dir)):
+        dp = os.path.join(skills_dir, d)
+        if not os.path.isdir(dp):
+            continue
+        if os.path.isfile(os.path.join(dp, "perks.json")):          # a flat skill at the chip root
+            found.add(d)
+        else:                                                        # maybe a SOURCE group — scan one level in
+            for s in os.listdir(dp):
+                if os.path.isfile(os.path.join(dp, s, "perks.json")):
+                    found.add(s)
+    return sorted(found)
 
 
 def permitted_skills(skills_dir=None):
@@ -95,9 +112,9 @@ def permitted_skills(skills_dir=None):
 
 
 def is_present(skill, skills_dir=None):
-    """True iff the skill is actually on disk — a dir carrying a perks.json."""
+    """True iff the skill is actually on disk — a dir carrying a perks.json (flat OR source-grouped)."""
     skills_dir = skills_dir or SKILLS
-    return os.path.isfile(os.path.join(skills_dir, skill, "perks.json"))
+    return os.path.isfile(os.path.join(_sd(skill, skills_dir), "perks.json"))
 
 
 def loadable(skill, skills_dir=None):
@@ -127,13 +144,13 @@ def all_skills(skills_dir=None):
 
 def skill_sha(skill, skills_dir=None):
     """The committed roll-up hash from index.json (None if the skill has no index yet)."""
-    ip = os.path.join(skills_dir or SKILLS, skill, INDEX)
+    ip = os.path.join(_sd(skill, skills_dir), INDEX)
     return (json.load(open(ip)) or {}).get("skill_sha") if os.path.isfile(ip) else None
 
 
 def _perk_vars(skills_dir, skill, perk):
     """The var KEYS a perk declares — required vs optional — read from its contracts.json (names only)."""
-    cp = os.path.join(skills_dir, skill, "perks", perk, "src", "contracts.json")
+    cp = os.path.join(_sd(skill, skills_dir), "perks", perk, "src", "contracts.json")
     inputs = (json.load(open(cp)) or {}).get("inputs", {}) if os.path.isfile(cp) else {}
     return {"required": sorted(k for k, s in inputs.items() if (s or {}).get("required")),
             "optional": sorted(k for k, s in inputs.items() if not (s or {}).get("required"))}
@@ -148,7 +165,7 @@ def catalog(skills_dir=None):
     skills = []
     for s in all_skills(skills_dir):
         ok, problems = verify(s, skills_dir)
-        pj = os.path.join(skills_dir, s, "perks.json")
+        pj = os.path.join(_sd(s, skills_dir), "perks.json")
         perks = [{"id": p.get("id"), "summary": p.get("summary", ""),
                   "destructive": bool(p.get("destructive", False)),
                   "vars": _perk_vars(skills_dir, s, p.get("id", ""))}
@@ -167,7 +184,8 @@ def chip_manifest(skills_dir=None, roster=None):
     members = sorted(roster) if roster is not None else all_skills(skills_dir)
     entries = []
     for s in members:
-        idx = json.load(open(os.path.join(skills_dir, s, INDEX))) if os.path.isfile(os.path.join(skills_dir, s, INDEX)) else {}
+        sip = os.path.join(_sd(s, skills_dir), INDEX)
+        idx = json.load(open(sip)) if os.path.isfile(sip) else {}
         entries.append({"skill": s, "skill_sha": idx.get("skill_sha"), "file_count": idx.get("file_count")})
     roll = canonical.digest({e["skill"]: e["skill_sha"] for e in entries})
     # version + cartridge marker: the manifest is the authoritative roster (cartridge model). The dev chip is

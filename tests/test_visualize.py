@@ -9,7 +9,7 @@ from infra.tool import visualize
 
 def _bp():
     import json
-    return json.load(open(registry.SKILLCHIP + "/codebaseqc/blueprint.json"))
+    return json.load(open(registry.skill_dir("codebaseqc") + "/blueprint.json"))
 
 
 def test_svg_is_well_formed_xml():

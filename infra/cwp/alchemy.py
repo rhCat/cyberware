@@ -33,6 +33,8 @@ import os
 import subprocess
 import sys
 
+from infra import registry
+
 _HOME = os.path.expanduser("~")
 PUTREFACTIO = os.environ.get(
     "ALCHEMY_PUTREFACTIO",
@@ -261,9 +263,8 @@ def triple_block(stop_on_fail: bool = False) -> dict:
                    and mismatch["reason"] == "cfg_mismatch")}
 
 
-DECLARED_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "skillChip", "alchemy", "declared", "chip-cfgs.json")
+# the alchemy skill's own pinned artifact — resolved wherever alchemy lives on the chip (flat OR source-grouped)
+DECLARED_PATH = os.path.join(registry.skill_dir("alchemy"), "declared", "chip-cfgs.json")
 
 
 def _porter_key(chip_dir: str, path: str) -> str:
@@ -276,13 +277,15 @@ def _porters(chip_dir: str):
     imported (e.g. a bare cartridge dir without the infra package on path)."""
     import glob
     try:
+        from infra import registry
         from infra.tool import skill_index
         skills = skill_index.all_skills(chip_dir)
-    except Exception:
-        return sorted(glob.glob(os.path.join(chip_dir, "*", "perks", "*", "src", "*.py")))
+    except Exception:                                        # bare cartridge (flat) OR source-grouped — glob both
+        return sorted(glob.glob(os.path.join(chip_dir, "*", "perks", "*", "src", "*.py"))
+                      + glob.glob(os.path.join(chip_dir, "*", "*", "perks", "*", "src", "*.py")))
     out = []
     for sk in skills:
-        out += glob.glob(os.path.join(chip_dir, sk, "perks", "*", "src", "*.py"))
+        out += glob.glob(os.path.join(registry.skill_dir(sk, chip_dir), "perks", "*", "src", "*.py"))
     return sorted(out)
 
 

@@ -140,7 +140,7 @@ DEFAULT_REGISTRY = _reg.SKILLCHIP    # the agent runs skills from its own skillC
 def _verify_registry(registry, plan):
     """The agent's OWN perk src files must match the blessed hashes — no file bodies cross the wire.
     Returns (src_dir, problem|None)."""
-    src = os.path.join(registry, plan["skill"], "perks", plan["perk"], "src")
+    src = os.path.join(_reg.skill_dir(plan["skill"], registry), "perks", plan["perk"], "src")
     for fname, want in (plan.get("snippet_shas") or {}).items():
         fp = os.path.join(src, fname)
         if not os.path.isfile(fp):
@@ -161,7 +161,7 @@ def _prepare(plan, ledger, registry):
     env = dict(os.environ)
     env.update({k: str(v) for k, v in (ledger.get("vars") or {}).items()})
     env["RECORD_STORE"] = run
-    env["SNIP"] = os.path.join(registry, plan["skill"], "perks", plan["perk"], "src")
+    env["SNIP"] = os.path.join(_reg.skill_dir(plan["skill"], registry), "perks", plan["perk"], "src")
     return run, sh, env
 
 

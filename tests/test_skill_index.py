@@ -48,7 +48,7 @@ def test_catalog_tags_a_foreign_registry(tmp_path):
 
 def test_tamper_and_missing_are_detected(tmp_path, monkeypatch):
     s = "fs"
-    shutil.copytree(os.path.join(skill_index.SKILLS, s), tmp_path / "skills" / s)
+    shutil.copytree(skill_index._sd(s), tmp_path / "skills" / s)   # resolve fs wherever it lives (any source)
     monkeypatch.setattr(skill_index, "SKILLS", str(tmp_path / "skills"))
     assert skill_index.verify(s)[0]                              # the copy is authentic
 

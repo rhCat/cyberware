@@ -19,7 +19,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 
 def load(p): return json.load(open(p))
-def skill_dir(skill): return os.path.join(registry.SKILLCHIP, skill)
+def skill_dir(skill): return registry.skill_dir(skill)   # flat OR source-grouped — the registry resolves it
 
 
 def check(name, ok, detail="", gating=True):
