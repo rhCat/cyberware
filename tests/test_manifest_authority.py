@@ -62,3 +62,18 @@ def test_scan_seeds_a_fresh_chip(tmp_path):
 def test_the_real_chip_is_36_and_authentic():
     assert len(si.all_skills()) == 36
     assert set(si.all_skills()) == set(si.permitted_skills())    # permitted == present, no drift
+
+
+def test_skill_dir_rejects_traversal_and_absolute_names(tmp_path):
+    """The resolver is the single chokepoint every SKILLCHIP/<skill> join now flows through, and the skill
+    name can be agent-supplied — so a `..`/absolute/separator name must never escape the chip, and must
+    resolve to a deterministically-ABSENT path (fail-closed), not raise."""
+    chip = _mini_chip(tmp_path, ("fs",))
+    root = os.path.realpath(chip)
+    assert os.path.realpath(registry.skill_dir("fs", chip)).startswith(root)   # a real name resolves inside
+    assert si.is_present("fs", chip)
+    for bad in ("../evil", "/etc", "", ".", "..", "a/b", "cws/fs", "x\\y"):
+        d = registry.skill_dir(bad, chip)
+        assert os.path.realpath(d).startswith(root), f"{bad!r} escaped the chip -> {d}"
+        assert not si.is_present(bad, chip)                       # invalid name => treated as absent
+    assert registry.valid_skill_name("fs") and not registry.valid_skill_name("../x")

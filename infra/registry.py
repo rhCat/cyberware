@@ -39,11 +39,26 @@ def source_groups(chip: str = None) -> list:
     return groups
 
 
+def valid_skill_name(skill) -> bool:
+    """A skill NAME is a single path segment — no separators, no parent/cur refs, not absolute. This is the
+    gate that keeps a (possibly agent-supplied) name from escaping the chip when joined into a path."""
+    return (isinstance(skill, str) and skill not in ("", ".", "..")
+            and not os.path.isabs(skill)
+            and "/" not in skill and "\\" not in skill and os.sep not in skill
+            and (os.altsep is None or os.altsep not in skill))
+
+
 def skill_dir(skill: str, chip: str = None) -> str:
     """Resolve a skill NAME to its directory — whether the chip is FLAT (`<chip>/<skill>`, e.g. a compiled
     single-skill cartridge) or SOURCE-grouped (`<chip>/<source>/<skill>`, the dev feed-stock). Skill names
-    are unique across sources. Returns the flat path if not found (the caller handles absence)."""
+    are unique across sources. Returns the flat path if not found (the caller handles absence).
+
+    An INVALID name (containing `/`, `..`, an absolute path, …) never reaches `os.path.join` — it resolves to
+    a deterministically-absent path *inside* the chip, so a `..`/`/etc` name can't traverse out and every
+    `is_present`/`isdir`/`isfile` check on the result simply reports absence (fail-closed, no exception)."""
     chip = chip or SKILLCHIP
+    if not valid_skill_name(skill):
+        return os.path.join(chip, ".__invalid_skill_name__")    # cannot exist; cannot escape the chip
     flat = os.path.join(chip, skill)
     if os.path.isfile(os.path.join(flat, "perks.json")):
         return flat
