@@ -27,7 +27,7 @@ def chip_repo(tmp_path):
     then one more commit on main (an extra skill) so main != v1."""
     repo = tmp_path / "feedstock"
     for s in ("search", "fs"):
-        shutil.copytree(os.path.join(registry.SKILLCHIP, s), repo / s)
+        shutil.copytree(registry.skill_dir(s), repo / s)               # resolve wherever the skill lives (any source)
     skill_index.write_manifest(str(repo), roster=skill_index.scan_skills(str(repo)))   # seed the cartridge roster from disk
     subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True, capture_output=True)
     _git(repo, "config", "user.email", "t@t")
@@ -37,7 +37,7 @@ def chip_repo(tmp_path):
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "chip v1")
     _git(repo, "tag", "v1")
-    shutil.copytree(os.path.join(registry.SKILLCHIP, "data"), repo / "data")   # main grows a 3rd skill
+    shutil.copytree(registry.skill_dir("data"), repo / "data")   # main grows a 3rd skill
     skill_index.write_manifest(str(repo), roster=skill_index.scan_skills(str(repo)))   # seed the cartridge roster from disk
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "chip v2: +data")

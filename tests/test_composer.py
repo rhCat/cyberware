@@ -44,5 +44,7 @@ def test_emit_tla_has_spec_and_terminal_self_loop():
 def test_real_skill_blueprints_are_all_sound():
     import glob
     import json
-    for p in glob.glob(registry.SKILLCHIP + "/*/blueprint.json"):
+    bps = (glob.glob(registry.SKILLCHIP + "/*/blueprint.json")          # flat (compiled cartridge)
+           + glob.glob(registry.SKILLCHIP + "/*/*/blueprint.json"))     # source-grouped (the dev feed-stock)
+    for p in bps:
         assert composer.structural(json.load(open(p))) == [], f"{p} has structural issues"

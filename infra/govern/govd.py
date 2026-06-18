@@ -183,7 +183,7 @@ def govern(ledger, cfg):
 
     if not skill or not perk:
         return {"decision": "reject", "problems": [{"id": "missing_skill_or_perk"}]}
-    pdir = os.path.join(registry.SKILLCHIP, skill, "perks", perk)
+    pdir = os.path.join(registry.skill_dir(skill), "perks", perk)
     if not os.path.isdir(pdir):
         return {"decision": "reject", "problems": [{"id": "unknown_skill_perk", "detail": f"{skill}/{perk}"}]}
 
@@ -201,8 +201,9 @@ def govern(ledger, cfg):
 
     try:
         contract = json.load(open(os.path.join(pdir, "src", "contracts.json")))
-        bp = json.load(open(os.path.join(registry.SKILLCHIP, skill, "blueprint.json")))
-        perks = json.load(open(os.path.join(registry.SKILLCHIP, skill, "perks.json")))["perks"]
+        sdir = registry.skill_dir(skill)
+        bp = json.load(open(os.path.join(sdir, "blueprint.json")))
+        perks = json.load(open(os.path.join(sdir, "perks.json")))["perks"]
     except (OSError, ValueError, KeyError) as e:
         return {"decision": "reject", "problems": [{"id": "registry_error", "detail": str(e)}]}
     destructive = next((p.get("destructive", False) for p in perks if p.get("id") == perk), False)
@@ -561,7 +562,7 @@ class Handler(BaseHTTPRequestHandler):
             # never escape the registry. (The dashboard's Flow tab uses /flow/run/<id>; this is a fallback.)
             skill = urllib.parse.unquote(path[len("/flow/"):])
             if skill in set(skill_index.all_skills()):
-                svgp = os.path.join(registry.SKILLCHIP, skill, "blueprint.svg")
+                svgp = os.path.join(registry.skill_dir(skill), "blueprint.svg")
                 if os.path.isfile(svgp):
                     return self._svg(open(svgp, "rb").read())
             return self._json(404, {"error": "no flow diagram", "skill": skill})

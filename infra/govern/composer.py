@@ -90,7 +90,7 @@ def main():
     ap.add_argument("--tla-out", default=None)
     a = ap.parse_args()
     L = load(a.ledger)
-    bp = load(os.path.join(registry.SKILLCHIP, L["skill"], "blueprint.json"))
+    bp = load(os.path.join(registry.skill_dir(L["skill"]), "blueprint.json"))
     print(f"composer · skill={L['skill']} perk={L['perk']}  ({len(bp['states'])} states, {len(bp['transitions'])} transitions)")
 
     issues = structural(bp)

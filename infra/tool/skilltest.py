@@ -35,7 +35,7 @@ SKILLS = os.path.join(registry.SKILLCHIP)
 
 
 def case_path(skill, perk):
-    return os.path.join(SKILLS, skill, "perks", perk, "test", "case.json")
+    return os.path.join(registry.skill_dir(skill), "perks", perk, "test", "case.json")
 
 
 def has_test(skill, perk):
@@ -74,7 +74,7 @@ def run(skill, perk, root=ROOT):
     try:
         fixture = os.path.join(work, "fixture")
         os.makedirs(fixture, exist_ok=True)
-        src_fix = os.path.join(SKILLS, skill, "perks", perk, "test", "fixture")
+        src_fix = os.path.join(registry.skill_dir(skill), "perks", perk, "test", "fixture")
         if os.path.isdir(src_fix):
             shutil.copytree(src_fix, fixture, dirs_exist_ok=True)
         record = os.path.join(work, "out")
@@ -140,7 +140,7 @@ def _abspath(rel, record, env):
 def all_cases():
     out = []
     for sk in skill_index.all_skills(SKILLS):            # manifest-authoritative: only PERMITTED skills, no dir scan
-        pj = os.path.join(SKILLS, sk, "perks.json")
+        pj = os.path.join(registry.skill_dir(sk), "perks.json")
         if not os.path.isfile(pj):
             continue
         for p in json.load(open(pj)).get("perks", []):

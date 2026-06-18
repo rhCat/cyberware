@@ -36,7 +36,7 @@ def all_perks():
     a run is never collected (no phantom parametrize ids)."""
     out = []
     for sk in skill_index.all_skills(str(registry.SKILLCHIP)):
-        pj = Path(registry.SKILLCHIP) / sk / "perks.json"
+        pj = Path(registry.skill_dir(sk)) / "perks.json"
         if not pj.is_file():
             continue
         for p in json.loads(pj.read_text())["perks"]:
