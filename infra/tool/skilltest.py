@@ -27,6 +27,7 @@ DATA pinned in the skill's index, not prose — so the proof can't drift from th
 from __future__ import annotations
 import argparse, json, os, shutil, subprocess, sys, tempfile
 from infra import registry
+from infra.tool import skill_index
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -138,7 +139,7 @@ def _abspath(rel, record, env):
 
 def all_cases():
     out = []
-    for sk in sorted(os.listdir(SKILLS)):
+    for sk in skill_index.all_skills(SKILLS):            # manifest-authoritative: only PERMITTED skills, no dir scan
         pj = os.path.join(SKILLS, sk, "perks.json")
         if not os.path.isfile(pj):
             continue

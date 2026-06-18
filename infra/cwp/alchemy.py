@@ -271,8 +271,19 @@ def _porter_key(chip_dir: str, path: str) -> str:
 
 
 def _porters(chip_dir: str):
+    """Porter scripts of the chip's PERMITTED skills (the manifest's roster), not a blind directory glob —
+    so a stray/foreign dir's porters are never modeled. Falls back to a glob only if skill_index can't be
+    imported (e.g. a bare cartridge dir without the infra package on path)."""
     import glob
-    return sorted(glob.glob(os.path.join(chip_dir, "*", "perks", "*", "src", "*.py")))
+    try:
+        from infra.tool import skill_index
+        skills = skill_index.all_skills(chip_dir)
+    except Exception:
+        return sorted(glob.glob(os.path.join(chip_dir, "*", "perks", "*", "src", "*.py")))
+    out = []
+    for sk in skills:
+        out += glob.glob(os.path.join(chip_dir, sk, "perks", "*", "src", "*.py"))
+    return sorted(out)
 
 
 def pin_declared(chip_dir: str, out_path: str = DECLARED_PATH) -> dict:

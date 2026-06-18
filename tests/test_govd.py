@@ -117,6 +117,9 @@ def test_discover_tags_verified_unverified_and_drift(server, tmp_path):
         {"skill": "znew", "perks": [{"id": "noop", "summary": "new", "destructive": False, "tools": ["znew_noop"]}]}))
     (src / "contracts.json").write_text(json.dumps({"tool": "znew_noop", "inputs": {"FOO": {"required": True}}}))
     skill_index.write_index("znew", str(reg))
+    # the agent PERMITS its own new skill in its local cartridge (re-seed the roster from disk) — govd's
+    # manifest still won't have znew, so discover tags it unverified
+    skill_index.write_manifest(str(reg), roster=skill_index.scan_skills(str(reg)))
     with open(reg / "fs" / "SKILL.md", "a") as f:
         f.write("\n# tampered\n")                                      # files no longer match fs's own index
     d2 = govd_client.discover(base, registry=str(reg))
