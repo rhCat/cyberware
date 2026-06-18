@@ -22,9 +22,50 @@ SKILLCHIP = os.path.abspath(os.environ.get("CYBERWARE_SKILLCHIP") or os.path.joi
 CHIP_MANIFEST = "index.json"   # the chip-level manifest at <skillChip>/index.json
 
 
-def skill_dir(skill: str) -> str:
-    """The directory of one skill on the chip."""
-    return os.path.join(SKILLCHIP, skill)
+def source_groups(chip: str = None) -> list:
+    """The chip's SOURCE groups — immediate subdirs that themselves hold skills (`cws/`, `general/`, and as
+    other sources are merged, `nvidia/`, `claude/`, …). A dir qualifies iff it contains a `*/perks.json`.
+    The legacy flat layout (skills directly at the chip root) has none."""
+    chip = chip or SKILLCHIP
+    if not os.path.isdir(chip):
+        return []
+    groups = []
+    for d in sorted(os.listdir(chip)):
+        p = os.path.join(chip, d)
+        if os.path.isdir(p) and any(
+                os.path.isfile(os.path.join(p, s, "perks.json"))
+                for s in os.listdir(p) if os.path.isdir(os.path.join(p, s))):
+            groups.append(d)
+    return groups
+
+
+def skill_dir(skill: str, chip: str = None) -> str:
+    """Resolve a skill NAME to its directory — whether the chip is FLAT (`<chip>/<skill>`, e.g. a compiled
+    single-skill cartridge) or SOURCE-grouped (`<chip>/<source>/<skill>`, the dev feed-stock). Skill names
+    are unique across sources. Returns the flat path if not found (the caller handles absence)."""
+    chip = chip or SKILLCHIP
+    flat = os.path.join(chip, skill)
+    if os.path.isfile(os.path.join(flat, "perks.json")):
+        return flat
+    for src in source_groups(chip):
+        cand = os.path.join(chip, src, skill)
+        if os.path.isfile(os.path.join(cand, "perks.json")):
+            return cand
+    return flat
+
+
+def source_for(skill: str) -> str:
+    """The SOURCE group a skill belongs to BY CONVENTION: cyberware's own `cws-*` skills live under `cws/`,
+    every other skill under `general/`. Skills merged from a named upstream (nvidia/, claude/, …) are placed
+    in that source's dir explicitly when imported — this only governs where a freshly-scaffolded skill lands."""
+    return "cws" if skill.startswith("cws-") else "general"
+
+
+def new_skill_dir(skill: str, chip: str = None) -> str:
+    """Where a freshly-scaffolded skill of this NAME belongs on the dev feed-stock: its source-grouped dir
+    (`<chip>/cws/<skill>` or `<chip>/general/<skill>`). The scaffolder creates the source dir as needed."""
+    chip = chip or SKILLCHIP
+    return os.path.join(chip, source_for(skill), skill)
 
 
 def manifest_path() -> str:

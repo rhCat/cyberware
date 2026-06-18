@@ -5,8 +5,10 @@ These pin the governance contract: every exit code below is a refusal the framew
 """
 import hashlib
 import json
+import os
 
 from conftest import compiler_shaped_script, run_cli
+from infra import registry
 
 
 def ledger(run_dir):
@@ -146,7 +148,7 @@ def test_snippet_refused_is_evidence_not_corruption(tmp_path):
     porter.write_text(porter.read_text() + "# mutated\n")
     run_cli("executor", "--script", run, "--step", "1")
     spec = importlib.util.spec_from_file_location(
-        "lv", "skillChip/cws-ledgercheck/perks/verify/src/cws_ledgerverify.py")
+        "lv", os.path.join(registry.skill_dir("cws-ledgercheck"), "perks", "verify", "src", "cws_ledgerverify.py"))
     lv = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(lv)
     _records, bad, mode = lv.verify(json.loads((store / "run-ledger.json").read_text()))

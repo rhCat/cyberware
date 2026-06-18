@@ -15,12 +15,11 @@ import tempfile
 
 from infra import registry
 
-CHIP = registry.SKILLCHIP
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _core(skill, perk, mod):
-    return os.path.join(CHIP, skill, "perks", perk, "src", f"{mod}.py")
+    return os.path.join(registry.skill_dir(skill), "perks", perk, "src", f"{mod}.py")
 
 
 def _load(skill, perk, mod):
@@ -216,7 +215,7 @@ def test_modelcheck_corpus_fixtures_each_trip_exactly_one_defect_class():
     """MC-1 backstop: each corpus fixture must fire its OWN class and no other — so deleting any one of
     the three structural detectors makes a specific fixture slip (the corpus genuinely guards all three)."""
     from infra.govern import composer
-    cdir = os.path.join(CHIP, "cws-modelcheck", "perks", "corpus", "test", "fixture", "corpus")
+    cdir = os.path.join(registry.skill_dir("cws-modelcheck"), "perks", "corpus", "test", "fixture", "corpus")
     expected = {
         "deadlock.blueprint.json": "deadlock: non-terminal state",
         "unreachable.blueprint.json": "unreachable:",
@@ -273,7 +272,7 @@ def test_conform_repin_flags_pre_existing_drift(tmp_path):
     """CONFORM-1/3: repin's signal must be falsifiable. Take the committed fixture chip, corrupt a tracked
     file, and re-pin: the committed index no longer matches, so pre_drift must name the skill, status must
     be 'drift', exit nonzero. A core that re-pins-then-verifies-itself (the tautology) would pass green."""
-    src = os.path.join(CHIP, "cws-conform", "perks", "repin", "test", "fixture", "chip")
+    src = os.path.join(registry.skill_dir("cws-conform"), "perks", "repin", "test", "fixture", "chip")
     chip = tmp_path / "chip"
     shutil.copytree(src, chip)
     # corrupt a tracked file WITHOUT re-pinning — the committed index.json now disagrees with disk

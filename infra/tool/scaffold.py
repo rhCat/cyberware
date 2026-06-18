@@ -127,9 +127,10 @@ def main():
     ap.add_argument("--force", action="store_true")
     a = ap.parse_args()
     sid = a.skill
-    S = os.path.join(registry.SKILLCHIP, sid)
+    existing = registry.skill_dir(sid)                       # resolve wherever it may already live (any source)
+    S = existing if os.path.isfile(os.path.join(existing, "perks.json")) else registry.new_skill_dir(sid)
     if os.path.exists(S) and not a.force:
-        sys.exit(f"skillChip/{sid} already exists (use --force to overwrite)")
+        sys.exit(f"{os.path.relpath(S, os.path.dirname(registry.SKILLCHIP))} already exists (use --force to overwrite)")
 
     perks = {}
     for spec in a.perk:

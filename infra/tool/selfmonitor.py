@@ -29,12 +29,12 @@ from infra.tool import skill_index as si
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 POLICY = os.path.join(ROOT, "infra", "govern", "selfmonitor_policy.json")
-MUTATE_CORE = os.path.join(registry.SKILLCHIP, "cws-mutate", "perks", "mutate", "src", "cws_mutate.py")
+MUTATE_CORE = os.path.join(registry.skill_dir("cws-mutate"), "perks", "mutate", "src", "cws_mutate.py")
 
 
 def check_blueprints():
     """(count, bad): every chip blueprint + the engine's pipeline blueprint must be deadlock-free."""
-    targets = [(s, os.path.join(si.SKILLS, s, "blueprint.json")) for s in si.all_skills()]
+    targets = [(s, os.path.join(registry.skill_dir(s), "blueprint.json")) for s in si.all_skills()]
     pipe = os.path.join(ROOT, "infra", "document", "pipeline.blueprint.json")
     if os.path.isfile(pipe):
         targets.append(("<engine pipeline>", pipe))
@@ -57,10 +57,10 @@ def check_no_stubs():
     blueprint, so its intentional TODO markers are not flagged.)"""
     offenders = []
     for s in si.all_skills():
-        bp = os.path.join(si.SKILLS, s, "blueprint.json")
+        bp = os.path.join(registry.skill_dir(s), "blueprint.json")
         if os.path.isfile(bp) and "TODO describe what this skill does" in json.load(open(bp)).get("description", ""):
             offenders.append(f"{s}/blueprint.json: placeholder description")
-        pj = os.path.join(si.SKILLS, s, "perks.json")
+        pj = os.path.join(registry.skill_dir(s), "perks.json")
         if os.path.isfile(pj):
             for p in (json.load(open(pj)) or {}).get("perks", []):
                 if (p.get("summary") or "").strip() == "TODO":
