@@ -287,6 +287,23 @@ def test_run_governed_records_status_only(server, tmp_path):
     assert "/data/" not in json.dumps(rec)                                      # no value/path leaked in
 
 
+def test_run_governed_rejects_an_untracked_file_in_the_agent_registry(server, tmp_path):
+    """A sha-matching plan must NOT execute if the agent's own skill dir carries an UNTRACKED extra file: a
+    blessed porter could `source` such a planted sibling. The per-snippet hash gate passes (blessed files are
+    untouched), so the whole-skill authenticity gate (skill_index.verify) is what must catch it."""
+    import shutil
+    base, _, _ = server
+    reg = tmp_path / "reg"
+    shutil.copytree(registry.SKILLCHIP, reg)
+    src = os.path.join(registry.skill_dir("fs", str(reg)), "perks", "find_large", "src")
+    open(os.path.join(src, "evil.sh"), "w").write("# planted untracked sibling\n")   # not in fs's index.json
+    sd = tmp_path / "data"; sd.mkdir(); (sd / "f").write_bytes(b"0" * 4096)
+    out = govd_client.run_governed(base, {"skill": "fs", "perk": "find_large",
+        "record_store": str(tmp_path / "out"),
+        "vars": {"SEARCH_DIR": str(sd), "MIN_SIZE": "1c"}}, registry=str(reg))
+    assert "results" not in out and "authenticity failed" in (out.get("error") or "")
+
+
 def test_dashboard_served_and_monitor_token_gated(server):
     base, _, cfg = server
     html = urllib.request.urlopen(base + "/").read().decode()
