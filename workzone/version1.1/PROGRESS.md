@@ -17,9 +17,12 @@ storm, a signed funded quote (per-quote escrow), a settlement engine where a mut
 (spent-quote idempotency), a manipulation-resistant FMV index, an m-of-n dispute lifecycle, and **the
 capstone**: cyberware's own redeemed development milestones settle as internal-credit bounties and the plan's
 completion is a dual-signed, TSA-anchored receipt that **verifies offline** — *development entered its own
-economy.* **63 of 90 tasks** are redeemed on the prev-hash-chained done-ledger (never asserted; the live
-board is [`pm-report.md`](pm-report.md)). The whole money cone was adversarially verified before redeem — the
-reviews caught a cross-quote double-pay and an FMV bimodal-manipulation hole, both fixed. SV-4 — *the registry and the engine publish and revoke themselves* — closed (9/9) with the
+economy.* **65 of 90 tasks** are redeemed on the prev-hash-chained done-ledger (never asserted; the live
+board is [`pm-report.md`](pm-report.md)) — and with **cws-chaos** (V-CHAOS: partition + crash-exod + settle-
+engine crash atomicity, P2-T10 + P6-T17) **every validator the plan references is now built** (the board's
+`blocked:validator` set is empty). The whole money cone was adversarially verified before redeem — the
+reviews caught a cross-quote double-pay, an FMV bimodal-manipulation hole, and a missing declared re-pin, all
+fixed; the validator family (11 skills, 84 perks) grades the build green and the ouroboros passes. SV-4 — *the registry and the engine publish and revoke themselves* — closed (9/9) with the
 `cws-release` skill (publisher signing, offline transparency proofs, engine attestation + mutual handshake,
 the governed release receipt, the signed revocation feed + in-flight enforcement + availability-grace tiers,
 key-rotation, dual-DSSE + in-toto receipts, TSA time anchors, WebAuthn approval, publish-time manifest lint,
@@ -33,13 +36,16 @@ perf budget needs `/dev/kvm`, absent on the dev box (see [`KNOWN-BLOCKERS.md`](K
 
 ## 2. What has been built
 
-- **The validator family (13 cws-* skills)** grades the build: `cws-conform` (SV-1 protocol — canonical
-  hashing, DSSE/cosign interop, CWP message-schemas, **reproducible engine build**), `cws-ledgercheck` (SV-2 —
-  chain re-verify, Go anchor, durability torture, crypto-shred erasure, Merkle checkpoints), `cws-mutate`
-  (gate strength), `cws-modelcheck` (SV-5 — **TLC + Apalache + TLAPS**, the 3-prover stack), `cws-redteam` +
-  `cws-bench` (SV-3 — the kernel boundary), **`cws-release`** (SV-4 — publisher signing, transparency, engine
-  attestation, governed receipts, revocation, key-rotation, TSA anchors, WebAuthn approval, manifest lint),
-  `cws-observe` (redemption), `cws-pm` (the board), `harden-pyenv` (the pinned compute image).
+- **The validator family — every grader the plan needs is now built** (`blocked:validator` = 0): `cws-conform`
+  (SV-1 protocol — canonical hashing, DSSE/cosign interop, CWP message-schemas, **reproducible engine build**),
+  `cws-ledgercheck` (SV-2 — chain re-verify, Go anchor, durability torture, crypto-shred erasure, Merkle
+  checkpoints), `cws-mutate` (gate strength), `cws-modelcheck` (SV-5 — **TLC + Apalache + TLAPS**, the 3-prover
+  stack), `cws-redteam` + `cws-bench` (SV-3 — the kernel boundary), **`cws-release`** (SV-4 — publisher signing,
+  transparency, engine attestation, governed receipts, revocation, key-rotation, TSA anchors, WebAuthn approval,
+  manifest lint, Citrinitas gate), **`alchemy`** (concordance — extract/conserve/classify/concord), **`cws-
+  settle-sim`** (SV-6 — Money/float-ban, double-entry ledger, funded quote, settlement engine, FMV, disputes,
+  the capstone), **`cws-chaos`** (V-CHAOS — partition/crash/settle-atomicity), `cws-observe` (redemption),
+  `cws-pm` (the board), `harden-pyenv` (the pinned compute image). 84 perks, all green; the ouroboros passes.
 - **The SV-3 execution boundary** (`infra/exec/`) — signed request-bound **grants**, the **exod** daemon (a
   separate principal whose signature is the only status the ledger trusts), the bwrap **SandboxProfile**,
   **capability manifests** (materialize-exactly), and exod-**attested meters**. Kernel-proven in docker
@@ -84,6 +90,7 @@ round). The complete task-by-task picture + the M0–M6 milestone closures are t
 | **SV-5 / M5** | workflow model-checking across **three provers** — TLC (empirical) + Apalache (symbolic) + TLAPS (axiomatic): emitter, saga, algebra, corpus, plan-as-workflow (P4-T01..T09) — **closed (8/8)** |
 | **SV-6 / M6** | the money's lifecycle (`infra/settle/`) + `cws-settle-sim` — `Money` (P6-T01), reward ledger (P6-T02), quote (P6-T04), settlement engine (P6-T05), FMV (P6-T11), disputes (P6-T12), simulate (P6-T18), ancestor royalties (P6-T19), and **the capstone** (P6-T21): real milestones settle as bounties, the plan-completion receipt verifies offline — **closed (21/21), THE LADDER CLOSES** |
 | **M0 / spine** | governed execution end to end — closed by the settlement engine (P6-T05): claim → grant → exod → priced quote → settled posting set — **closed (15/15)** |
+| **V-CHAOS** | `cws-chaos` (`infra/chaos.py`) — partition (next refuses closed + idempotent resume), crash-exod (orphan reaped, error recorded, no false pass), and settle-engine crash atomicity (all-or-nothing + exactly-once across both crash orderings + conservation): P2-T10 + P6-T17. The last validator — **all 11 graders now built** |
 
 ## 4. The operating model
 
