@@ -102,7 +102,7 @@ python3 -m infra.govern.executor   --script /tmp/run.sh --step 1        # govern
 python3 -m infra.tool.scaffold --skill myskill --name "My Skill" --perk fetch:my_fetch:curl --perk store:my_store:python3
 
 # render a blueprint as draw.io XML + self-contained SVG (entry blue, terminal green)
-python3 -m infra.tool.visualize --skill pg_ops               # → skillChip/pg_ops/blueprint.{drawio,svg}
+python3 -m infra.tool.visualize --skill pg_ops               # → skillChip/general/pg_ops/blueprint.{drawio,svg}
 python3 -m infra.tool.visualize --ledger task.json -o run    # annotated with the chosen perk's steps
 ```
 
@@ -151,6 +151,7 @@ python3 -c "import os,json; json.dump(sorted(d for d in os.listdir('skillChip') 
 python3 -m http.server -d "$D" 8765           # → http://localhost:8765
 ```
 
+- [governed-vs-free](docs/governed-vs-free.md) — the thesis: free up to the gate, accountable past it — why cyberware governs at the moment of commitment
 - [architecture](docs/architecture.md) — the skill-as-package, the two execution planes, governance, authenticity, self-proof
 - [governance-service](docs/governance-service.md) — **govd**: the control/audit plane, discovery (`/catalog`), the WebSocket, the dashboard
 - [authoring](docs/authoring.md) — scaffold + the perk / manifesto / contract / snippet / self-test pattern
