@@ -98,7 +98,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exec python3 "$HERE/<tool>.py"
 ```
 
-`scaffold.py` writes exactly this when a perk's binary is `python3` (see `skillChip/codebaseqc`, whose
+`scaffold.py` writes exactly this when a perk's binary is `python3` (see `skillChip/general/codebaseqc`, whose
 `cbqc_*` tools are standalone `.py` cores behind thin porters).
 
 ## 5. Visualize, index + run

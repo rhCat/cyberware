@@ -12,10 +12,12 @@ cyberware is the **engine**; the skills are a separate **cartridge** — the [**
 
 | side | what | where |
 |---|---|---|
-| **skillChip** | the cartridge — the skills, each a self-contained, verifiable **package** (context · lifecycle · pathways · contracts · authenticity · proof). A separate repo, vendored as a submodule. | `skillChip/<skill>/` |
+| **skillChip** | the cartridge — the skills, each a self-contained, verifiable **package** (context · lifecycle · pathways · contracts · authenticity · proof). A separate repo, vendored as a submodule. | `skillChip/<source>/<skill>/` |
 | **governance** | the engine — the infrastructure that validates · composes · compiles · oversees · executes — and governs/audits as a service | `infra/` |
 
 The chip is located by `infra/registry.py` (`registry.SKILLCHIP`): the hardcoded default `<repo>/skillChip`, overridable with **`$CYBERWARE_SKILLCHIP`**. The chip is **self-describing** — `skillChip/index.json` is its **manifest**: every skill with its `skill_sha`, plus a roll-up `chip_sha`, which cyberware retrieves to discover + verify the whole chip as a unit (each skill keeps its own `index.json` for file-level authenticity). Swap the chip — point `$CYBERWARE_SKILLCHIP` elsewhere — and the same engine governs a different feed-stock, unchanged.
+
+The chip is a **multi-source cartridge**: skills live under a **source group** — cyberware's own `cws-*` skills in `cws/`, the rest in `general/`, and skills merged from a named upstream in their own dir (e.g. future `nvidia/`, `claude/`). Names are unique across sources; `registry.skill_dir(name)` resolves a skill NAME to its directory whatever the layout — flat (`<chip>/<skill>`, e.g. a compiled single-skill cartridge) or source-grouped (`<chip>/<source>/<skill>`). The **manifest is the authoritative load set**, never a directory scan; a porter never assumes its depth in the chip (enforced by the `check_porter_path_hygiene` ouroboros gate), so a skill stays relocatable across sources and cartridges.
 
 `infra/` is a Python package, invoked as `python3 -m infra.<pkg>.<module>`:
 
