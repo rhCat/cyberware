@@ -26,6 +26,11 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq cpu-checker
           sudo kvm-ok || true
 
+      - name: grant the runner access to /dev/kvm (it's root:kvm 0660; runner isn't in the kvm group)
+        run: |
+          sudo chmod 666 /dev/kvm        # the standard GitHub-runner idiom (Android-emulator workflows do this)
+          ls -l /dev/kvm
+
       - name: is /dev/kvm actually USABLE (open + KVM_GET_API_VERSION ioctl)?
         run: |
           python3 - <<'PY'
