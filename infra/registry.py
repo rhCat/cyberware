@@ -78,8 +78,13 @@ def source_for(skill: str) -> str:
 
 def new_skill_dir(skill: str, chip: str = None) -> str:
     """Where a freshly-scaffolded skill of this NAME belongs on the dev feed-stock: its source-grouped dir
-    (`<chip>/cws/<skill>` or `<chip>/general/<skill>`). The scaffolder creates the source dir as needed."""
+    (`<chip>/cws/<skill>` or `<chip>/general/<skill>`). The scaffolder creates the source dir as needed.
+    Validates the name (same gate as `skill_dir`) — the WRITE path must not let a `..`/absolute name escape
+    the chip and have files written outside it; raises rather than returning a sentinel, since creating a
+    skill with a bad name is never intended."""
     chip = chip or SKILLCHIP
+    if not valid_skill_name(skill):
+        raise ValueError(f"invalid skill name {skill!r}: must be a single path segment")
     return os.path.join(chip, source_for(skill), skill)
 
 
