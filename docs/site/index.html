@@ -268,8 +268,11 @@ function perkPanel(p) {
 const getJSON = (p) => fetch(p, { cache: "no-store" }).then(r => r.ok ? r.json() : null).catch(() => null);
 const getText = (p) => fetch(p, { cache: "no-store" }).then(r => r.ok ? r.text() : null).catch(() => null);
 
-async function loadSkill(name) {
-  const base = `skillChip/${encodeURIComponent(name)}`;
+async function loadSkill(entry) {
+  // skills.json carries {name, dir} so the source-grouped chip (skillChip/<source>/<skill>) resolves;
+  // a bare string (legacy flat) still works (dir === name).
+  const dir = (typeof entry === "string") ? entry : (entry.dir || entry.name);
+  const base = "skillChip/" + dir.split("/").map(encodeURIComponent).join("/");
   const [bp, pj, smd, svg, idx] = await Promise.all([
     getJSON(`${base}/blueprint.json`), getJSON(`${base}/perks.json`),
     getText(`${base}/SKILL.md`), getText(`${base}/blueprint.svg`), getJSON(`${base}/index.json`)]);

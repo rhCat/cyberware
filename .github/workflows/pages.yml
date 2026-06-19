@@ -33,13 +33,16 @@ jobs:
       - name: assemble the site
         run: |
           mkdir -p _site/docs
-          cp docs/site/index.html _site/index.html
+          cp index.html _site/index.html                 # the cyberpunk homepage (landing)
+          cp docs/site/index.html _site/dashboard.html    # the live registry dashboard (root-relative fetches)
           cp -r skillChip _site/skillChip
           cp infra/document/pipeline.blueprint.svg  _site/pipeline.svg
           cp infra/document/pipeline.blueprint.json _site/pipeline.blueprint.json
           cp cyberware.md _site/cyberware.md
           cp docs/*.md _site/docs/
-          python3 -c "import os,json; json.dump(sorted(d for d in os.listdir('skillChip') if os.path.isfile(os.path.join('skillChip',d,'perks.json'))), open('_site/skills.json','w'))"
+          # skills.json carries {name, dir} so the source-grouped chip (skillChip/<source>/<skill>) AND the
+          # legacy flat layout (skillChip/<skill>) both resolve. The dashboard builds its base path from dir.
+          python3 -c "import os,json; r='skillChip'; flat=[{'name':d,'dir':d} for d in os.listdir(r) if os.path.isfile(os.path.join(r,d,'perks.json'))]; nested=[{'name':s,'dir':d+'/'+s} for d in os.listdir(r) if os.path.isdir(os.path.join(r,d)) for s in os.listdir(os.path.join(r,d)) if os.path.isfile(os.path.join(r,d,s,'perks.json'))]; out=sorted(flat+nested, key=lambda e:e['name']); json.dump(out, open('_site/skills.json','w'))"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
