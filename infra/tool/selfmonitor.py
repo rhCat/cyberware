@@ -19,6 +19,7 @@ import argparse
 import concurrent.futures
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -65,6 +66,41 @@ def check_no_stubs():
             for p in (json.load(open(pj)) or {}).get("perks", []):
                 if (p.get("summary") or "").strip() == "TODO":
                     offenders.append(f"{s}/perks.json: perk '{p.get('id')}' summary is TODO")
+    return not offenders, offenders
+
+
+# A porter sits at <skill>/perks/<perk>/src/. Reaching its OWN skill root is `../../..` (3 up) — stable, the
+# skill's internal shape never changes. Reaching 4+ levels ESCAPES the skill (to the chip / a source group /
+# the repo), and doing that by COUNTING `..` is what the source-subfolder migration silently broke. The seam
+# is: CYBERWARE_ROOT / CYBERWARE_SKILLCHIP, an upward marker-search, or registry.skill_dir — never depth.
+_FRAGILE_PARENT = re.compile(r"(?:\.\./){3,}")                          # raw  ../../../..  (depth >= 4)
+_FRAGILE_PARENT_PY = re.compile(r"""(?:["']\.\.["']\s*,\s*){3,}["']\.\.["']""")  # os.path.join(..,"..","..","..","..")
+_HARDCODED_CHIP = re.compile(r"skillChip/\S")                           # a literal path INTO the chip
+
+
+def check_porter_path_hygiene():
+    """(ok, offenders): no porter may reach the repo/chip root by a FIXED-DEPTH `..` walk (>=4 levels escapes
+    its own skill) or HARDCODE a `skillChip/<...>` path. A skill must be RELOCATABLE — the cartridge model's
+    promise (swap / move / compile skills freely) only holds if no skill assumes where it sits. This is the
+    root-cause guard for the cws/<skill> source-subfolder migration's regression: the added directory level
+    shifted every porter's depth by one and silently broke the fixed-depth walkers. Scans porter source only
+    (perks/*/src, .py + .sh), skipping test fixtures."""
+    offenders = []
+    for s in si.all_skills():
+        for dp, dirs, files in os.walk(os.path.join(registry.skill_dir(s), "perks")):
+            dirs[:] = [d for d in dirs if d not in ("__pycache__", "test")]
+            if "src" not in dp.split(os.sep):
+                continue
+            for f in files:
+                if not f.endswith((".py", ".sh")):
+                    continue
+                ap = os.path.join(dp, f)
+                rel = os.path.relpath(ap, registry.SKILLCHIP)
+                for i, line in enumerate(open(ap, encoding="utf-8", errors="ignore").read().splitlines(), 1):
+                    if _FRAGILE_PARENT.search(line) or _FRAGILE_PARENT_PY.search(line):
+                        offenders.append(f"{rel}:{i}: fixed-depth `..` walk — resolve the root via a marker-search / CYBERWARE_ROOT")
+                    if _HARDCODED_CHIP.search(line):
+                        offenders.append(f"{rel}:{i}: hardcoded skillChip/ path — use registry.skill_dir")
     return not offenders, offenders
 
 
@@ -126,6 +162,11 @@ def main():
     print(f"[ {'ok' if sok else 'FAIL'} ] no scaffold stubs — "
           + ("none" if sok else f"{len(stubs)} placeholder(s): {stubs[:5]}"))
     failed = failed or not sok
+
+    pok, frag = check_porter_path_hygiene()
+    print(f"[ {'ok' if pok else 'FAIL'} ] porter path hygiene — "
+          + ("no fixed-depth `..` walks / hardcoded chip paths" if pok else f"{len(frag)} fragile: {frag[:5]}"))
+    failed = failed or not pok
 
     if not a.no_mutation:
         rows, mfail = check_mutation()
