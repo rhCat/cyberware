@@ -44,7 +44,9 @@ def test_intra_skill_parent_walk_is_allowed(tmp_path, monkeypatch):
     (chip / "general" / "demo" / "perks.json").write_text(
         '{"skill": "demo", "perks": [{"id": "go", "summary": "x", "destructive": false, "tools": ["go"]}]}')
     src = chip / "general" / "demo" / "perks" / "go" / "src"
-    (src / "go.sh").write_text('#!/usr/bin/env bash\nSKILL="$(cd "$HERE/../../.." && pwd)"\n')   # depth-3 = skill root
+    # depth-3 reaches the OWN skill root — allowed both as a bare `cd` and as a file read (`../../../SKILL.md`);
+    # the gate must key on `..` SEGMENT depth (>=4 escapes), not on a trailing slash.
+    (src / "go.sh").write_text('#!/usr/bin/env bash\nSKILL="$(cd "$HERE/../../.." && pwd)"\ncat "$HERE/../../../SKILL.md"\n')
     si.write_manifest(str(chip), roster=["demo"])
     monkeypatch.setattr(registry, "SKILLCHIP", str(chip))
     monkeypatch.setattr(si, "SKILLS", str(chip))

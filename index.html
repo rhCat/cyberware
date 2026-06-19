@@ -452,7 +452,7 @@
     <div class="ladder" id="ladder-rungs">
       <div class="rung"><span class="sv">SV-1</span><div class="body"><span class="mk">✓ </span><strong>Protocol &amp; canonical hashing</strong><span>RFC-8785 canonicalization — one bytes-exact form everything hashes from.</span></div></div>
       <div class="rung"><span class="sv">SV-2</span><div class="body"><span class="mk">✓ </span><strong>Tamper-evident hash-chained ledger</strong><span>A provenance chain — skip a step and you leave a visible hole.</span></div></div>
-      <div class="rung"><span class="sv">SV-3</span><div class="body"><span class="mk">✓ </span><strong>Kernel-enforced execution boundary</strong><span>A bubblewrap sandbox under a separate OS principal, exod, whose Ed25519 signature is the only status the ledger trusts. Refusals hold even with the in-process scanner switched off.</span><span class="note"># the boundary is the kernel + a signature, not a scanner. The microVM tier reports skipped where /dev/kvm is absent — never faked.</span></div></div>
+      <div class="rung"><span class="sv">SV-3</span><div class="body"><span class="mk">◐ </span><strong>Kernel-enforced execution boundary <span class="note">(9/10)</span></strong><span>A bubblewrap sandbox under a separate OS principal, exod, whose Ed25519 signature is the only status the ledger trusts. Refusals hold even with the in-process scanner switched off.</span><span class="note"># the boundary is the kernel + a signature, not a scanner. The one open brick is the microVM perf tier, which reports skipped where /dev/kvm is absent — never faked.</span></div></div>
       <div class="rung"><span class="sv">SV-4</span><div class="body"><span class="mk">✓ </span><strong>Signed, transparency-logged releases + revocation</strong><span>Releases are signed and logged; a compromised build can be revoked.</span></div></div>
       <div class="rung"><span class="sv">SV-5</span><div class="body"><span class="mk">✓ </span><strong>Model-checking across the three-prover stack</strong><span>Workflow blueprints proven deadlock-free by TLC, Apalache, and TLAPS.</span></div></div>
       <div class="rung"><span class="sv">SV-6</span><div class="body"><span class="mk">✓ </span><strong>Settlement layer (future)</strong><span>A future settlement plane where attested work CAN be paid — billed on the meter the isolated principal signed, never the agent's stopwatch.</span></div></div>
@@ -531,7 +531,7 @@
 <div>$ ls docs/</div>
 <div>  <a href="https://github.com/rhCat/cyberware/blob/main/docs/SPEC.md">docs/SPEC.md</a></div>
 <div>  <a href="https://github.com/rhCat/cyberware/blob/main/docs/architecture.md">docs/architecture.md</a></div>
-<div>  <a href="https://github.com/rhCat/cyberware">the MIT-licensed skillChip</a></div>
+<div>  <a href="https://github.com/rhCat/skillChip">the MIT-licensed skillChip</a></div>
         </div>
       </div>
     </div>
