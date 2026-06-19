@@ -73,7 +73,7 @@ def check_no_stubs():
 # skill's internal shape never changes. Reaching 4+ levels ESCAPES the skill (to the chip / a source group /
 # the repo), and doing that by COUNTING `..` is what the source-subfolder migration silently broke. The seam
 # is: CYBERWARE_ROOT / CYBERWARE_SKILLCHIP, an upward marker-search, or registry.skill_dir — never depth.
-_FRAGILE_PARENT = re.compile(r"(?:\.\./){3,}")                          # raw  ../../../..  (depth >= 4)
+_FRAGILE_PARENT = re.compile(r"\.\.(?:/\.\.){3,}")                      # raw  ../../../..  (>= 4 `..` SEGMENTS)
 _FRAGILE_PARENT_PY = re.compile(r"""(?:["']\.\.["']\s*,\s*){3,}["']\.\.["']""")  # os.path.join(..,"..","..","..","..")
 _HARDCODED_CHIP = re.compile(r"skillChip/\S")                           # a literal path INTO the chip
 

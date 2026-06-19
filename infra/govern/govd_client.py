@@ -245,7 +245,10 @@ def main():
     out = (fetch(a.url, ledger, a.approve) if a.fetch_only
            else run_governed(a.url, ledger, a.approve, registry=a.registry))
     print(json.dumps(out, indent=2))
-    sys.exit(0 if out.get("decision") in ("allow", None) else 2)
+    # a blocked run (registry mismatch / authenticity drift / unauthorized oversight) returns decision="allow"
+    # WITH an `error` and no results — it must NOT report success to a caller keying on the exit code.
+    blocked = bool(out.get("error"))
+    sys.exit(0 if out.get("decision") in ("allow", None) and not blocked else 2)
 
 
 if __name__ == "__main__":
