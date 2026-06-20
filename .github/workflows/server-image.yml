@@ -1,0 +1,77 @@
+name: server-image
+# Quick deployment: build the govd governance-server image (root Dockerfile) and publish it SIGNED to ghcr,
+# so an individual can `docker run` an overseen govd in one line. Signed keyless with cosign via GitHub OIDC
+# (no stored key — the chip's publisher key stays local). Deliberate publishes only: on a vN.N.N tag or on demand.
+on:
+  push:
+    tags: [ "v*" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write          # publish the image to ghcr under this repo's owner
+  id-token: write          # cosign keyless signing (OIDC -> Fulcio/Rekor); no secret stored
+
+concurrency:
+  group: server-image
+  cancel-in-progress: false
+
+jobs:
+  build-push-sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: checkout the skillChip cartridge (submodule the image bakes in)
+        env:
+          TOKEN: ${{ secrets.SUBMODULE_PAT || github.token }}   # PAT for a private chip; falls back for a public one
+        run: |
+          AUTH="https://x-access-token:${TOKEN}@github.com/"
+          git -c "url.${AUTH}.insteadOf=git@github.com:" \
+              -c "url.${AUTH}.insteadOf=https://github.com/" \
+              submodule update --init --recursive --depth=1 skillChip
+
+      - uses: docker/setup-qemu-action@v3       # emulate arm64 for the multi-arch build
+      - uses: docker/setup-buildx-action@v3
+
+      - name: log in to ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/cyberware   # metadata-action lowercases the owner
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+            type=sha,format=long
+
+      - name: build + push (multi-arch) — the Dockerfile's skill_index --check gate fails the build on chip drift
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
+
+      - name: install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: keyless-sign the pushed image (OIDC — verifiable, no stored key)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          owner="${{ github.repository_owner }}"
+          cosign sign --yes "ghcr.io/${owner,,}/cyberware@${DIGEST}"
