@@ -439,6 +439,13 @@ def test_run_detail_endpoint(server):
     assert d["run_id"] == rid and "token" not in d and d["seq"] == ["fs_find_large"]
 
 
+def test_favicon_is_served(server):
+    """The monitor's favicon is served as a PNG (ungated, like the dashboard HTML)."""
+    base, _, _ = server
+    r = urllib.request.urlopen(base + "/favicon.png")
+    assert r.getcode() == 200 and r.headers.get("Content-Type") == "image/png" and len(r.read()) > 0
+
+
 def test_codebaseqc_audit_runs_end_to_end_via_govd(server, sample_repo, tmp_path):
     """Regression: the audit's `.sh` porters exec sibling `.py` cores. The agent now runs from its own
     registry (which has both), verified against the blessed hashes — so it no longer dies with
