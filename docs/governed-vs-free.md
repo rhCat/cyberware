@@ -61,6 +61,42 @@ them governed. The pitch was never "our skills are better." It is **"your skills
 competitive set is not a skill catalog — it is "is there any way to run an agent that touches money or prod with
 provenance and refusal," and there mostly is not, yet.
 
+## The agent economy — why SaaS thrives, not dies
+
+The dominant narrative treats the model as a software *substitute*: have the agent write the script. Read it as
+a software *consumer* instead and the conclusion inverts — more agents means more software usage, because the
+hard parts (correct solvers, threading, numerics, a decade of edge-case polish) are exactly what an agent cannot
+improvise and must consume. The lever changes hands, from a human in a UI to a program under contract; the
+machinery behind the lever does not go away.
+
+So a vendor's **skillChip becomes a third product surface** — past the UI (for humans) and the API (for
+developers): the *blessed, correct, metered* way an agent may use the software. Vendors will ship one not out of
+generosity but self-interest:
+
+- **Control** — an API is a surface an agent calls *wrong*; a skill is the vendor encoding the one correct way + the safety envelope. The API, but opinionated.
+- **Monetization** — the skill is the metering point: bill the governed run, not the seat.
+- **Liability** — when an agent misuses your software, "who's accountable?" becomes existential. A governed skill + ledger is a provable record of correct-usage-or-refusal — the price of entry in regulated domains.
+
+Those three are precisely what the governance layer supplies — correct-by-construction usage (the value-free
+plan), ledgerable traceback (the authenticity chain + ledger), and metered pricing (the settlement layer's
+quote → meter → settle, billed on the meter the isolated principal signed, never the agent's stopwatch). No SaaS
+vendor has all three today.
+
+**Two go-to-market motions, and the gravity between them.** Enterprise buys a license bounded by runtimes (even a
+swarm of agents hits the ceiling); a small business pays per use over MCP (access + compute) when it can't afford
+to buy. These aren't a stable pair — the moment one agent saturates a per-seat license at machine speed, per-seat
+pricing gets arbitraged and vendors migrate toward per-run metering. The license is the transition state; metered
+usage is the end-state — and the settlement layer is built for the end-state.
+
+**Professionals get *more* valuable, not less.** Democratizing skill *use* concentrates value in skill
+*authorship*: whoever encodes the correct, validated way to run the solver becomes the scarce, paid party — paid
+per use through skill lineage (a verified-tier publish pays its ancestor). Authorship becomes IP with a meter.
+
+The honest edge: this is strongest where correctness is non-negotiable — regulated, high-consequence, heavy-compute
+work (a statistics package accepted by regulators is not something an agent re-derives on the fly). The disposable
+middle gets eaten by throwaway scripts; the proven core survives and gains an agent consumer. Same seam as before —
+free for discovery, governed for commitment — drawn across the whole industry.
+
 ## Two honest pressure points
 
 - **The capability counter-argument.** *"Smarter models won't need governance."* Capability ≠ accountability.
