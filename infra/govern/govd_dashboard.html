@@ -102,7 +102,8 @@ const DEC = {allow:"b-allow", push_back:"b-push", reject:"b-reject"};
 function badge(d){ return el("span","badge "+(DEC[d]||""), d||"?"); }
 const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;   // the viewer's timezone
 // govd records UTC (ISO + 'Z'); render in the viewer's LOCAL tz so timestamps match the user's clock.
-function fmt(ts){ if(!ts) return "-"; const d=new Date(ts); return isNaN(d.getTime()) ? String(ts) : d.toLocaleTimeString(undefined, {hour12:false}); }
+function fmt(ts){ if(!ts) return "-"; const d=new Date(ts); return isNaN(d.getTime()) ? String(ts)
+  : d.toLocaleString(undefined, {year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}); }
 function stepStates(seq, events){
   seq = seq||[]; events = events||[];
   const res={}, granted=new Set(), refused=new Set();
