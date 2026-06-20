@@ -446,6 +446,23 @@ def test_favicon_is_served(server):
     assert r.getcode() == 200 and r.headers.get("Content-Type") == "image/png" and len(r.read()) > 0
 
 
+def test_price_endpoint_returns_a_value_free_quote(server):
+    """GET /price gives an itemized usage quote for a claim BEFORE it runs — ungated, no values, total>0."""
+    from decimal import Decimal
+    base, _, _ = server
+    d = json.loads(urllib.request.urlopen(base + "/price?skill=fs&perk=find_large").read())
+    assert d["skill"] == "fs" and d["perk"] == "find_large"
+    assert d["mode"] == "structured"                       # default mode (no ?mode= -> structured)
+    assert "context_tokens" in d["llm"] and "output_tokens" in d["llm"]
+    assert Decimal(d["total"]) > 0 and d["currency"] == "USD"
+    f = json.loads(urllib.request.urlopen(base + "/price?skill=fs&perk=find_large&mode=freeform").read())
+    assert f["mode"] == "freeform" and f["llm"]["output_tokens"] != d["llm"]["output_tokens"]
+    try:
+        urllib.request.urlopen(base + "/price?skill=nope&perk=x"); assert False, "unknown skill must 404"
+    except urllib.error.HTTPError as e:
+        assert e.code == 404
+
+
 def test_codebaseqc_audit_runs_end_to_end_via_govd(server, sample_repo, tmp_path):
     """Regression: the audit's `.sh` porters exec sibling `.py` cores. The agent now runs from its own
     registry (which has both), verified against the blessed hashes — so it no longer dies with
