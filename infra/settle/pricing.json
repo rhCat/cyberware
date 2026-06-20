@@ -1,0 +1,18 @@
+{
+  "_doc": "Governance-provider USAGE PRICING. All amounts are exact-decimal STRINGS (never JSON floats — Money refuses a float, that is the float-ban at the type boundary). Rates are per 1000 tokens; tool_fees keyed by 'skill' or 'skill/perk' (the skill's pay route / MCP-call / paid-API passthrough); marketplace_fee_pct is applied to the subtotal. The gov provider owns this file; a skill MAY also declare a `price` in its perk metadata.json (used when no fee is set here).",
+  "currency": "USD",
+  "default_model": "nemotron-3-ultra",
+  "model_rates": {
+    "nemotron-3-ultra": { "in_per_1k": "0.0030", "out_per_1k": "0.0120" },
+    "default":          { "in_per_1k": "0.0010", "out_per_1k": "0.0030" }
+  },
+  "tool_fees": {
+    "_default": "0",
+    "http/get": "0.0010",
+    "http/post": "0.0020",
+    "net/healthcheck": "0.0005",
+    "stripe/charge": "0.3000",
+    "stripe/payout": "0.2500"
+  },
+  "marketplace_fee_pct": "0.05"
+}

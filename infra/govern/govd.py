@@ -588,6 +588,21 @@ class Handler(BaseHTTPRequestHandler):
             # value-free discovery (names · perks · var-KEYS · skill_sha · verified) — ungated like /health,
             # so an agent can ask "what do you govern?" before it claims. No values, no run data.
             return self._json(200, catalog_snapshot())
+        if path == "/price":
+            # value-free USAGE QUOTE for a claim, BEFORE it runs: LLM cost (context + output tokens at the
+            # model rate) + the tool's pay-route fee, itemized. Priced from the plan shape — no execution, no
+            # generation, no values. The `total` is what a Stripe charge bills (it reconciles to the cent).
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            skill = qs.get("skill", [""])[0]
+            perk = qs.get("perk", [""])[0]
+            if skill not in set(skill_index.all_skills()):
+                return self._json(404, {"error": "unknown skill", "skill": skill})
+            mode = "freeform" if qs.get("mode", ["structured"])[0] == "freeform" else "structured"
+            try:
+                from infra.settle import price
+                return self._json(200, price.price_plan(skill, perk, model=qs.get("model", [None])[0], mode=mode))
+            except Exception as e:                       # never 500 the thread on a pricing edge case
+                return self._json(400, {"error": f"price failed: {type(e).__name__}: {e}"})
         if path.startswith("/flow/run/"):
             # THIS run's task blueprint (the perk's gated sequence, gates bound to concrete contract
             # checks) — rendered value-free from the record. Monitor-gated like /monitor/run.
