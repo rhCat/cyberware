@@ -360,6 +360,25 @@ def test_porter_sources_surfaces_the_blessed_porter():
     assert govd.porter_sources("../evil", "x", ["y"]) == {}      # a bad skill name resolves to nothing, never escapes
 
 
+def test_non_allow_verdicts_survive_a_restart_in_the_run_list(tmp_path):
+    """reject/push_back get no per-run dir, only the durable decisions feed — but a RESTARTED store must
+    still surface them in the navigable run list (their submitted ledger + problems), not only the feed."""
+    root = str(tmp_path / "led")
+    s1 = govd.Store(root)
+    s1.create("ar", {"run_id": "ar", "ts": "2026-01-01T00:00:01Z", "skill": "fs", "perk": "find_large",
+                     "decision": "allow", "seq": ["fs_find_large"], "events": [], "var_keys": ["SEARCH_DIR"]})
+    s1.record_decision({"run_id": "rj", "ts": "2026-01-01T00:00:02Z", "skill": "fs", "perk": "find_large",
+                        "decision": "reject", "var_keys": ["BAD KEY"], "problems": ["bad_var_key"]})
+    s1.record_decision({"run_id": "pb", "ts": "2026-01-01T00:00:03Z", "skill": "pg_ops", "perk": "migrate",
+                        "decision": "push_back", "var_keys": ["PGHOST"], "problems": [], "needs_approve": ["migrate"]})
+    s2 = govd.Store(root)                                     # fresh store, same on-disk root (a restart)
+    nav = {r["run_id"]: r for r in s2.monitor_snapshot()["runs"]}
+    assert {"ar", "rj", "pb"} <= set(nav)                     # ALL three navigable, not just the allow run
+    assert nav["rj"]["decision"] == "reject" and nav["pb"]["decision"] == "push_back"
+    det = s2.run_detail("rj")                                 # the restored reject carries its ledger + problem
+    assert det and "BAD KEY" in det["var_keys"] and any(p.get("id") == "bad_var_key" for p in det["problems"])
+
+
 def test_run_view_failed_flag_tracks_the_error_state_exactly(tmp_path):
     """The monitor's `failed` flag = an allowed run whose step erred. Pins govd.py's run-view
     classification so the `state == 'error'` comparison can't silently flip (mutation ratchet)."""
