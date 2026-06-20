@@ -144,7 +144,7 @@ The infra is covered by a real suite under [`tests/`](tests/) — the governance
 - **integration** — the executor channel: tamper snapshot + drift refusal, **in-channel oversight**
   refuse/waive, the upstream gate, step validation, provenance; and the full
   validate→compose→compile→oversee→execute pipeline.
-- **per-perk contract** — every one of the 41 perks (across 22 skills) compiles to a clean, consistent,
+- **per-perk contract** — every one of the 126 perks (across 37 skills) compiles to a clean, consistent,
   oversight-clear script.
 - **in-skill self-tests** — each skill carries its OWN proof: `perks/<perk>/test/case.json`, run
   end-to-end **through the governed executor** on shipped fixtures (`infra.tool.skilltest`, discovered by
@@ -170,7 +170,7 @@ then serve):
 ```sh
 D=$(mktemp -d); cp docs/site/index.html "$D"; cp -r skillChip "$D"; mkdir "$D/docs"; cp docs/*.md "$D/docs"; cp cyberware.md "$D"
 cp infra/document/pipeline.blueprint.svg "$D/pipeline.svg"; cp infra/document/pipeline.blueprint.json "$D/pipeline.blueprint.json"
-python3 -c "import os,json; json.dump(sorted(d for d in os.listdir('skillChip') if os.path.exists(f'skillChip/{d}/perks.json')), open('$D/skills.json','w'))"
+python3 -c "import os,json; r='skillChip'; flat=[{'name':d,'dir':d} for d in os.listdir(r) if os.path.isfile(os.path.join(r,d,'perks.json'))]; nested=[{'name':s,'dir':d+'/'+s} for d in os.listdir(r) if os.path.isdir(os.path.join(r,d)) for s in os.listdir(os.path.join(r,d)) if os.path.isfile(os.path.join(r,d,s,'perks.json'))]; json.dump(sorted(flat+nested, key=lambda e:e['name']), open('$D/skills.json','w'))"
 python3 -m http.server -d "$D" 8765           # → http://localhost:8765
 ```
 
@@ -178,6 +178,6 @@ python3 -m http.server -d "$D" 8765           # → http://localhost:8765
 - [architecture](docs/architecture.md) — the skill-as-package, the two execution planes, governance, authenticity, self-proof
 - [governance-service](docs/governance-service.md) — **govd**: the control/audit plane, discovery (`/catalog`), the WebSocket, the dashboard
 - [authoring](docs/authoring.md) — scaffold + the perk / manifesto / contract / snippet / self-test pattern
-- [skills](docs/skills.md) — the catalog (22 skills)
+- [skills](docs/skills.md) — the catalog (37 skills)
 - [SKILL.md](SKILL.md) — the agent contract: discover → claim → run the blessed plan → review the verdict
 - [spec](docs/SPEC.md) — the original specification
