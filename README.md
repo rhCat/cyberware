@@ -133,6 +133,52 @@ python3 -m infra.tool.visualize --ledger task.json -o run    # annotated with th
 the operate step annotated with that task's actual tool sequence. The SVG renders in any browser —
 the only fast way to eyeball what a compiled task will do before the executor runs it.
 
+## Local development
+
+Skills live on the **chip**, so developing one means pointing the engine at *your* chip and iterating.
+The engine resolves the chip from **`$CYBERWARE_SKILLCHIP`** (default `<repo>/skillChip`). Whatever the
+source, `skill_index --check` runs at boot and govd **refuses to start on an unauthentic or drifted
+chip** — you can't accidentally serve a broken cartridge.
+
+**Native loop — edit → re-pin → serve (no Docker, tightest):**
+
+```sh
+export CYBERWARE_SKILLCHIP=$PWD/skillChip            # or any chip dir you're working in
+# … edit a skill under $CYBERWARE_SKILLCHIP/<source>/<skill>/ …
+python3 -m infra.tool.skill_index --skill <skill>   # re-pin the skill's authenticity index
+python3 -m infra.tool.skill_index --chip            # roll it into chip_sha (a NEW skill: --chip --add <skill>)
+python3 -m infra.tool.skilltest   --skill <skill>   # run its governed self-tests
+python3 -m infra.govern.govd --mode local           # serve YOUR chip → http://127.0.0.1:5773/
+```
+
+Skip the re-pin and boot fails closed — authenticity catches the drift. See
+[authoring.md](docs/authoring.md) for the perk / manifesto / contract / snippet / self-test pattern.
+
+**Against the published image — mount your local chip** (same governor, your cartridge, no rebuild):
+
+```sh
+docker run -p 5773:5773 -v $PWD/skillChip:/app/skillChip ghcr.io/rhcat/cyberware:latest
+```
+
+**Against a fork or dev branch** — clone it live at boot (good for a teammate or CI):
+
+```sh
+docker run -p 5773:5773 -e CLOUD_MODE=1 \
+  -e CLOUD_SOURCE=https://github.com/you/skillChip.git -e CLOUD_SOURCE_TAG=my-branch \
+  ghcr.io/rhcat/cyberware:latest
+# private fork: add -e CLOUD_SOURCE_TOKEN=…   (GIT_ASKPASS-only — never logged or persisted)
+```
+
+| pointer | style | rebuild? | best for |
+|---|---|---|---|
+| `$CYBERWARE_SKILLCHIP` | native | no | editing skills locally (tightest loop) |
+| `-v …:/app/skillChip` | container | no | testing your chip in the real image |
+| `CLOUD_MODE` + `CLOUD_SOURCE` | container | no | a fork / branch / CI |
+
+Either side ahead of the other is **reported, never silent**: a skill your chip has but the governor
+doesn't → claims `reject: unknown_skill_perk` and discovery tags it `unverified`; a local edit that
+diverges from the governed hash → `drift`; the governor's own copy failing its index → `server_drift`.
+
 ## Tests
 
 The infra is covered by a real suite under [`tests/`](tests/) — the governance behavior is pinned, so
