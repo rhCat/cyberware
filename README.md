@@ -160,7 +160,7 @@ itself — the ouroboros).
 
 ## Docs
 
-**[→ live dashboard at rhcat.github.io/cyberware](https://rhcat.github.io/cyberware/)** — a static site
+**[→ the homepage at cyberware.systems](https://cyberware.systems/)** + the live **[registry dashboard](https://cyberware.systems/dashboard.html)** — a static site
 (auto-deployed by [`.github/workflows/pages.yml`](.github/workflows/pages.yml) on every push) to review
 every skill — blueprint, perk flow, contracts, and snippet code — with the review documents below as
 in-site tabs. It is **self-discovering**: the page fetches the real registry at runtime (no build step,
