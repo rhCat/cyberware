@@ -261,6 +261,7 @@ function runTab(panel, d){
 
 function flowTab(panel, d){
   const fl=sect("Task blueprint — "+d.skill+" / "+d.perk); const wrap=el("div","flow");
+  fl.b.appendChild(el("div","note","Value-free by design: var keys render as ${KEY} and the run dir as $RUN — govd never receives the values (the SHELL//BLESS boundary). The actual values live agent-side, in your task-ledger.json + the run's record_store; they are never sent here."));
   const cached=flowCache[d.run_id];                          // keyed by RUN — this is the task-specific blueprint
   if(cached===undefined){                                    // fetch THIS run's task blueprint once, then cache
     wrap.appendChild(el("div","empty","loading task blueprint…"));
