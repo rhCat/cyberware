@@ -61,6 +61,11 @@
   details.code > summary { cursor:pointer; color:var(--blue); font-size:12px; font-family:var(--mono); }
   pre { background:#0b0d13; border:1px solid var(--line); border-radius:8px; padding:12px; overflow:auto; font:12px/1.5 var(--mono); color:#cdd3e1; margin:6px 0; }
   pre.tall { max-height:360px; }
+  .srcfile { margin:12px 0; }
+  .srcfile:first-child { margin-top:0; }
+  .srchead { font-family:var(--mono); font-size:12px; color:var(--acc); margin-bottom:4px; display:flex; align-items:center; gap:8px; }
+  .srchead .ext { color:var(--dim); font-size:10px; border:1px solid var(--line); border-radius:5px; padding:0 6px; }
+  .ledgernote { color:var(--dim); font-size:12.5px; margin:0 0 6px; }
   .md h1,.md h2,.md h3,.md h4 { color:var(--ink); }
   .md h4 { margin:12px 0 4px; font-size:14px; }
   .md p, .md li { color:var(--dim); }
@@ -206,7 +211,7 @@ function render() {
     s.perks.map(p=>`<span class="tab ${p.id===cur.tab?'active':''}" data-tab="${esc(p.id)}"><span class="muted" style="font-weight:400">perk ·</span> ${esc(p.id)}</span>`).join("");
   const body = cur.tab==="overview" ? overviewHtml(s)
     : cur.tab==="blueprint" ? blueprintHtml(s)
-    : perkPanel(s.perks.find(p=>p.id===cur.tab));
+    : perkPanel(s, s.perks.find(p=>p.id===cur.tab));
   document.getElementById("detail").innerHTML = `
     <h2>${esc(s.name)} <span class="muted" style="font-size:13px">· ${esc(s.id)}</span></h2>
     <p class="desc">${esc(s.description)}</p>
@@ -238,14 +243,30 @@ function blueprintHtml(s) {
     <pre class="tall">${esc(JSON.stringify(s.blueprint || {}, null, 2))}</pre>`;
 }
 
-function perkPanel(p) {
+// the value-free task-ledger you'd submit to run THIS perk — built from ledger.json + the perk's
+// declared vars (manifesto env, minus RECORD_STORE), specialised to this perk.
+function perkLedger(s, p) {
+  const t = s.ledger || {};
+  const tmplVars = t.vars || {};
+  const keys = Object.keys(p.env || {}).filter(k => k !== "RECORD_STORE");
+  const vars = {};
+  keys.forEach(k => { vars[k] = (k in tmplVars) ? tmplVars[k] : "<value>"; });
+  return { skill: s.id, perk: p.id,
+    record_store: t.record_store || "<absolute dir for outputs + run-ledger>", vars };
+}
+
+function perkPanel(s, p) {
   const meta = p.metadata || {}, c = p.contracts || {};
   const inputs = Object.entries(c.inputs || {}).map(([k,v]) =>
     `<tr><td class="${v.required?'req':''}">${esc(k)}${v.required?' *':''}</td><td>${esc(v.type||'')}</td></tr>`).join("");
   const outputs = Object.entries(c.outputs || {}).map(([k,v]) =>
     `<tr><td>${esc(k)}</td><td><code>${esc(v.path||'')}</code></td></tr>`).join("");
-  const snippets = Object.entries(p.snippets || {}).map(([name,code]) =>
-    `<details class="code"><summary>${esc(name)}</summary><pre>${esc(code)}</pre></details>`).join("");
+  const ledgerJson = JSON.stringify(perkLedger(s, p), null, 2);
+  const sources = Object.entries(p.snippets || {}).map(([name,code]) => {
+    const ext = name.slice(name.lastIndexOf(".") + 1);
+    return `<div class="srcfile"><div class="srchead">${esc(name)}<span class="ext">${esc(ext)}</span></div><pre class="tall">${esc(code)}</pre></div>`;
+  }).join("");
+  const nsrc = Object.keys(p.snippets || {}).length;
   return `
     <div class="perkhead"><b>${esc(p.id)}</b><span class="sum">${esc(p.summary)}</span>
       <span class="badge ${p.destructive?'dx':'ro'}">${p.destructive?'destructive':'read-only'}</span></div>
@@ -260,8 +281,11 @@ function perkPanel(p) {
       ${outputs ? `<table class="io"><tr><th>output</th><th>path</th></tr>${outputs}</table>` : ""}
       ${c.checks ? `<div class="kv"><b>checks</b> — ${esc(JSON.stringify(c.checks))}</div>` : ""}
     </div>
-    <h3>Code</h3>
-    <div class="card">${snippets || '<span class="muted">no snippet</span>'}</div>`;
+    <h3>Task-ledger — what you submit</h3>
+    <p class="ledgernote">The value-free claim submitted to the pipeline for this perk (derived from <code>ledger.json</code>): copy to <code>task-ledger.json</code>, fill <code>record_store</code> + the vars. Only var <b>keys</b> cross the wire — a secret goes via a <code>*_FILE</code> pointer, read at runtime.</p>
+    <pre class="tall">${esc(ledgerJson)}</pre>
+    <h3>Source — the porter${nsrc>1?'s':''} this run executes</h3>
+    <div class="card">${sources || '<span class="muted">no source</span>'}</div>`;
 }
 
 // ── self-discovery: fetch the real registry at runtime; no pre-baked data.js, no build step ──
@@ -273,9 +297,10 @@ async function loadSkill(entry) {
   // a bare string (legacy flat) still works (dir === name).
   const dir = (typeof entry === "string") ? entry : (entry.dir || entry.name);
   const base = "skillChip/" + dir.split("/").map(encodeURIComponent).join("/");
-  const [bp, pj, smd, svg, idx] = await Promise.all([
+  const [bp, pj, smd, svg, idx, led] = await Promise.all([
     getJSON(`${base}/blueprint.json`), getJSON(`${base}/perks.json`),
-    getText(`${base}/SKILL.md`), getText(`${base}/blueprint.svg`), getJSON(`${base}/index.json`)]);
+    getText(`${base}/SKILL.md`), getText(`${base}/blueprint.svg`), getJSON(`${base}/index.json`),
+    getJSON(`${base}/ledger.json`)]);
   if (!bp) return null;
   const perks = await Promise.all((pj && pj.perks || []).map(async pm => {
     const pd = `${base}/perks/${encodeURIComponent(pm.id)}`;
@@ -292,7 +317,7 @@ async function loadSkill(entry) {
   }));
   return { id: bp.id, name: bp.name || bp.id, description: bp.description || "",
     group: String(bp.id).startsWith("cws") ? "cws internals" : "skills",
-    blueprint: bp, svg: svg || "", skill_md: smd || "", index: idx, perks };
+    blueprint: bp, svg: svg || "", skill_md: smd || "", index: idx, ledger: led || null, perks };
 }
 
 const DOCSET = [["operate", "Operate", "cyberware.md"], ["architecture", "Architecture", "docs/architecture.md"],
