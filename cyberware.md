@@ -29,7 +29,7 @@ explicit, logged `--approve`.
 
 ## How to run a skill — the loop
 
-**1. Pick a skill + perk.** Browse `skillChip/` (the skill cartridge), or the [dashboard](https://rhcat.github.io/cyberware/).
+**1. Pick a skill + perk.** Browse `skillChip/` (the skill cartridge), or the [dashboard](https://cyberware.systems/).
 Read the skill's `SKILL.md` and the perk's `perks/<perk>/metadata.json` (rules · usage · limitation ·
 minimal_example) to learn the inputs.
 
@@ -144,4 +144,4 @@ The agent's entry contract for this loop is [`SKILL.md`](SKILL.md): **discover**
 [`docs/architecture.md`](docs/architecture.md) · [`docs/authoring.md`](docs/authoring.md) ·
 [`docs/skills.md`](docs/skills.md) · [`docs/SPEC.md`](docs/SPEC.md) ·
 [`docs/governance-service.md`](docs/governance-service.md) · the live
-[dashboard](https://rhcat.github.io/cyberware/) (blueprints, perk flows, contracts, code).
+[dashboard](https://cyberware.systems/) (blueprints, perk flows, contracts, code).

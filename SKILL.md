@@ -102,4 +102,4 @@ review. Once merged and govd's image is rebuilt (the build re-checks every index
 The govd-less local pipeline (validator → composer → compiler → oversight → executor) is in
 [`cyberware.md`](cyberware.md); the service internals (HTTP, WebSocket, authenticity, dashboard) are in
 [`docs/governance-service.md`](docs/governance-service.md); the live
-[dashboard](https://rhcat.github.io/cyberware/) shows every blueprint, perk flow, and contract.
+[dashboard](https://cyberware.systems/) shows every blueprint, perk flow, and contract.

@@ -33,6 +33,7 @@ jobs:
       - name: assemble the site
         run: |
           mkdir -p _site/docs
+          echo 'cyberware.systems' > _site/CNAME          # custom apex domain (asserted on every deploy)
           cp index.html _site/index.html                 # the cyberpunk homepage (landing)
           cp docs/site/index.html _site/dashboard.html    # the live registry dashboard (root-relative fetches)
           cp -r skillChip _site/skillChip
