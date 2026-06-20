@@ -248,6 +248,27 @@ def govern(ledger, cfg):
             "needs_approve": needs_approve}
 
 
+def porter_sources(skill, perk, seq):
+    """The blessed porter source for each tool in a run's sequence, read from govd's OWN registry —
+    the same public chip code `/catalog` exposes (program text, never values or command output). For the
+    monitor's Script tab, so a reviewer reads exactly what the call runs, not just the value-free wrapper."""
+    out = {}
+    try:
+        sd = registry.skill_dir(skill)
+    except Exception:
+        return out
+    srcdir = os.path.join(sd, "perks", perk or "", "src")
+    for tool in (seq or []):
+        for ext in (".sh", ".py"):
+            p = os.path.join(srcdir, str(tool) + ext)
+            if os.path.isfile(p):
+                try:
+                    out[str(tool) + ext] = open(p, encoding="utf-8").read()
+                except OSError:
+                    pass
+    return out
+
+
 # ───────────────────────── server-side provenance store ─────────────────────────
 
 class Store:
@@ -319,6 +340,15 @@ class Store:
                 self.runs.pop(next(iter(self.runs)), None)
             snapshot = json.dumps(record, indent=2)
         self._persist(run_id, snapshot)                      # disk write outside the lock — less contention
+
+    def remember(self, run_id, record):
+        """Keep a NON-allow verdict (push_back / reject) in memory only — navigable + inspectable in the
+        monitor (its submitted ledger, blessed plan, and problems) — but NOT written to disk. Only allow
+        runs get a durable per-run ledger dir; the verdict itself still lands in the durable decisions feed."""
+        with self.lock:
+            self.runs[run_id] = record
+            while len(self.runs) > self.max_runs:            # same in-memory cap; oldest evicted
+                self.runs.pop(next(iter(self.runs)), None)
 
     def get(self, run_id):
         with self.lock:
@@ -398,6 +428,7 @@ class Store:
                               "destructive": r.get("destructive", False), "plan_sha": (r.get("plan_sha") or "")[:12],
                               "tlc": r.get("tlc"), "var_keys": r.get("var_keys", []), "steps": steps,
                               "restored": r.get("restored", False),
+                              "failed": any(s["state"] == "error" for s in steps),   # an allowed run whose step erred
                               "progress": f"{done}/{len(seq)}" if seq else "-"})
             for e in ev:
                 feed.append({"run_id": r["run_id"], "skill": r.get("skill"), "perk": r.get("perk"), **e})
@@ -576,6 +607,8 @@ class Handler(BaseHTTPRequestHandler):
             if not self._monitor_authed(cfg):
                 return self._json(403, {"error": "missing/invalid monitor token"})
             detail = store.run_detail(path.split("/monitor/run/", 1)[1])
+            if detail:                                   # attach the porters this run runs (public chip code)
+                detail["sources"] = porter_sources(detail.get("skill"), detail.get("perk"), detail.get("seq"))
             return self._json(200 if detail else 404, detail or {"error": "unknown run_id"})
         if self.path.startswith("/ledger/"):
             tail = self.path.split("/ledger/", 1)[1]
@@ -660,6 +693,8 @@ class Handler(BaseHTTPRequestHandler):
                   "problems": v.get("problems", []), "events": []}
         if v["decision"] == "allow":                     # only authorized runs are persisted (bounds growth)
             store.create(run_id, record)
+        else:                                            # push_back/reject: in-memory only — navigable + inspectable
+            store.remember(run_id, record)               # in the monitor (ledger + plan + problems), not on disk
         # every decision (incl. push_back/reject) is logged for the monitor — metadata only, no token
         store.record_decision({"run_id": run_id, "ts": record["ts"], "skill": record["skill"],
                                "perk": record["perk"], "decision": v["decision"],
