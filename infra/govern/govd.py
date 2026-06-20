@@ -612,6 +612,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(404, {"error": "no flow diagram", "skill": skill})
         if path in ("/", "/dashboard"):
             return self._dashboard()
+        if path == "/favicon.png":
+            return self._favicon()
         if path == "/monitor/state":
             if not self._monitor_authed(cfg):
                 return self._json(403, {"error": "missing/invalid monitor token (?token= or X-Govd-Monitor)"})
@@ -658,6 +660,18 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(500, {"error": "dashboard asset missing"})
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _favicon(self):
+        try:
+            body = open(os.path.join(HERE, "favicon.png"), "rb").read()
+        except OSError:
+            return self._json(404, {"error": "no favicon"})
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Cache-Control", "max-age=86400")   # static asset
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
