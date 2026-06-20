@@ -5,7 +5,7 @@
 > *Free up to the gate; accountable past it.*
 
 This is the thesis behind cyberware, and the reason it is built the way it is. The public version lives on the
-[homepage](https://rhcat.github.io/cyberware/); this is the longer argument for people reading the code.
+[homepage](https://cyberware.systems/); this is the longer argument for people reading the code.
 
 ## The shape everyone is converging on
 
@@ -116,5 +116,5 @@ sources are in progress. No users-served, throughput, or social-proof claims are
 and the thesis are the substance.
 
 ---
-**See also:** the [homepage](https://rhcat.github.io/cyberware/) · [architecture.md](architecture.md) ·
-[SPEC.md](SPEC.md) · the live [registry dashboard](https://rhcat.github.io/cyberware/dashboard.html).
+**See also:** the [homepage](https://cyberware.systems/) · [architecture.md](architecture.md) ·
+[SPEC.md](SPEC.md) · the live [registry dashboard](https://cyberware.systems/dashboard.html).

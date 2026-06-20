@@ -261,7 +261,7 @@ Blueprints render as flowcharts (`infra/tool/visualize.py` → drawio + SVG): **
 **transition** = line, **gate** = diamond (with its `✓ pass` / `✗ fail → exit·log` branches), **action**
 = the predefined-process shape showing its `compute_unit`. The **govd monitor dashboard** draws them in a
 cyberpunk theme; its **Flow** tab renders the **task** blueprint — the perk's actual gated sequence,
-value-free (while the [Pages catalog](https://rhcat.github.io/cyberware/) shows the shared lifecycle plus
+value-free (while the [Pages catalog](https://cyberware.systems/) shows the shared lifecycle plus
 each perk's step sequence).
 
 ## The agent contract
