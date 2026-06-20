@@ -36,6 +36,8 @@ jobs:
           echo 'cyberware.systems' > _site/CNAME          # custom apex domain (asserted on every deploy)
           cp index.html _site/index.html                 # the cyberpunk homepage (landing)
           cp docs/site/index.html _site/dashboard.html    # the live registry dashboard (root-relative fetches)
+          cp favicon.png _site/favicon.png                # tab icon (favicon, small) — both pages link /favicon.png
+          cp icon.png _site/icon.png                      # full crest — og:image / twitter:image / apple-touch
           cp -r skillChip _site/skillChip
           cp infra/document/pipeline.blueprint.svg  _site/pipeline.svg
           cp infra/document/pipeline.blueprint.json _site/pipeline.blueprint.json
