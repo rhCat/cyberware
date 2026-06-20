@@ -1,0 +1,54 @@
+# cyberware-modelcheck — the govd server PLUS the full SV-5 three-prover stack (TLC + Apalache + TLAPS),
+# so cws-modelcheck / test_workflow run FULLY in-container instead of skipping. Heavier than the lean
+# `cyberware` server image (TLC only) — use this when you want symbolic (Apalache) + axiomatic (TLAPS) proofs.
+# Built FROM the pinned compute env (python + openssl + go + java + TLA2TOOLS already present & checksum-verified).
+ARG COMPUTE_REF=ghcr.io/rhcat/cyberware-compute:latest
+FROM ${COMPUTE_REF}
+ARG TARGETARCH
+
+# --- Apalache (SYMBOLIC) — JVM, arch-agnostic; pinned + checksum-verified ---
+ARG APALACHE_VERSION=0.58.0
+ARG APALACHE_SHA256=d52d5b12e9b4417313fd8de864afcbb0c7f89b75f5c14028970e2995016a0488
+RUN set -eux; \
+    curl -fsSL "https://github.com/apalache-mc/apalache/releases/download/v${APALACHE_VERSION}/apalache.tgz" -o /tmp/apalache.tgz; \
+    echo "${APALACHE_SHA256}  /tmp/apalache.tgz" | sha256sum -c -; \
+    mkdir -p /opt && tar -C /opt -xzf /tmp/apalache.tgz && rm /tmp/apalache.tgz; \
+    APA="$(find /opt -type f -name apalache-mc | head -1)"; ln -s "$APA" /usr/local/bin/apalache-mc; \
+    apalache-mc version
+ENV APALACHE_MC=/usr/local/bin/apalache-mc
+
+# --- TLAPS (AXIOMATIC) — tlapm. The official installer is x86_64-linux ONLY, so install on amd64 only; on
+# arm64 tlapm stays absent and workflow.py's check_tlaps returns `skipped` (honest, never a false pass). ---
+ARG TLAPS_TAG=202210041448
+ARG TLAPS_VERSION=1.5.0
+RUN set -eux; \
+    if [ "${TARGETARCH}" = "amd64" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends libgmp10 && rm -rf /var/lib/apt/lists/*; \
+      curl -fsSL "https://github.com/tlaplus/tlapm/releases/download/${TLAPS_TAG}/tlaps-${TLAPS_VERSION}-x86_64-linux-gnu-inst.bin" -o /tmp/tlaps.bin; \
+      chmod +x /tmp/tlaps.bin; \
+      sh /tmp/tlaps.bin -d /opt/tlaps; \
+      TLAPM="$(find /opt/tlaps -type f -name tlapm | head -1)"; ln -s "$TLAPM" /usr/local/bin/tlapm; \
+      rm /tmp/tlaps.bin; \
+      tlapm --version; \
+    else \
+      echo "TLAPS skipped on ${TARGETARCH:-unknown} (installer is x86_64-linux only)"; \
+    fi
+
+# --- the govd server itself — engine + baked chip + boot-time authenticity gate (same as the lean image) ---
+WORKDIR /app
+COPY infra/ ./infra/
+COPY skillChip/ ./skillChip/
+RUN python3 -m infra.tool.skill_index --check --all      # fail the build on chip drift
+ENV GOVD_CONFIG=/app/infra/govern/govd_config.json \
+    GOVD_RECORD_ROOT=/data/govd \
+    PYTHONUNBUFFERED=1
+VOLUME ["/data/govd"]
+EXPOSE 5773
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s \
+  CMD python3 -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5773/health').getcode()==200 else 1)"
+CMD ["python3", "-m", "infra.govern.chipfetch", "--exec", \
+     "python3", "-m", "infra.govern.govd", "--mode", "remote", "--port", "5773"]
+
+LABEL org.opencontainers.image.source="https://github.com/rhCat/cyberware" \
+      org.opencontainers.image.description="cyberware govd + full SV-5 three-prover stack (TLC + Apalache + TLAPS)" \
+      org.opencontainers.image.licenses="MIT"

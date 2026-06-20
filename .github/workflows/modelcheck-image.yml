@@ -1,0 +1,93 @@
+name: modelcheck-image
+# Build the heavy "full prover" image: govd + the SV-5 three-prover stack (TLC + Apalache + TLAPS), FROM the
+# compute env. On a PR touching it -> BUILD-SMOKE (amd64, no push) to verify the install (esp. the TLAPS
+# installer) before anything ships. On a vN.N.N tag / on demand -> multi-arch build, push to ghcr, cosign-sign.
+on:
+  pull_request:
+    paths:
+      - "infra/pyenv/Dockerfile.modelcheck"
+      - ".github/workflows/modelcheck-image.yml"
+  push:
+    tags: [ "v*" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write          # publish to ghcr (and pull the FROM compute image)
+  id-token: write          # cosign keyless signing on publish
+
+concurrency:
+  group: modelcheck-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: checkout the skillChip cartridge (submodule the image bakes in)
+        env:
+          TOKEN: ${{ secrets.SUBMODULE_PAT || github.token }}
+        run: |
+          AUTH="https://x-access-token:${TOKEN}@github.com/"
+          git -c "url.${AUTH}.insteadOf=git@github.com:" \
+              -c "url.${AUTH}.insteadOf=https://github.com/" \
+              submodule update --init --recursive --depth=1 skillChip
+
+      - name: build config (PR = amd64 smoke, no push; tag/dispatch = multi-arch publish)
+        id: cfg
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "push=false"  >> "$GITHUB_OUTPUT"
+            echo "platforms=linux/amd64" >> "$GITHUB_OUTPUT"
+          else
+            echo "push=true"   >> "$GITHUB_OUTPUT"
+            echo "platforms=linux/amd64,linux/arm64" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: log in to ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/cyberware-modelcheck
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+            type=sha,format=long
+
+      - name: build (+ push on tag/dispatch) — TLAPS install is verified here on amd64
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/pyenv/Dockerfile.modelcheck
+          platforms: ${{ steps.cfg.outputs.platforms }}
+          push: ${{ steps.cfg.outputs.push }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
+
+      - name: install cosign
+        if: steps.cfg.outputs.push == 'true'
+        uses: sigstore/cosign-installer@v3
+
+      - name: keyless-sign the pushed image (OIDC)
+        if: steps.cfg.outputs.push == 'true'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          owner="${{ github.repository_owner }}"
+          cosign sign --yes "ghcr.io/${owner,,}/cyberware-modelcheck@${DIGEST}"
