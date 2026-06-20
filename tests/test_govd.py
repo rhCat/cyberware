@@ -360,6 +360,21 @@ def test_porter_sources_surfaces_the_blessed_porter():
     assert govd.porter_sources("../evil", "x", ["y"]) == {}      # a bad skill name resolves to nothing, never escapes
 
 
+def test_run_view_failed_flag_tracks_the_error_state_exactly(tmp_path):
+    """The monitor's `failed` flag = an allowed run whose step erred. Pins govd.py's run-view
+    classification so the `state == 'error'` comparison can't silently flip (mutation ratchet)."""
+    st = govd.Store(str(tmp_path))
+    st.create("okrun", {"run_id": "okrun", "ts": "t1", "skill": "s", "perk": "p", "seq": ["a"], "decision": "allow",
+                        "events": [{"type": "granted", "step": "1"},
+                                   {"type": "step_result", "step": "1", "status": "ok", "exit": 0}]})
+    st.create("badrun", {"run_id": "badrun", "ts": "t2", "skill": "s", "perk": "p", "seq": ["a"], "decision": "allow",
+                         "events": [{"type": "granted", "step": "1"},
+                                    {"type": "step_result", "step": "1", "status": "error", "exit": 1}]})
+    views = {r["run_id"]: r for r in st.monitor_snapshot()["runs"]}
+    assert views["okrun"]["failed"] is False          # all steps ok -> NOT failed (kills the == -> != mutant)
+    assert views["badrun"]["failed"] is True           # an errored step -> failed
+
+
 def test_monitor_snapshot_is_value_free(server, tmp_path):
     base, store, _ = server
     sd = tmp_path / "d"; sd.mkdir(); (sd / "f").write_bytes(b"0" * 4096)
