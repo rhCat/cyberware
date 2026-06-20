@@ -17,21 +17,20 @@ RUN set -eux; \
     apalache-mc version
 ENV APALACHE_MC=/usr/local/bin/apalache-mc
 
-# --- TLAPS (AXIOMATIC) — tlapm. The official installer is x86_64-linux ONLY, so install on amd64 only; on
-# arm64 tlapm stays absent and workflow.py's check_tlaps returns `skipped` (honest, never a false pass). ---
-ARG TLAPS_TAG=202210041448
-ARG TLAPS_VERSION=1.5.0
+# --- TLAPS (AXIOMATIC) — tlapm. The maintainers' current Linux distribution is the 1.6.0-pre rolling
+# TARBALL (x86_64-linux only) — used instead of the 1.5.0 makeself `.bin` installer, which needs interactive
+# flag handling. So install on amd64 only; on arm64 tlapm stays absent and workflow.py's check_tlaps returns
+# `skipped` (honest, never a false pass). Rolling tag => not checksum-pinned (TLC + Apalache are). ---
+ARG TLAPS_TAG=1.6.0-pre
 RUN set -eux; \
     if [ "${TARGETARCH}" = "amd64" ]; then \
       apt-get update && apt-get install -y --no-install-recommends libgmp10 && rm -rf /var/lib/apt/lists/*; \
-      curl -fsSL "https://github.com/tlaplus/tlapm/releases/download/${TLAPS_TAG}/tlaps-${TLAPS_VERSION}-x86_64-linux-gnu-inst.bin" -o /tmp/tlaps.bin; \
-      chmod +x /tmp/tlaps.bin; \
-      sh /tmp/tlaps.bin -d /opt/tlaps; \
+      curl -fsSL "https://github.com/tlaplus/tlapm/releases/download/${TLAPS_TAG}/tlapm-${TLAPS_TAG}-x86_64-linux-gnu.tar.gz" -o /tmp/tlapm.tgz; \
+      mkdir -p /opt/tlaps && tar -C /opt/tlaps -xzf /tmp/tlapm.tgz && rm /tmp/tlapm.tgz; \
       TLAPM="$(find /opt/tlaps -type f -name tlapm | head -1)"; ln -s "$TLAPM" /usr/local/bin/tlapm; \
-      rm /tmp/tlaps.bin; \
       tlapm --version; \
     else \
-      echo "TLAPS skipped on ${TARGETARCH:-unknown} (installer is x86_64-linux only)"; \
+      echo "TLAPS skipped on ${TARGETARCH:-unknown} (tarball is x86_64-linux only)"; \
     fi
 
 # --- the govd server itself — engine + baked chip + boot-time authenticity gate (same as the lean image) ---

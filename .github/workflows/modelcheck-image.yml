@@ -70,6 +70,8 @@ jobs:
 
       - name: build (+ push on tag/dispatch) — TLAPS install is verified here on amd64
         id: build
+        env:
+          BUILDKIT_PROGRESS: plain          # full RUN output so an install failure shows its real message
         uses: docker/build-push-action@v6
         with:
           context: .
