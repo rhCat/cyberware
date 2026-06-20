@@ -328,6 +328,19 @@ class Store:
                     continue
         for s in sorted(by_id.values(), key=lambda x: x.get("ts") or "")[-self.decisions.maxlen:]:
             self.decisions.append(s)
+        # non-allow verdicts (reject/push_back) get NO per-run dir — only the metadata feed. Restore them into
+        # the navigable run list too, so the monitor's overview shows them after a restart (their submitted
+        # ledger + problems survive; the value-free plan/script is not retained for a non-allow run).
+        for s in self.decisions:
+            rid = s.get("run_id")
+            if rid and rid not in self.runs and s.get("decision") in ("reject", "push_back"):
+                self.runs[rid] = {"run_id": rid, "ts": s.get("ts"), "skill": s.get("skill"), "perk": s.get("perk"),
+                                  "decision": s.get("decision"), "destructive": s.get("destructive", False),
+                                  "var_keys": s.get("var_keys", []), "plan_sha": s.get("plan_sha"),
+                                  "problems": [{"id": p} for p in (s.get("problems") or [])],
+                                  "seq": [], "events": [], "wrapper": "", "restored": True}
+        while len(self.runs) > self.max_runs:                 # keep the in-memory cap after restoring non-allow
+            self.runs.pop(next(iter(self.runs)), None)
 
     def _persist(self, run_id, snapshot):
         os.makedirs(os.path.join(self.root, run_id), exist_ok=True)

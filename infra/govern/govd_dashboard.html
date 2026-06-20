@@ -304,7 +304,7 @@ function scriptTab(panel, d){
     const sc=sect("porter · "+name); sc.s.appendChild(el("pre",null,code)); panel.appendChild(sc.s); }
   if(d.tlc_tla){ any=true; const a=sect("TLA+ spec (task.tla)"); a.s.appendChild(el("pre",null,d.tlc_tla)); panel.appendChild(a.s); }
   if(d.tlc_log){ any=true; const b=sect("TLC model check — "+(d.tlc||"")); b.s.appendChild(el("pre",null,d.tlc_log)); panel.appendChild(b.s); }
-  if(!any) panel.appendChild(el("div","empty","no script for this run (rejected before a plan was built)"));
+  if(!any) panel.appendChild(el("div","empty","no script — rejected before a plan was built, or a non-allow run restored after restart (only allowed runs persist their plan)"));
 }
 
 async function tick(){
