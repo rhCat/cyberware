@@ -6,6 +6,11 @@ on:
   push:
     tags: [ "v*" ]
   workflow_dispatch:
+    inputs:
+      skillchip_ref:
+        description: "skillChip ref to bake into the image (tag/branch/sha). Default: the lean 'core' channel tag."
+        default: core
+        required: false
 
 permissions:
   contents: read
@@ -24,14 +29,19 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: checkout the skillChip cartridge (submodule the image bakes in)
+      - name: pull the skillChip CORE tag (the lean cartridge the image bakes in)
+        # The core image bakes skillChip@core — the lean cws+general channel — NOT the vendored submodule
+        # pointer. Re-tag `core` on the skillChip repo and the next build picks it up; the parent submodule
+        # can advance to the full marketplace (main) without changing what the signed core image carries.
         env:
-          TOKEN: ${{ secrets.SUBMODULE_PAT || github.token }}   # PAT for a private chip; falls back for a public one
+          TOKEN: ${{ secrets.SUBMODULE_PAT || github.token }}   # PAT for the private chip; falls back for a public one
+          SKILLCHIP_REF: ${{ github.event.inputs.skillchip_ref || 'core' }}
         run: |
-          AUTH="https://x-access-token:${TOKEN}@github.com/"
-          git -c "url.${AUTH}.insteadOf=git@github.com:" \
-              -c "url.${AUTH}.insteadOf=https://github.com/" \
-              submodule update --init --recursive --depth=1 skillChip
+          rm -rf skillChip
+          git clone --depth 1 --branch "${SKILLCHIP_REF}" \
+            "https://x-access-token:${TOKEN}@github.com/rhCat/skillChip.git" skillChip
+          rm -rf skillChip/.git                                 # don't bake the clone's git metadata into the image
+          python3 -c "import json;d=json.load(open('skillChip/index.json'));print('baked skillChip@${SKILLCHIP_REF}:',d['count'],'skills · chip_sha',d['chip_sha'][:16])"
 
       - uses: docker/setup-qemu-action@v3       # emulate arm64 for the multi-arch build
       - uses: docker/setup-buildx-action@v3
