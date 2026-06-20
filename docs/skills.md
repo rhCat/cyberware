@@ -4,7 +4,7 @@ Tool skills (operational pathways) — not design/taste skills. They live on the
 swappable skill cartridge, a separate repo vendored as the `skillChip/` submodule). Each runs through the
 governed pipeline (`validate → compose → compile → oversight → executor`), ships a `blueprint.{drawio,svg}`,
 pins every file in an `index.json` (authenticity), and carries a per-perk `test/case.json` that proves it
-through the real channel. **32 skills** — discover them at `GET /catalog` or `./govd-client --discover`.
+through the real channel. **37 skills** — discover them at `GET /catalog` or `./govd-client --discover`.
 The table below is the **general tool** catalog; the **v1.1 validator family** (which grades the build
 against the plan) is listed separately under [Validators](#validators).
 
@@ -19,6 +19,7 @@ against the plan) is listed separately under [Validators](#validators).
 | **ci-codeqc** | `github_actions` | bash | generate/update `.github/workflows/codeqc.yml` (ruff + mypy + pytest) for any repo. Idempotent: existing workflow backed up to `.bk` before overwrite. |
 | **datadog** | `github_ci` | bash · datadog-ci | generate/update `.github/workflows/datadog-ci.yml` — install datadog-ci, run tests, upload JUnit results to Datadog (CI Test Visibility). Idempotent; add the `DD_API_KEY` secret after. |
 | **docker** | `build` · `ps` | docker | build an image from a context dir; `ps` lists containers (read-only). Needs a running daemon. |
+| **cws-deploy** | `serve` · `status` · `down` | docker | deploy the cyberware **govd engine itself** as a governed container — `serve` builds (if absent) + runs + waits for `/health`, `status` reports, `down` tears down (data volume preserved). The dogfood loop: a governed skill that brings up the engine that governs it. Monitor token via `TOKEN_FILE`. Needs a running daemon. |
 | **net** | `healthcheck` · `dns` | curl · python3 | HTTP probe (status + latency); DNS resolve (python core via porter). Read-only. |
 | **data** | `csv2json` · `jq` | python3 · jq | CSV → JSON array (python core); jq query over a JSON file. |
 | **search** | `grep` · `loc` | ripgrep/grep · find | pattern search (rg, fallback grep); line counts by extension. Read-only. |
@@ -30,6 +31,8 @@ against the plan) is listed separately under [Validators](#validators).
 | **jsonschema** | `validate` · `infer` | python3 | validate JSON against a schema · infer a schema from a sample (stdlib). Read-only. |
 | **markdown** | `toc` · `links` | python3 | table of contents from headings · dead relative-link finder. Read-only. |
 | **ssh** | `check` · `run` | ssh | connectivity check (read-only) · vetted remote command (destructive → approve; key via `*_FILE`). |
+| **alchemy** | `extract` · `conserve` · `classify` · `concord` · `lineage` | python3 | the concordance / transmutation engine — extract claims, conserve through transforms, classify, build the concordance + lineage. The SV-4 concordance ancestor that `cws-release/citrinitas` gates on. |
+| **cws-release** | `sign` · `publish` · `receipts` · `transparency` · `revoke` · `keyrotate` · `timeanchor` · `engine` · `citrinitas` · … | python3 | publish & transparency toolchain — cosign the chip manifest (tri-layer refusal), Rekor transparency proofs, signed revocation feed, key-rotation, TSA time-anchor, engine attestation, the Citrinitas gate (13 perks). |
 | **cws-create** | `evaluate` · `scaffold` | python3 · scaffold.py | **the on-ramp** — classify a candidate skill (execution / design / transformable / unclear) and, if it fits, scaffold it into cyberware format. |
 | **cws-addperk** | `evaluate` · `apply` | python3 · git · gh | add a perk to an existing skill, governed — evaluate (exists / generalizable / scope), then branch → formulate + validate → open a PR (merge through the agent). |
 
@@ -51,6 +54,8 @@ asserted). The on-ramp (`cws-create` / `cws-addperk`) authors new skills; the re
 | **cws-pm** | composite operator | drives a playbook of validators + tracks the board (pm.json / pm.md) |
 | **harden-pyenv** | reproducible env | hash-locked deps · SBOM · the pinned compute image |
 | **cws-redteam-sw** | SV-1/SV-2 software-tier red-team | the precursor corpus (not the M3 kernel gate) |
+| **cws-chaos** | resilience under fault (V-CHAOS) | partition · crash · settle-atomicity drills — the system holds, or refuses safely, under injected faults |
+| **cws-settle-sim** | SV-6 settlement soundness (V-SETTLE) | the money's lifecycle (quote → settle → capstone) + adversarial zero-sum · float-ban · manipulation · dispute drills |
 
 The execution-boundary validators (`cws-redteam`, `cws-bench`) are described in
 [architecture.md](architecture.md#the-kernel-enforced-execution-boundary-sv-3).
