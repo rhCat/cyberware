@@ -24,7 +24,7 @@ ENV APALACHE_MC=/usr/local/bin/apalache-mc
 ARG TLAPS_TAG=1.6.0-pre
 RUN set -eux; \
     if [ "${TARGETARCH}" = "amd64" ]; then \
-      apt-get update && apt-get install -y --no-install-recommends libgmp10 && rm -rf /var/lib/apt/lists/*; \
+      apt-get update && apt-get install -y --no-install-recommends libgmp10 procps && rm -rf /var/lib/apt/lists/*; \
       curl -fsSL "https://github.com/tlaplus/tlapm/releases/download/${TLAPS_TAG}/tlapm-${TLAPS_TAG}-x86_64-linux-gnu.tar.gz" -o /tmp/tlapm.tgz; \
       mkdir -p /opt/tlaps && tar -C /opt/tlaps -xzf /tmp/tlapm.tgz && rm /tmp/tlapm.tgz; \
       TLAPM="$(find /opt/tlaps -type f -name tlapm | head -1)"; ln -s "$TLAPM" /usr/local/bin/tlapm; \
