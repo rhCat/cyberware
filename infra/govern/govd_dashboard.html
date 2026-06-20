@@ -35,6 +35,9 @@
   .b-allow{color:var(--allow);border-color:var(--allow)} .b-push{color:var(--push);border-color:var(--push)} .b-reject{color:var(--reject);border-color:var(--reject)}
   .tag-dest{color:var(--destructive);border:1px solid var(--destructive);border-radius:6px;padding:0 6px;font-size:10px}
   .tag-restored{color:var(--restored);border:1px solid var(--restored);border-radius:6px;padding:0 6px;font-size:10px}
+  .tag-fail{color:var(--reject);border:1px solid var(--reject);border-radius:6px;padding:0 6px;font-size:10px}
+  .note{color:var(--dim);font-size:11px;padding:6px 0}
+  .prob{color:var(--reject);font-size:11px;padding:3px 0;border-bottom:1px solid var(--line)}
   section{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:14px;overflow:hidden}
   .hd{padding:9px 13px;border-bottom:1px solid var(--line);color:var(--dim);text-transform:uppercase;letter-spacing:.12em;font-size:10px}
   .pad{padding:10px 13px}
@@ -156,6 +159,7 @@ function render(){
     const it=el("div","navitem"+(state.selected===r.run_id?" sel":""));
     const r1=el("div","r1"); r1.appendChild(el("span","nm",(r.skill||"?")+" / "+(r.perk||"?"))); r1.appendChild(badge(r.decision));
     const r2=el("div","r2"); r2.appendChild(el("span",null,fmt(r.ts))); r2.appendChild(el("span",null,r.progress||"-"));
+    if(r.failed) r2.appendChild(el("span","tag-fail","failed"));
     if(r.destructive) r2.appendChild(el("span","tag-dest","D"));
     if(r.restored) r2.appendChild(el("span","tag-restored","restored"));
     it.append(r1,r2); it.onclick=()=>select(r.run_id); nav.appendChild(it);
@@ -193,7 +197,7 @@ function overview(main, s){
   main.appendChild(fd.s);
 }
 
-const TABS=["Run","Flow","CFG"];
+const TABS=["Run","Ledger","Script","Flow"];
 
 function detailView(main){
   const d=state.detail;
@@ -218,7 +222,7 @@ function detailView(main){
   main.appendChild(bar);
 
   const panel=el("div");
-  ({Run:runTab, Flow:flowTab, CFG:cfgTab}[state.tab]||runTab)(panel, d);
+  ({Run:runTab, Ledger:ledgerTab, Script:scriptTab, Flow:flowTab}[state.tab]||runTab)(panel, d);
   main.appendChild(panel);
 }
 
@@ -268,11 +272,39 @@ function flowTab(panel, d){
   panel.appendChild(fl.s);
 }
 
-function cfgTab(panel, d){
-  if(d.wrapper){ const pl=sect("Blessed plan (value-free)"); const shas=el("div","keys"); for(const [t,h] of Object.entries(d.snippet_shas||{})) shas.appendChild(el("span",null,t+" "+String(h).slice(0,10))); pl.b.appendChild(shas); pl.s.appendChild(el("pre",null,d.wrapper)); panel.appendChild(pl.s); }
-  if(d.tlc_tla){ const a=sect("TLA+ spec (task.tla)"); a.s.appendChild(el("pre",null,d.tlc_tla)); panel.appendChild(a.s); }
-  if(d.tlc_log){ const b=sect("TLC model check — "+(d.tlc||"")); b.s.appendChild(el("pre",null,d.tlc_log)); panel.appendChild(b.s); }
-  if(!d.wrapper && !d.tlc_tla && !d.tlc_log) panel.appendChild(el("div","empty","no plan / model-check artifacts for this run"));
+function ledgerTab(panel, d){
+  // the value-free claim the agent submitted to govd for THIS run. Only var KEYS cross the wire — the
+  // values and record_store stay agent-side; govd governs the claim, never the data.
+  const sub={skill:d.skill, perk:d.perk, var_keys:d.var_keys||[]};
+  if(d.approved && d.approved.length) sub.approve=d.approved;
+  const ls=sect("Submitted ledger — the value-free claim");
+  ls.s.appendChild(el("pre",null,JSON.stringify(sub,null,2)));
+  ls.b.appendChild(el("div","note","Decision: "+(d.decision||"?")+". Only var KEYS cross the wire — values + record_store stay agent-side (govd governs the claim, never the data). A secret is passed as a *_FILE pointer, read at runtime."));
+  panel.appendChild(ls.s);
+  if(d.problems && d.problems.length){
+    const ps=sect("Problems — why govd "+(d.decision==="reject"?"rejected":"pushed back")); const box=el("div");
+    for(const p of d.problems){ const id=(p&&p.id)||p;
+      const det=p&&p.detail?(" — "+(Array.isArray(p.detail)?p.detail.join(", "):p.detail)):"";
+      const reason=p&&p.reason?(" · "+p.reason):"";
+      box.appendChild(el("div","prob",String(id)+det+reason)); }
+    ps.b.appendChild(box); panel.appendChild(ps.s);
+  }
+}
+
+function scriptTab(panel, d){
+  // the script this call runs: the value-free compiled wrapper (gated steps + contract checks, ${VAR}
+  // placeholders) plus the blessed porter source for each step, read from govd's own registry.
+  let any=false;
+  if(d.wrapper){ any=true;
+    const pl=sect("Compiled wrapper (value-free) — what the executor drives");
+    const shas=el("div","keys"); for(const [t,h] of Object.entries(d.snippet_shas||{})) shas.appendChild(el("span",null,t+" "+String(h).slice(0,10)));
+    if(Object.keys(d.snippet_shas||{}).length) pl.b.appendChild(shas);
+    pl.s.appendChild(el("pre",null,d.wrapper)); panel.appendChild(pl.s); }
+  for(const [name,code] of Object.entries(d.sources||{})){ any=true;
+    const sc=sect("porter · "+name); sc.s.appendChild(el("pre",null,code)); panel.appendChild(sc.s); }
+  if(d.tlc_tla){ any=true; const a=sect("TLA+ spec (task.tla)"); a.s.appendChild(el("pre",null,d.tlc_tla)); panel.appendChild(a.s); }
+  if(d.tlc_log){ any=true; const b=sect("TLC model check — "+(d.tlc||"")); b.s.appendChild(el("pre",null,d.tlc_log)); panel.appendChild(b.s); }
+  if(!any) panel.appendChild(el("div","empty","no script for this run (rejected before a plan was built)"));
 }
 
 async function tick(){
