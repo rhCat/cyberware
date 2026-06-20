@@ -13,7 +13,7 @@ Stdlib only (urllib + a tiny RFC 6455 client), so an agent can drive govd with n
   python3 infra/govd_client.py --url http://127.0.0.1:5773 --ledger task-ledger.json [--approve <id>]
 """
 from __future__ import annotations
-import argparse, base64, collections, hashlib, json, os, socket, subprocess, sys, urllib.error, urllib.request
+import argparse, base64, collections, hashlib, json, os, socket, subprocess, sys, urllib.error, urllib.parse, urllib.request
 
 from infra import registry as _reg   # the agent's `registry` arg = its skillChip; default = the bundled chip
 from infra.govern import compiler
@@ -64,6 +64,20 @@ def discover(base_url, registry=None):
     summary = collections.Counter(r["status"] for r in out)
     return {"governed_by": base_url.rstrip("/"), "registry": registry, "skills": out,
             "missing_local": sorted(set(gov) - {s["skill"] for s in local["skills"]}), "summary": dict(summary)}
+
+
+def estimate(base_url, ledger):
+    """Ask govd what this claim COSTS before running it — an itemized, value-free usage quote (LLM context +
+    output tokens at the model rate, plus the tool's pay-route fee). Only skill/perk/model cross the wire; the
+    `total` is what a Stripe charge would bill. No execution, no values."""
+    skill = urllib.parse.quote(str(ledger.get("skill") or ""))
+    perk = urllib.parse.quote(str(ledger.get("perk") or ""))
+    q = f"/price?skill={skill}&perk={perk}"
+    if ledger.get("model"):
+        q += "&model=" + urllib.parse.quote(str(ledger["model"]))
+    if ledger.get("mode") == "freeform":
+        q += "&mode=freeform"
+    return _get_json(base_url.rstrip("/") + q)
 
 
 def fetch(base_url, ledger, approve=()):
