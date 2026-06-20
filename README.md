@@ -95,6 +95,29 @@ python3 -m infra.govern.oversight  --script /tmp/run.sh                 # OVERSI
 python3 -m infra.govern.executor   --script /tmp/run.sh --step 1        # governed run (the ONLY channel)
 ```
 
+## Run the governed server (Docker)
+
+A **signed** image of the govd governance server is published to GitHub Packages — pull and run an overseen
+govd in one line (it bakes the chip, validates it at boot, and refuses to start on drift):
+
+```sh
+docker run --rm -p 5773:5773 ghcr.io/rhcat/cyberware:latest    # boots govd; prints a monitor token → http://127.0.0.1:5773/
+docker run -p 5773:5773 -v cyberware-govd:/data/govd ghcr.io/rhcat/cyberware:latest   # persist the provenance ledger
+```
+
+Verify the image's signature (keyless cosign via GitHub OIDC — no key to manage):
+
+```sh
+cosign verify ghcr.io/rhcat/cyberware:latest \
+  --certificate-identity-regexp 'https://github.com/rhCat/cyberware/.github/workflows/server-image.yml@.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+Serve a **live** chip instead of the baked one: add `-e CLOUD_MODE=1` (clones `rhCat/skillChip` at boot and
+refuses on drift). The image is the **governor** — it observes + governs and never executes; the agent runs the
+blessed plan's porters from its own registry against it. Published on a `vN.N.N` tag (or on demand) by
+[`server-image.yml`](.github/workflows/server-image.yml).
+
 ## Authoring + visualizing
 
 ```sh
