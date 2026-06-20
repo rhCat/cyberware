@@ -337,6 +337,29 @@ def test_monitor_logs_every_decision(server):
     assert {"allow", "reject", "push_back"} <= decs
 
 
+def test_non_allow_verdicts_are_navigable_with_ledger_and_problems(server):
+    """push_back/reject land in the in-memory run store too (not only the decisions feed), so the monitor
+    can select them and show their submitted ledger + blessed plan + problems."""
+    base, store, _ = server
+    _, rj = claim(base, "fs", "find_large", var_keys=["SEARCH_DIR", "BAD KEY"])           # reject
+    _, pb = claim(base, "pg_ops", "migrate",
+                  var_keys=["PGHOST", "PGDATABASE", "PGUSER", "MIGRATION"])               # push_back (destructive)
+    assert rj["decision"] == "reject" and pb["decision"] == "push_back"
+    rdet, pdet = store.run_detail(rj["run_id"]), store.run_detail(pb["run_id"])
+    assert rdet and rdet["decision"] == "reject" and "BAD KEY" in rdet["var_keys"]        # the submitted ledger
+    assert any(p.get("id") == "bad_var_key" for p in rdet["problems"])                    # why it was refused
+    assert pdet and pdet["decision"] == "push_back" and pdet.get("wrapper")               # plan exists for the Script tab
+    nav = {r["decision"] for r in store.monitor_snapshot()["runs"]}
+    assert {"reject", "push_back"} <= nav            # in the navigable run list, not only the decisions feed
+
+
+def test_porter_sources_surfaces_the_blessed_porter():
+    """run_detail's Script tab reads the porter source from govd's OWN registry (public chip code)."""
+    src = govd.porter_sources("fs", "find_large", ["fs_find_large"])
+    assert "fs_find_large.sh" in src and src["fs_find_large.sh"].startswith("#!/usr/bin/env bash")
+    assert govd.porter_sources("../evil", "x", ["y"]) == {}      # a bad skill name resolves to nothing, never escapes
+
+
 def test_monitor_snapshot_is_value_free(server, tmp_path):
     base, store, _ = server
     sd = tmp_path / "d"; sd.mkdir(); (sd / "f").write_bytes(b"0" * 4096)
