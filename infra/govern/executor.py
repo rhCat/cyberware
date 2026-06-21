@@ -82,10 +82,12 @@ def noroot_gate(euid, ledger, lpath, allow_root=False):
             ledger["runs"].append({"ts": now(), "event": "root_refused", "euid": euid})
             json.dump(ledger, open(lpath, "w"), indent=2)
             raise SystemExit(9)
+        # operator escape: ALLOW but warn loudly on stdout. Deliberately NOT a run-ledger event — it would
+        # pollute EVERY escaped run's ledger (and the ledger verifier would read it as an unknown event);
+        # the loud warning + the run's own provenance record are evidence enough. Only the security-critical
+        # REFUSAL is a ledger event (terminal, so it never pollutes a normal run).
         print("  [NOROOT] execution as root (uid 0) — ALLOWED by CYBERWARE_ALLOW_ROOT (operator escape; "
-              "NOT for production) — recorded")
-        ledger["runs"].append({"ts": now(), "event": "root_allowed", "euid": euid})
-        json.dump(ledger, open(lpath, "w"), indent=2)
+              "NOT for production)")
 
 
 def main():

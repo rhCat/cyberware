@@ -24,12 +24,12 @@ def test_noroot_gate_refuses_root(tmp_path):
     assert json.load(open(lpath))["runs"][-1]["event"] == "root_refused"
 
 
-def test_noroot_gate_allows_root_with_operator_escape(tmp_path):
+def test_noroot_gate_allows_root_with_operator_escape(tmp_path, capsys):
     lpath = tmp_path / "run-ledger.json"
     ledger = {"runs": []}
     noroot_gate(0, ledger, str(lpath), allow_root=True)  # operator escape (CYBERWARE_ALLOW_ROOT) -> no raise
-    assert ledger["runs"][-1]["event"] == "root_allowed"  # but recorded loudly as evidence
-    assert json.load(open(lpath))["runs"][-1]["event"] == "root_allowed"
+    assert ledger["runs"] == []                           # NOT a run-ledger event (no per-run pollution)
+    assert "ALLOWED by CYBERWARE_ALLOW_ROOT" in capsys.readouterr().out   # but warns loudly on stdout
 
 
 def test_noroot_gate_allows_nonroot(tmp_path):
