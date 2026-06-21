@@ -10,9 +10,12 @@
     "_default": "0",
     "http/get": "0.0010",
     "http/post": "0.0020",
-    "net/healthcheck": "0.0005",
-    "stripe/charge": "0.3000",
-    "stripe/payout": "0.2500"
+    "net/healthcheck": "0.0005"
   },
-  "marketplace_fee_pct": "0.05"
+  "marketplace_fee_pct": "0.05",
+  "rails": {
+    "_doc": "How the platform tax is COLLECTED at settle (not by an agent call, not a hidden portal). 'default' picks the rail; the tax is the transparent itemized split above. StripeRail is inert until 'stripe.key_file' points at the OPERATOR's key (server-side; the agent never sees it).",
+    "default": "ledger",
+    "stripe": { "key_file": null }
+  }
 }
