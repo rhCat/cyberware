@@ -140,9 +140,28 @@ class StripeRail:
                     "detail": e.read().decode()[:300], "idem": idem_key}
 
 
+class CreditRail:
+    """Collect the usage tax by DEBITING a prepaid credit balance (no per-call Stripe fee) — refused if the
+    balance can't cover it (the tax is a structural gate). Top up the balance with credits.topup (one Stripe
+    charge, fee amortized). This is the production per-call model; charge-mode is only for big one-off paids."""
+    name = "credit"
+
+    def __init__(self, entries: list, operator: str = "operator"):
+        self.entries = entries
+        self.operator = operator
+
+    def collect(self, charge: dict, idem_key: str) -> dict:
+        from infra.settle import credits
+        return credits.debit_usage(self.entries, self.operator, charge, idem_key)
+
+
 def make_rail(name: str = "ledger", entries: list = None, config: dict = None):
+    config = config or {}
     if name == "stripe":
         return StripeRail(config)
+    if name == "credit":
+        return CreditRail(entries if entries is not None else reward_ledger.open_ledger(),
+                          config.get("operator", "operator"))
     if name == "ledger":
         return LedgerRail(entries if entries is not None else reward_ledger.open_ledger())
     raise ValueError(f"unknown rail: {name}")
