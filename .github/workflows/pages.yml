@@ -15,8 +15,10 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted]          # dev: private repo → self-hosted (free Actions minutes). Revert to ubuntu-latest when cyberware goes public.
     steps:
+      - name: reclaim workspace ownership before checkout (self-hosted runner)
+        run: sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE" 2>/dev/null || true
       - uses: actions/checkout@v4                  # main repo: the native runner token owns cyberware
         with:
           persist-credentials: false                # don't leave a github.token extraheader that shadows the PAT
@@ -33,7 +35,7 @@ jobs:
       - name: assemble the site
         run: |
           mkdir -p _site/docs
-          echo 'cyberware.systems' > _site/CNAME          # custom apex domain (asserted on every deploy)
+          echo 'www.cyberware.systems' > _site/CNAME      # custom domain — MUST match the repo's Pages config (www), or the deploy is rejected
           cp index.html _site/index.html                 # the cyberpunk homepage (landing)
           cp docs/site/index.html _site/dashboard.html    # the live registry dashboard (root-relative fetches)
           cp favicon.png _site/favicon.png                # tab icon (favicon, small) — both pages link /favicon.png
