@@ -55,7 +55,7 @@ asserted). The on-ramp (`cws-create` / `cws-addperk`) authors new skills; the re
 | **harden-pyenv** | reproducible env | hash-locked deps · SBOM · the pinned compute image |
 | **cws-redteam-sw** | SV-1/SV-2 software-tier red-team | the precursor corpus (not the M3 kernel gate) |
 | **cws-chaos** | resilience under fault (V-CHAOS) | partition · crash · settle-atomicity drills — the system holds, or refuses safely, under injected faults |
-| **cws-settle-sim** | SV-6 settlement soundness (V-SETTLE) | the money's lifecycle (quote → settle → capstone) + adversarial zero-sum · float-ban · manipulation · dispute drills |
+| **cws-settle-sim** | SV-6 settlement soundness (V-SETTLE) | the money's lifecycle (quote → settle → capstone) + the usage-pricing layer (pricer · tax-rail · credits) + adversarial zero-sum · float-ban · manipulation · dispute drills |
 
 The execution-boundary validators (`cws-redteam`, `cws-bench`) are described in
 [architecture.md](architecture.md#the-kernel-enforced-execution-boundary-sv-3).
