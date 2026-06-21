@@ -60,7 +60,7 @@ def test_scan_seeds_a_fresh_chip(tmp_path):
 
 
 def test_the_real_chip_is_37_and_authentic():
-    assert len(si.all_skills()) == 37
+    assert len(si.all_skills()) == 38
     assert set(si.all_skills()) == set(si.permitted_skills())    # permitted == present, no drift
 
 
