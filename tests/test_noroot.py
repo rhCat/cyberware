@@ -1,9 +1,9 @@
 """The no-root execution gate (infra/govern/executor.noroot_gate).
 
 Faithful execution requires a NON-ROOT identity — the user's own uid or a scoped agent assumed-role — never
-ambient root. These tests exercise BOTH branches (root refused / non-root allowed) so the gate's mutants
-(`== 0`, the exit code, the recorded refusal) are killed — the executor is a ratchet-tracked enforcement
-surface.
+ambient root. These tests exercise all branches (root refused / root allowed under the operator escape /
+non-root allowed) so the gate's mutants (`== 0`, `not allow_root`, the exit code, the recorded events) are
+killed — the executor is a ratchet-tracked enforcement surface.
 """
 import json
 
@@ -22,6 +22,14 @@ def test_noroot_gate_refuses_root(tmp_path):
     assert ledger["runs"][-1]["euid"] == 0
     # the refusal is recorded to disk as evidence, not just in memory
     assert json.load(open(lpath))["runs"][-1]["event"] == "root_refused"
+
+
+def test_noroot_gate_allows_root_with_operator_escape(tmp_path):
+    lpath = tmp_path / "run-ledger.json"
+    ledger = {"runs": []}
+    noroot_gate(0, ledger, str(lpath), allow_root=True)  # operator escape (CYBERWARE_ALLOW_ROOT) -> no raise
+    assert ledger["runs"][-1]["event"] == "root_allowed"  # but recorded loudly as evidence
+    assert json.load(open(lpath))["runs"][-1]["event"] == "root_allowed"
 
 
 def test_noroot_gate_allows_nonroot(tmp_path):

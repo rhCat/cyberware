@@ -6,6 +6,12 @@ on:
 permissions:
   contents: read
   packages: read                  # pull the pinned compute image from ghcr
+env:
+  # CI runs in a root container (the pinned compute image), and the executor's no-root gate refuses uid 0
+  # by default. This is the explicit OPERATOR escape for the root-only test runner — it is NEVER set in
+  # production (the deployed image runs under a non-root USER, so the gate never fires there). Every root
+  # run is still recorded (root_allowed) in the run-ledger.
+  CYBERWARE_ALLOW_ROOT: "1"
 jobs:
   codeqc:
     runs-on: ubuntu-latest
