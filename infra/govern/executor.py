@@ -65,6 +65,21 @@ def record_store_of(script):
     return os.path.dirname(os.path.abspath(script))
 
 
+def noroot_gate(euid, ledger, lpath):
+    """No-root execution gate: faithful execution requires a NON-ROOT identity — the user's own uid or a
+    scoped agent assumed-role — never ambient root. Root in a container leaves root-owned artifacts on
+    bind-mounts and widens the escape surface, silently un-governing the boundary. Refuses with exit 9 when
+    `euid` is 0, recording the refusal as evidence. `euid` is passed IN (production calls
+    `noroot_gate(os.geteuid(), ...)`) so the gate is unit-testable without actually being root — and is NOT
+    bypassable from the environment (production always uses the real geteuid)."""
+    if euid == 0:
+        print("  [NOROOT] execution as root (uid 0) — REFUSED; run under a non-root USER, or a RUN_AS "
+              "user / assumed-role identity (never root)")
+        ledger["runs"].append({"ts": now(), "event": "root_refused", "euid": euid})
+        json.dump(ledger, open(lpath, "w"), indent=2)
+        raise SystemExit(9)
+
+
 def main():
     ap = argparse.ArgumentParser(description="the governed channel — the only way to run a compiled script")
     ap.add_argument("--script", required=True)
@@ -116,6 +131,9 @@ def main():
             json.dump(ledger, open(lpath, "w"), indent=2)
             sys.exit(7)
         print("  [oversight] clear" + (f" ({len(waived)} waived)" if waived else ""))
+
+    # 2b. no-root gate — faithful execution under a non-root identity, never ambient root (before any bash)
+    noroot_gate(os.geteuid(), ledger, lpath)
 
     # which steps — both paths validate against the script's own --list
     listing = subprocess.run(["bash", script, "--list"], capture_output=True, text=True).stdout

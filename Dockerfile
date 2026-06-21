@@ -25,6 +25,15 @@ COPY skillChip/ ./skillChip/
 # stripping a pinned file) — fail the build fast rather than ship a govd that rejects every claim.
 RUN python3 -m infra.tool.skill_index --check --all
 
+# non-root principal — govd/exod execute faithfully under a scoped service identity, NEVER root (the
+# executor refuses uid 0). chown BEFORE the VOLUME line so a FRESH named volume inherits cyberware
+# ownership (Docker seeds a new volume from the image path's content + perms); an existing root-owned
+# volume must be re-chowned once (or use a fresh volume name).
+RUN groupadd -g 1000 cyberware \
+ && useradd -u 1000 -g cyberware -d /app -s /usr/sbin/nologin cyberware \
+ && mkdir -p /data/govd \
+ && chown -R cyberware:cyberware /app /data/govd
+
 ENV GOVD_CONFIG=/app/infra/govern/govd_config.json \
     GOVD_RECORD_ROOT=/data/govd \
     PYTHONUNBUFFERED=1
@@ -35,6 +44,9 @@ VOLUME ["/data/govd"]
 
 # remote mode binds 0.0.0.0; map the port on `docker run`
 EXPOSE 5773
+
+# drop to the non-root principal for runtime — every step the engine runs inherits this uid, never root
+USER cyberware
 
 # start-period covers a CLOUD_MODE clone+validate before the server binds
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s \
