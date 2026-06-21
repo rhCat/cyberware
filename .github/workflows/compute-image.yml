@@ -24,6 +24,8 @@ jobs:
   build-push:
     runs-on: [self-hosted]          # dev: private repo → self-hosted (free Actions minutes). Revert to ubuntu-latest when cyberware goes public.
     steps:
+      - name: reclaim workspace (self-hosted: prior container jobs leave root-owned files)
+        run: sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE" 2>/dev/null || true
       - uses: actions/checkout@v4
         with:
           persist-credentials: false

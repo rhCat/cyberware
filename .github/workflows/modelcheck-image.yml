@@ -5,8 +5,7 @@ name: modelcheck-image
 on:
   pull_request:
     paths:
-      - "infra/pyenv/Dockerfile.modelcheck"
-      - ".github/workflows/modelcheck-image.yml"
+      - "infra/pyenv/Dockerfile.modelcheck"   # only the Dockerfile triggers the (heavy) PR build-smoke — not cosmetic workflow edits
   push:
     tags: [ "v*" ]
   workflow_dispatch:
@@ -24,6 +23,8 @@ jobs:
   build:
     runs-on: [self-hosted]          # dev: private repo → self-hosted (free Actions minutes). Revert to ubuntu-latest when cyberware goes public.
     steps:
+      - name: reclaim workspace (self-hosted: prior container jobs leave root-owned files)
+        run: sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE" 2>/dev/null || true
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
