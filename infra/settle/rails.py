@@ -23,10 +23,20 @@ amount is exact-decimal Money, and the line amounts come straight from the price
 """
 from __future__ import annotations
 
+from decimal import Decimal
+
 from infra.settle import reward_ledger
 from infra.settle.money import Money, float_ban_scan
 
 _TAX_PREFIX = "tax:"
+_HUNDRED = Decimal("100")               # USD -> minor units (cents); Decimal, never a float (float-ban)
+
+
+def usd_to_minor(amount, currency: str = "USD") -> int:
+    """Exact-decimal amount -> integer minor units (cents) for the Stripe API. Truncates sub-cent — which is
+    exactly why per-call micro-taxes can't be a one-shot charge (Stripe's ~$0.50 minimum); use meter mode for
+    usage. Pure Decimal/int — no float touches it."""
+    return int(Money(amount, currency).scale(_HUNDRED).amount)
 
 
 def charge_from_price(price_quote: dict, plan_sha: str) -> dict:
@@ -78,22 +88,55 @@ class LedgerRail:
 
 class StripeRail:
     """Charge the OPERATOR's account for the quoted total (Idempotency-Key = the run's plan_sha), with the
-    line items as metadata. Inert until `config.key_file` is set — the operator wires the key, server-side;
-    the agent never sees it. The actual charge call is the one seam the operator completes."""
+    transparent line items as metadata. Inert until `config.key_file` is set — the operator wires the key,
+    server-side (the agent never sees it). charge-mode = one-shot PaymentIntent (for amounts >= the Stripe
+    minimum; for per-call usage micro-taxes, meter mode is the right primitive — a later config switch)."""
     name = "stripe"
+    API = "https://api.stripe.com/v1/payment_intents"
 
     def __init__(self, config: dict = None):
         self.config = config or {}
 
     def collect(self, charge: dict, idem_key: str) -> dict:
-        if not self.config.get("key_file"):
+        key_file = self.config.get("key_file")
+        if not key_file:
             return {"rail": "stripe", "status": "unconfigured", "would_charge": charge["total"],
                     "currency": charge["currency"], "breakdown": charge["breakdown"], "idem": idem_key,
                     "note": "set rails.stripe.key_file (operator's key, server-side) to enable; the agent never sees it"}
-        # SEAM (operator wires this): POST https://api.stripe.com/v1/payment_intents
-        #   amount = charge["total"] (minor units), currency, Idempotency-Key = idem_key,
-        #   metadata = the breakdown (the transparent line items), key = cat(self.config["key_file"]).
-        raise NotImplementedError("wire the Stripe charge here using config['key_file'] (cat at runtime)")
+        return self._charge(charge, idem_key, key_file)
+
+    def _charge(self, charge: dict, idem_key: str, key_file: str) -> dict:
+        # charge-mode: a one-shot PaymentIntent for the quoted total, idempotent on plan_sha. The operator's
+        # key is read at call time (cat) and never logged; the breakdown rides as metadata (transparent).
+        import json as _json
+        import os
+        import urllib.error
+        import urllib.parse
+        import urllib.request
+        cur = charge["currency"]
+        cents = usd_to_minor(charge["total"], cur)
+        if cents <= 0:                                             # sub-cent: a one-shot charge is impossible
+            return {"rail": "stripe", "status": "below_minimum", "would_charge": charge["total"],
+                    "currency": cur, "idem": idem_key, "note": "sub-cent total — use meter mode for usage taxes"}
+        key = open(os.path.expanduser(key_file), encoding="utf-8").read().strip()
+        fields = {"amount": cents, "currency": cur.lower(), "confirm": "true",
+                  "payment_method": self.config.get("payment_method", "pm_card_visa"),
+                  "description": f"cyberware tax {idem_key[:16]}"}
+        for b in charge["breakdown"]:                              # transparent line items as Stripe metadata
+            fields[f"metadata[{b['account']}]"] = b["amount"]
+        req = urllib.request.Request(
+            self.API, data=urllib.parse.urlencode(fields).encode(), method="POST",
+            headers={"Authorization": "Bearer " + key, "Idempotency-Key": idem_key,
+                     "Content-Type": "application/x-www-form-urlencoded"})
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                pi = _json.loads(r.read())
+            return {"rail": "stripe", "status": "charged", "charge_id": pi.get("id"),
+                    "pi_status": pi.get("status"), "amount": charge["total"], "currency": cur,
+                    "breakdown": charge["breakdown"], "idem": idem_key}
+        except urllib.error.HTTPError as e:                        # surface Stripe's error, never the key
+            return {"rail": "stripe", "status": "error", "http": e.code,
+                    "detail": e.read().decode()[:300], "idem": idem_key}
 
 
 def make_rail(name: str = "ledger", entries: list = None, config: dict = None):
@@ -110,6 +153,23 @@ def collect_tax(charge: dict, rail, idem_key: str) -> dict:
     if not split_balances(charge):
         raise ValueError("charge breakdown does not re-sum to the total (a skim) — refused")
     return rail.collect(charge, idem_key)
+
+
+def collect_run_tax(skill: str, perk: str, plan_sha: str, rail=None, pricing: dict = None,
+                    model: str = None, mode: str = "structured", ledger_entries: list = None) -> dict:
+    """The settle-time tax collection for ONE run: price the plan → the transparent charge → collect via the
+    rail. This is what the engine/operator calls when a priced run SETTLES (never the agent — no extra LLM
+    call). Idempotent on plan_sha. Returns {price, charge, receipt}. With no rail, builds the one named by
+    pricing.json `rails.default`."""
+    from infra.settle import price
+    pricing = pricing or price.load_pricing()
+    pq = price.price_plan(skill, perk, model=model, mode=mode, pricing=pricing)
+    charge = charge_from_price(pq, plan_sha)
+    if rail is None:
+        rails_cfg = pricing.get("rails") or {}
+        rail = make_rail(rails_cfg.get("default", "ledger"), entries=ledger_entries,
+                         config=rails_cfg.get("stripe", {}))
+    return {"price": pq, "charge": charge, "receipt": collect_tax(charge, rail, plan_sha)}
 
 
 def rails_selftest() -> dict:
@@ -139,5 +199,9 @@ def rails_selftest() -> dict:
         "zero_sum": reward_ledger.global_zero(led),
         "stripe_inert_until_keyed": StripeRail().collect(charge, "Z")["status"] == "unconfigured",
         "skim_refused": skim_refused,
+        "usd_to_minor_dollar": usd_to_minor("1.0000") == 100,          # $1.00 -> 100 cents
+        "usd_to_minor_subcent_zero": usd_to_minor("0.0072") == 0,      # micro-tax -> below Stripe minimum
+        "collect_run_tax_settles": collect_run_tax(
+            "http", "get", "PSHA2", rail=LedgerRail(reward_ledger.open_ledger()))["receipt"]["status"] == "collected",
         "float_ban_clean": float_ban_scan([__file__]) == [],
     }

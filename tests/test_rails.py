@@ -47,5 +47,24 @@ def test_stripe_rail_is_inert_until_keyed():
     assert r["status"] == "unconfigured" and r["would_charge"] == ch["total"]
 
 
+def test_usd_to_minor_cents_and_subcent():
+    assert rails.usd_to_minor("1.0000") == 100 and rails.usd_to_minor("0.5000") == 50
+    assert rails.usd_to_minor("0.0072") == 0                        # sub-cent -> below Stripe's ~$0.50 minimum
+
+
+def test_collect_run_tax_prices_then_collects():
+    out = rails.collect_run_tax("http", "get", "PSHA", rail=rails.LedgerRail(reward_ledger.open_ledger()))
+    assert out["receipt"]["status"] == "collected"
+    assert Money(out["charge"]["total"], "USD") > Money("0") and "llm" in out["price"]
+
+
+def test_stripe_charge_below_minimum_makes_no_network_call(tmp_path):
+    keyf = tmp_path / "k"
+    keyf.write_text("sk_test_dummy")                               # never read: below_minimum returns first
+    ch = rails.charge_from_price(price.price_plan("fs", "find_large"), "PSHA")   # sub-cent total
+    r = rails.StripeRail({"key_file": str(keyf)}).collect(ch, "PSHA")
+    assert r["status"] == "below_minimum" and r["would_charge"] == ch["total"]
+
+
 def test_no_float_in_rails():
     assert float_ban_scan([rails.__file__]) == []
