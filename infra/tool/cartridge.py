@@ -88,6 +88,17 @@ def verify(cartridge_dir: str) -> dict:
         ok, drift = skill_index.verify(sk, cartridge_dir)
         if not ok:
             problems.append(f"{sk}: files do not match skill_sha ({str(drift)[:60]})")
+        # bind the per-skill manifest to the root: the skill's OWN index.json skill_sha must equal what the
+        # root manifest declares for it. Without this, tampering a file AND re-pinning the skill's index.json
+        # would pass skill_index.verify (files match the rewritten index) while the root chip_sha — the load
+        # set's identity — silently diverges. The per-skill manifest must not drift from the root.
+        try:
+            on_disk_sha = json.load(open(os.path.join(cartridge_dir, sk, INDEX))).get("skill_sha")
+        except Exception:
+            on_disk_sha = None
+        if on_disk_sha != e.get("skill_sha"):
+            problems.append(f"{sk}: index.json skill_sha {str(on_disk_sha)[:12]} != manifest "
+                            f"{str(e.get('skill_sha'))[:12]} (per-skill manifest drifted from the root)")
     roll = canonical.digest({e["skill"]: e.get("skill_sha") for e in declared})
     if roll != man.get("chip_sha"):
         problems.append(f"chip_sha mismatch: manifest={str(man.get('chip_sha'))[:12]} recomputed={roll[:12]}")
