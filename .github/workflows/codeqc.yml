@@ -14,7 +14,7 @@ env:
   CYBERWARE_ALLOW_ROOT: "1"
 jobs:
   codeqc:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted]          # dev: private repo → self-hosted (free Actions minutes). Revert to ubuntu-latest when cyberware goes public.
     container:                      # run on the pinned, reproducible compute env (compute-image.yml -> ghcr):
       image: ghcr.io/rhcat/cyberware-compute:latest   # python 3.12 · openssl 3.5 · go · java+TLA, so
       credentials:                  # cws-conform/interop (ed25519ph) + cws-modelcheck (TLC) RUN, not skip
@@ -53,7 +53,7 @@ jobs:
     # "building is running"): every blueprint deadlock-free, the chip authentic, and the enforcement
     # surface mutation-tested against its ratchet floor. Its own job so the slow mutation pass is
     # isolated from the fast suite and reads as a distinct gate.
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted]          # dev: private repo → self-hosted (free Actions minutes). Revert to ubuntu-latest when cyberware goes public.
     container:
       image: ghcr.io/rhcat/cyberware-compute:latest
       credentials:
