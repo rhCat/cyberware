@@ -121,6 +121,7 @@ class StripeRail:
         key = open(os.path.expanduser(key_file), encoding="utf-8").read().strip()
         fields = {"amount": cents, "currency": cur.lower(), "confirm": "true",
                   "payment_method": self.config.get("payment_method", "pm_card_visa"),
+                  "payment_method_types[]": "card",          # card-only -> no redirect, no return_url needed
                   "description": f"cyberware tax {idem_key[:16]}"}
         for b in charge["breakdown"]:                              # transparent line items as Stripe metadata
             fields[f"metadata[{b['account']}]"] = b["amount"]
