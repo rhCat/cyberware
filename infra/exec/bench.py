@@ -200,25 +200,31 @@ def _await_sock(path: str, timeout: float) -> None:
 
 
 def _api(sock_path: str, method: str, route: str, body: dict | None) -> None:
-    """Minimal HTTP-over-unix-socket call to the Firecracker API (no extra deps). Raises on non-2xx."""
+    """Minimal HTTP-over-unix-socket call to the Firecracker API (no extra deps). Reads only THROUGH the
+    response header block (FC's mutating routes answer 204 No Content) rather than looping until the peer
+    closes — and sets a socket timeout — so a wedged API socket RAISES instead of hanging the run. Non-2xx
+    raises with FC's fault body."""
     payload = b"" if body is None else json.dumps(body).encode()
     req = (f"{method} {route} HTTP/1.1\r\nHost: localhost\r\n"
            f"Content-Type: application/json\r\nContent-Length: {len(payload)}\r\n"
            f"Connection: close\r\n\r\n").encode() + payload
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    s.connect(sock_path)
-    s.sendall(req)
-    resp = b""
-    while True:
-        chunk = s.recv(4096)
-        if not chunk:
-            break
-        resp += chunk
-    s.close()
+    s.settimeout(30)
+    try:
+        s.connect(sock_path)
+        s.sendall(req)
+        resp = b""
+        while b"\r\n\r\n" not in resp:                  # the full header block carries the status line
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            resp += chunk
+    finally:
+        s.close()
     status = resp.split(b"\r\n", 1)[0]
     if b" 200 " not in status and b" 204 " not in status:
-        body = resp.split(b"\r\n\r\n", 1)[1][:300] if b"\r\n\r\n" in resp else b""
-        raise RuntimeError(f"firecracker API {method} {route} -> {status!r} body={body!r}")
+        det = resp.split(b"\r\n\r\n", 1)[1][:300] if b"\r\n\r\n" in resp else b""
+        raise RuntimeError(f"firecracker API {method} {route} -> {status!r} body={det!r}")
 
 
 def bench_microvm(work: str | None = None) -> dict:
