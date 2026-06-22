@@ -243,6 +243,44 @@ def run_governed(base_url, ledger, approve=(), registry=None):
             "ledger": base_url.rstrip("/") + "/ledger/" + verdict["run_id"] + "?token=" + tok}
 
 
+def run_delegated(base_url, ledger, approve=()):
+    """SERVER-SIDE execution (P2-T12): the agent POSTs the claim, opens the per-run WS, and asks govd to
+    EXECUTE each step — govd delegates to exod the limb, which runs it CONFINED and signs the authoritative
+    status; govd records the SIGNED status. The agent runs NOTHING and holds no porter: intent-in, status-out
+    (contrast run_governed, the cooperative client-side mode). Requires govd in delegated exec_mode with exod
+    attached; otherwise each step is refused (fail-closed)."""
+    verdict = fetch(base_url, ledger, approve)
+    if verdict.get("decision") != "allow":
+        return verdict
+    plan = verdict["plan"]
+    psha = compiler.plan_sha(plan)
+    ws_host, ws_port = verdict["ws"].split("://", 1)[1].split("/", 1)[0].rsplit(":", 1)
+    sock = _ws_connect(ws_host, int(ws_port))
+    _ws_send(sock, json.dumps({"type": "hello", "run_id": verdict["run_id"], "token": verdict.get("session_token")}))
+    hello = _ws_recv(sock)
+    if hello is None or not json.loads(hello).get("authorized"):
+        sock.close()
+        return {"run_id": verdict["run_id"], "decision": "allow", "error": "oversight session not authorized"}
+    steps = [str(i) for i in range(1, len(plan["sequence"]) + 1)]   # plan is sole source of step truth (P1-T06)
+    results = []
+    for st in steps:
+        _ws_send(sock, json.dumps({"type": "step_request", "step": st, "plan_sha": psha}))
+        raw = _ws_recv(sock)
+        if raw is None:
+            results.append({"step": st, "refused": "server closed the oversight channel"}); break
+        resp = json.loads(raw)
+        if resp.get("type") != "executed":              # the limb ran it server-side, or govd refused
+            results.append({"step": st, "refused": resp.get("reason")}); break
+        results.append({"step": st, "status": resp.get("status"), "exit": resp.get("exit"),
+                        "authority": resp.get("authority")})
+        if resp.get("status") != "ok":
+            break
+    _ws_send(sock, b"", 0x8)
+    sock.close()
+    return {"run_id": verdict["run_id"], "decision": "allow", "mode": "delegated", "results": results,
+            "plan_sha": psha}
+
+
 def main():
     ap = argparse.ArgumentParser(description="drive govd: discover the catalog, then fetch + run a governed script")
     ap.add_argument("--url", default="http://127.0.0.1:5773")

@@ -117,8 +117,13 @@ def build_plan(skill, perk):
         "esac",
         "",
     ]
+    # the credential IDs the perk's manifesto declares it needs (NAMES only, never values) — the
+    # server-authoritative set govd binds onto the run so the limb resolves exactly these from its vault in
+    # delegated mode. The agent never chooses its own secrets; absent declaration -> credential-free.
+    credential_ids = [str(c) for c in manifesto.get("credentials", [])]
     return {"skill": skill, "perk": perk, "sequence": list(seq), "wrapper": "\n".join(wrap),
-            "snippet_shas": snippet_shas, "skill_sha": idx.get("skill_sha", "")}
+            "snippet_shas": snippet_shas, "skill_sha": idx.get("skill_sha", ""),
+            "credential_ids": credential_ids}
 
 
 def plan_sha(plan):
