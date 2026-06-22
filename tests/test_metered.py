@@ -30,9 +30,34 @@ def test_receipt_pass_through_reimbursement():
     assert RL.is_balanced(posting)                                                # double-entry, sums to zero
 
 
-def test_mismatched_receipt_is_unsettleable():
+def test_mismatched_tokens_unsettleable():
     s = M.settleable(METER, {"in_tokens": 5000, "out_tokens": 500, "cost": "9.99"}, RATE, FLOOR, CAP)
     assert s["settleable"] is False and s["reason"] == "receipt_meter_mismatch"   # never pay a disputed receipt
+
+
+def test_cost_overbill_unsettleable():
+    # tokens reconcile but the cost is ~8x the attested estimate -> rejected, NOT clamped-and-paid up to cap
+    s = M.settleable(METER, {"in_tokens": 1010, "out_tokens": 495, "cost": "9.99"}, RATE, FLOOR, CAP)
+    assert s["settleable"] is False and s["reason"] == "receipt_cost_exceeds_attested"
+
+
+def test_foreign_currency_receipt_unsettleable():
+    s = M.settleable(METER, {"in_tokens": 1010, "out_tokens": 495, "cost": "1.2500", "currency": "EUR"},
+                     RATE, FLOOR, CAP)
+    assert s["settleable"] is False and s["reason"] == "currency_mismatch"         # no silent relabel/FX
+
+
+def test_float_cost_refused_at_the_boundary():
+    # a binary float must not be laundered through str() — the float-ban holds at the untrusted receipt boundary
+    s = M.settleable(METER, {"in_tokens": 1010, "out_tokens": 495, "cost": 1.25}, RATE, FLOOR, CAP)
+    assert s["settleable"] is False and s["reason"] == "receipt_cost_not_exact"
+
+
+def test_malformed_or_missing_cost_unsettleable():
+    assert M.settleable(METER, {"in_tokens": 1010, "out_tokens": 495}, RATE, FLOOR, CAP)["reason"] \
+        == "receipt_cost_not_exact"                                                # missing cost, no raw exception
+    assert M.settleable(METER, {"in_tokens": 1010, "out_tokens": 495, "cost": "abc"}, RATE, FLOOR, CAP)["reason"] \
+        == "receipt_cost_malformed"                                                # non-numeric, no raw exception
 
 
 def test_absent_receipt_prices_the_attested_count():
@@ -42,9 +67,10 @@ def test_absent_receipt_prices_the_attested_count():
 
 def test_floor_and_cap_clamp():
     lo = M.settleable(METER, {"in_tokens": 1000, "out_tokens": 500, "cost": "0.0001"}, RATE, FLOOR, CAP)
-    hi = M.settleable(METER, {"in_tokens": 1000, "out_tokens": 500, "cost": "999999"}, RATE, FLOOR, CAP)
-    assert lo["amount"] == "0.0100" and lo["clamped"] is True
-    assert hi["amount"] == "100.0000" and hi["clamped"] is True
+    assert lo["amount"] == "0.0100" and lo["clamped"] is True                     # receipt below floor -> floor
+    big = {"by": "exod", "in_tokens": 1_000_000, "out_tokens": 0}                 # attested-count price 500 > cap
+    hi = M.settleable(big, None, RATE, FLOOR, CAP)
+    assert hi["amount"] == "100.0000" and hi["clamped"] is True                   # meter-path price over cap -> cap
 
 
 def test_unattested_meter_is_never_settleable():

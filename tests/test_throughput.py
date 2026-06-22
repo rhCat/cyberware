@@ -38,6 +38,35 @@ def test_unbalanced_member_rejects_the_whole_batch_no_partial():
         w.commit()
     assert len(entries) == before                            # NOT a partial append — the good set didn't land either
     assert w.committed == 0
+    assert w._staged == []                                   # rejected batch dropped — the writer is not wedged
+    w.stage(_pair("a", "b"))                                 # and it accepts new work after the failure
+    assert w.commit() == 1
+
+
+def test_foreign_currency_set_is_rejected():
+    entries = RL.open_ledger("t", "t")
+    w = TP.GroupCommitWriter(entries, "USD")                 # single-writer-PER-CURRENCY
+    w.stage([RL._posting("e1", -Money("1.00", "EUR")), RL._posting("e2", Money("1.00", "EUR"))])
+    before = len(entries)
+    with pytest.raises(ValueError):
+        w.commit()
+    assert len(entries) == before and w.committed == 0
+
+
+def test_writer_seeded_from_an_existing_chain():
+    entries = RL.open_ledger("t", "t")
+    RL.post(entries, _pair("seed_a", "seed_b"))              # a posting set already on the chain
+    w = TP.GroupCommitWriter(entries, "USD")                 # attaches to a NON-empty chain
+    cp = w.checkpoint()
+    assert cp["root"] == RL.balance_root(entries)            # checkpoint reflects the whole chain, not just deltas
+    w.stage(_pair("c", "d"))
+    w.commit()
+    assert w.checkpoint()["root"] == RL.balance_root(entries)
+
+
+def test_resume_rejects_a_nonconserving_checkpoint():
+    bad = {"root": TP._balances_root([("a", "USD", "5")]), "balances": {"a|USD": "5"}}  # root-consistent but not zero-sum
+    assert TP.resume_verify(bad) is False
 
 
 def test_checkpoint_resume_verifies_and_detects_tamper():

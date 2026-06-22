@@ -45,18 +45,33 @@ def _clamp(amount, floor, cap):
     return amount
 
 
-def settleable(meter, receipt, rate, floor, cap, tol="0.05"):
+def settleable(meter, receipt, rate, floor, cap, tol="0.05", cost_tol="0.10"):
     """Decide the settleable Money for a metered step. Returns a dict with `settleable` (bool), and when
     settleable: `amount` (str), `currency`, `source` ('receipt' pass-through | 'meter' attested-count),
-    `clamped` (bool). When not: `reason`."""
+    `clamped` (bool). When not: `reason`. A receipt is honoured only if it (a) is in the run's currency,
+    (b) its TOKENS reconcile with the attested meter within `tol`, AND (c) its COST does not exceed the
+    rate-implied cost of the attested token count by more than `cost_tol` — so a receipt cannot over-bill
+    dollars while matching token volume. The cost is taken through Money's float-ban (str/int/Decimal only;
+    a binary float is refused, not laundered through str())."""
     cur = floor.currency
     if not isinstance(meter, dict) or meter.get("by") != "exod":
         return {"settleable": False, "reason": "meter_not_attested", "source": None}
     if receipt is not None:
+        if receipt.get("currency") and receipt["currency"] != cur:
+            return {"settleable": False, "reason": "currency_mismatch", "source": "receipt"}
         if not reconcile(meter, receipt, tol):
             return {"settleable": False, "reason": "receipt_meter_mismatch", "source": "receipt"}
-        raw = Money(str(receipt["cost"]), cur)                      # pass-through reimbursement of the real cost
-        amount = _clamp(raw, floor, cap)
+        cost = receipt.get("cost")
+        if isinstance(cost, float) or cost is None:                 # float-ban: never launder a binary float
+            return {"settleable": False, "reason": "receipt_cost_not_exact", "source": "receipt"}
+        try:
+            raw = Money(cost, cur)                                  # str/int/Decimal -> Money refuses a float
+        except (TypeError, ValueError, ArithmeticError):
+            return {"settleable": False, "reason": "receipt_cost_malformed", "source": "receipt"}
+        est = price.llm_cost(meter.get("in_tokens", 0), meter.get("out_tokens", 0), rate)
+        if raw.amount > est.amount * (Decimal(1) + Decimal(str(cost_tol))):   # cost bound to attested tokens x rate
+            return {"settleable": False, "reason": "receipt_cost_exceeds_attested", "source": "receipt"}
+        amount = _clamp(raw, floor, cap)                            # pass-through reimbursement of the real cost
         return {"settleable": True, "amount": str(amount.amount), "currency": cur, "source": "receipt",
                 "within_tolerance": True, "clamped": amount.amount != raw.amount}
     raw = price.llm_cost(meter.get("in_tokens", 0), meter.get("out_tokens", 0), rate)   # attested-count fallback
@@ -90,26 +105,41 @@ def metered_selftest():
     bad = {"in_tokens": 5000, "out_tokens": 500, "cost": "9.99"}
     mismatch_refused = settleable(meter, bad, rate, floor, cap)["reason"] == "receipt_meter_mismatch"
 
+    # tokens match but the cost over-bills the attested estimate (~8x) -> unsettleable (not paid up to cap)
+    overbill = {"in_tokens": 1010, "out_tokens": 495, "cost": "9.99"}
+    overbill_refused = settleable(meter, overbill, rate, floor, cap)["reason"] == "receipt_cost_exceeds_attested"
+
+    # a foreign-currency receipt is not silently relabeled
+    foreign = {"in_tokens": 1010, "out_tokens": 495, "cost": "1.2500", "currency": "EUR"}
+    currency_checked = settleable(meter, foreign, rate, floor, cap)["reason"] == "currency_mismatch"
+
+    # a missing/non-numeric cost is refused as unsettleable, never a raw exception (float-cost refusal is
+    # exercised in tests/test_metered.py — a float LITERAL cannot live in infra/settle under the float-ban)
+    malformed_refused = (settleable(meter, {"in_tokens": 1010, "out_tokens": 495}, rate, floor, cap)["reason"]
+                         == "receipt_cost_not_exact")
+
     # no receipt -> exod token COUNT priced (0.50*1 + 1.50*0.5 = 1.2500)
     s_meter = settleable(meter, None, rate, floor, cap)
     meter_fallback = s_meter["settleable"] and s_meter["source"] == "meter" and s_meter["amount"] == "1.2500"
 
-    # floor/cap clamp
-    tiny = {"in_tokens": 1000, "out_tokens": 500, "cost": "0.0001"}      # below floor
-    huge = {"in_tokens": 1000, "out_tokens": 500, "cost": "999999.00"}   # above cap
+    # floor clamp (receipt within cost tolerance but below floor) + cap clamp (attested-count price over cap)
+    tiny = {"in_tokens": 1000, "out_tokens": 500, "cost": "0.0001"}
     clamp_floor = settleable(meter, tiny, rate, floor, cap)["amount"] == "0.0100"
-    clamp_cap = settleable(meter, huge, rate, floor, cap)["amount"] == "100.0000"
+    big_meter = {"by": "exod", "in_tokens": 1_000_000, "out_tokens": 0}      # 0.50*1000 = 500.00 > cap
+    clamp_cap = settleable(big_meter, None, rate, floor, cap)["amount"] == "100.0000"
 
     # an un-attested meter is never settleable
     unattested = settleable({"by": "agent", "in_tokens": 1000, "out_tokens": 500}, rcpt, rate, floor, cap)
     attested_required = unattested["settleable"] is False and unattested["reason"] == "meter_not_attested"
 
-    ok = bool(receipt_settles and reimbursement_balanced and mismatch_refused and meter_fallback
-              and clamp_floor and clamp_cap and attested_required)
+    ok = bool(receipt_settles and reimbursement_balanced and mismatch_refused and overbill_refused
+              and currency_checked and malformed_refused and meter_fallback and clamp_floor and clamp_cap
+              and attested_required)
     return {"receipt_settles": receipt_settles, "reimbursement_balanced": reimbursement_balanced,
-            "mismatch_refused": mismatch_refused, "meter_fallback": meter_fallback,
-            "clamp_floor": clamp_floor, "clamp_cap": clamp_cap, "attested_required": attested_required,
-            "ok": ok}
+            "mismatch_refused": mismatch_refused, "overbill_refused": overbill_refused,
+            "currency_checked": currency_checked, "malformed_refused": malformed_refused,
+            "meter_fallback": meter_fallback, "clamp_floor": clamp_floor, "clamp_cap": clamp_cap,
+            "attested_required": attested_required, "ok": ok}
 
 
 if __name__ == "__main__":
