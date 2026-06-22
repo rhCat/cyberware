@@ -598,3 +598,64 @@ def test_govern_bearer_auth_principal_and_rate_limit(tmp_path):
         assert 429 in codes
     finally:
         httpd.shutdown(); httpd.server_close()
+
+
+# ── P5-T02: SSE push + paginated decisions feed ──────────────────────────────────────────────────────
+
+def _fill_decisions(store, n):
+    for i in range(n):
+        store.decisions.append({"ts": f"2026-06-22T00:{i // 60:02d}:{i % 60:02d}Z", "run_id": f"r{i}",
+                                "decision": "allow", "skill": "fs", "perk": "read", "destructive": False})
+
+
+def test_monitor_state_paginates_decisions(server):
+    base, store, _ = server
+    _fill_decisions(store, 250)                                    # more than one page
+    p1 = json.loads(urllib.request.urlopen(base + "/monitor/state?token=admin&dec_limit=50").read())
+    assert len(p1["decisions"]) == 50                              # one page, not all 250
+    assert p1["decisions_page"] == {"page": 1, "pages": 5, "total": 250, "limit": 50}
+    assert p1["decisions"][0]["run_id"] == "r249"                  # newest first
+    p2 = json.loads(urllib.request.urlopen(base + "/monitor/state?token=admin&dec_page=2&dec_limit=50").read())
+    assert p2["decisions_page"]["page"] == 2
+    assert p2["decisions"][0]["run_id"] == "r199"                  # the next-older window — no overlap with page 1
+    # out-of-range / bad params clamp rather than error (feed.paginate)
+    over = json.loads(urllib.request.urlopen(base + "/monitor/state?token=admin&dec_page=99&dec_limit=50").read())
+    assert over["decisions_page"]["page"] == 5
+    bad = json.loads(urllib.request.urlopen(base + "/monitor/state?token=admin&dec_page=x").read())
+    assert bad["decisions_page"]["page"] == 1                      # non-int -> default, never a 500
+
+
+def test_monitor_state_pagination_is_token_gated(server):
+    base, _, _ = server
+    with pytest.raises(urllib.error.HTTPError) as e:
+        urllib.request.urlopen(base + "/monitor/state?dec_page=2")   # no token
+    assert e.value.code == 403
+
+
+def test_monitor_stream_pushes_sse_and_is_token_gated(server):
+    base, store, _ = server
+    _fill_decisions(store, 3)
+    r = urllib.request.urlopen(base + "/monitor/stream?token=admin", timeout=5)
+    assert r.headers.get("Content-Type") == "text/event-stream"
+    r.fp.raw._sock.settimeout(4)                                   # bound the streaming read
+    buf = b""
+    while len(buf) < 65536:                                        # read until a COMPLETE data frame arrives
+        chunk = r.read(256)
+        if not chunk:
+            break
+        buf += chunk
+        if b"data: " in buf and b"\n\n" in buf.split(b"data: ", 1)[1]:
+            break
+    r.close()
+    txt = buf.decode(errors="replace")
+    assert "retry: 2000" in txt                                   # client auto-reconnect backoff is advertised
+    assert "data: " in txt                                        # a value-free snapshot was PUSHED
+    payload = json.loads(txt.split("data: ", 1)[1].split("\n\n", 1)[0])
+    assert "decisions" in payload and "token" not in json.dumps(payload)   # value-free, no session token
+
+
+def test_monitor_stream_requires_token(server):
+    base, _, _ = server
+    with pytest.raises(urllib.error.HTTPError) as e:
+        urllib.request.urlopen(base + "/monitor/stream")
+    assert e.value.code == 403
