@@ -93,7 +93,7 @@
   {
     "task_id": "P0-T14",
     "skill": "harden-pyenv",
-    "perk": "verify",
+    "perk": null,
     "vars": {},
     "redeem": true
   },
@@ -267,6 +267,13 @@
   },
   {
     "task_id": "P2-T11",
+    "skill": "cws-redteam",
+    "perk": null,
+    "vars": {},
+    "redeem": true
+  },
+  {
+    "task_id": "P2-T12",
     "skill": "cws-redteam",
     "perk": null,
     "vars": {},

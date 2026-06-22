@@ -337,6 +337,16 @@ TASKS = [
      {"banner_every_run": True, "honest_distinction_visible_in_logs": True},
      "S", "p2-exod"),
 
+    ("P2-T12", "govd-as-executor: server-side governed execution (agent posts intent, kernel runs it)", "P2", "AGENT", "build",
+     ["P1-T08", "P2-T05", "P2-T11"], "cws-redteam",
+     "run_governed moves SERVER-SIDE: the agent POSTs a value-free claim to govd; govd authenticates the principal, blesses, and fires exod on the worker (faithful non-root uid, secrets double-blind via sec_config, sandboxed); only governed status + the provenance ledger return to the agent — the cognition holds no limb. Composes exod-over-mTLS (T02), the thin-client executor (T11), auth (T08) + double-blind secrets (T05) + the neoclaw handle",
+     ["AGENT-V01", "F6", "R2"],
+     {"agent_holds_no_limb": "the agent process never spawns the porter; execution is exod-side on the worker",
+      "agent_zero_secret_bytes": "the claim + the agent's environ/fds carry no credential bytes; secrets resolve exod-side via sec_config",
+      "faithful_uid": "steps run under the user uid or a scoped assumed-role, NEVER root",
+      "info_only_return": "only status + ledger cross to the agent; never raw command output, never a secret"},
+     "L", "p2-exod"),
+
     # ===================== PHASE 3 — marketplace trust → SV-4 =====================
     ("P3-T01", "Publisher signing: cosign over skill_sha + chip manifest (T13)", "P3", "SV-4", "build",
      ["P0-T03"], "cws-release",
@@ -757,6 +767,12 @@ MILESTONES = [
      "Validated work settles; intelligence is priced per contract; value is never minted, only earned — and the system paid for its own completion.",
      "10+ development milestones settle as internal-credit bounties; the first FMV index prices cyberware's own tasks; the plan's completion is a settled, TSA-anchored receipt reconciled against the PSP sandbox.",
      "the birth-certificate receipt — verified offline end to end"),
+
+    ("M7", "Agent-mode — the kernel runs the agent's intent  (cognition holds no limb)", "AGENT",
+     ["P2-T12"], False,
+     "An agent on any node holds only a token + an endpoint + the skill; it can think about anything and act only by issuing a governed syscall. The kernel authenticates who is calling, holds every secret double-blind, executes faithfully on the worker under a non-root identity, and returns only governed information — a compromised or misaligned agent can propose, never reach past the kernel to the limb.",
+     "An agent with only {principal token, govd URL, cws-neoclaw} POSTs a claim; govd authenticates it (no token → 401, over-rate → 429), fires exod server-side under a non-root uid with the credential injected step-side (the agent's environ scanned: zero secret bytes), and returns only status + the provenance ledger.",
+     "the govd-as-executor server-side run-ledger + the agent-zero-secret-bytes scan + the auth (401/429) + double-blind-secret receipts"),
 ]
 
 # normalize: some tuples carry a trailing comma quirk; coerce to 11 fields

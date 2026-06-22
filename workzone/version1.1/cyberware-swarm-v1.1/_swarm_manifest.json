@@ -2,7 +2,7 @@
   "$schema": "cwp-swarm-manifest-v1.1",
   "program": "cyberware Foundation Plan v1.1",
   "generated_from": "single-source generator (generate_swarm.py)",
-  "task_count": 90,
+  "task_count": 91,
   "phases": {
     "P0": [
       "P0-T01",
@@ -47,7 +47,8 @@
       "P2-T08",
       "P2-T09",
       "P2-T10",
-      "P2-T11"
+      "P2-T11",
+      "P2-T12"
     ],
     "P3": [
       "P3-T01",
@@ -225,7 +226,7 @@
     "P6-T05",
     "P6-T06"
   ],
-  "dag_edges": 121,
+  "dag_edges": 124,
   "roots": [
     "P0-T01",
     "P0-T02",
@@ -255,6 +256,9 @@
     "V-LIVE"
   ],
   "criterion_to_tasks": {
+    "AGENT-V01": [
+      "P2-T12"
+    ],
     "F1": [
       "P0-T02",
       "P0-T03",
@@ -294,6 +298,7 @@
     "F6": [
       "P2-T01",
       "P2-T05",
+      "P2-T12",
       "P3-T04",
       "P3-T14"
     ],
@@ -646,7 +651,8 @@
       "P6-T19"
     ],
     "R2": [
-      "P2-T04"
+      "P2-T04",
+      "P2-T12"
     ]
   },
   "milestones": [
@@ -879,6 +885,29 @@
         "P6-T02",
         "P6-T05"
       ]
+    },
+    {
+      "id": "M7",
+      "label": "Agent-mode \u2014 the kernel runs the agent's intent  (cognition holds no limb)",
+      "rung": "AGENT",
+      "on_spine": false,
+      "gate_tasks": [
+        "P2-T12"
+      ],
+      "promise_outward": "An agent on any node holds only a token + an endpoint + the skill; it can think about anything and act only by issuing a governed syscall. The kernel authenticates who is calling, holds every secret double-blind, executes faithfully on the worker under a non-root identity, and returns only governed information \u2014 a compromised or misaligned agent can propose, never reach past the kernel to the limb.",
+      "demo": "An agent with only {principal token, govd URL, cws-neoclaw} POSTs a claim; govd authenticates it (no token \u2192 401, over-rate \u2192 429), fires exod server-side under a non-root uid with the credential injected step-side (the agent's environ scanned: zero secret bytes), and returns only status + the provenance ledger.",
+      "redeemed_by": "the govd-as-executor server-side run-ledger + the agent-zero-secret-bytes scan + the auth (401/429) + double-blind-secret receipts",
+      "tasks_cumulative": 10,
+      "tasks_new": [
+        "P1-T08",
+        "P2-T05",
+        "P2-T11",
+        "P2-T12"
+      ],
+      "tasks_new_count": 4,
+      "spine_tasks_new": [
+        "P2-T05"
+      ]
     }
   ],
   "validators": {
@@ -916,7 +945,7 @@
   },
   "executors": {
     "human-authoring": 9,
-    "local-code": 18,
+    "local-code": 19,
     "external-anchor": 11,
     "governed-channel": 52
   },
