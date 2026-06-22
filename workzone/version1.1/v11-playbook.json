@@ -1,455 +1,639 @@
-{
- "playbook": "cyberware v1.1",
- "steps": [
+[
   {
-   "task_id": "P0-T01",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T01",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T02",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T02",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T03",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T03",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T04",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T04",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T05",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T05",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T06",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T06",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T07",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T07",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T08",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T08",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T09",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T09",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T10",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T10",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T11",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T11",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T12",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T12",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T13",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T13",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T14",
-   "skill": "harden-pyenv",
-   "perk": "verify"
+    "task_id": "P0-T14",
+    "skill": "harden-pyenv",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T15",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T15",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T16",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T16",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T17",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T17",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P0-T18",
-   "skill": "cws-conform",
-   "perk": null
+    "task_id": "P0-T18",
+    "skill": "cws-conform",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P1-T01",
-   "skill": "cws-ledgercheck",
-   "perk": null
+    "task_id": "P1-T01",
+    "skill": "cws-ledgercheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P1-T02",
-   "skill": "cws-ledgercheck",
-   "perk": null
+    "task_id": "P1-T02",
+    "skill": "cws-ledgercheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P1-T03",
-   "skill": "cws-ledgercheck",
-   "perk": null
+    "task_id": "P1-T03",
+    "skill": "cws-ledgercheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P1-T04",
-   "skill": "cws-ledgercheck",
-   "perk": null
+    "task_id": "P1-T04",
+    "skill": "cws-ledgercheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P1-T05",
-   "skill": "cws-ledgercheck",
-   "perk": null
+    "task_id": "P1-T05",
+    "skill": "cws-ledgercheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P1-T06",
-   "skill": "cws-ledgercheck",
-   "perk": null
+    "task_id": "P1-T06",
+    "skill": "cws-ledgercheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P1-T07",
-   "skill": "cws-ledgercheck",
-   "perk": null
+    "task_id": "P1-T07",
+    "skill": "cws-ledgercheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P1-T08",
-   "skill": "cws-ledgercheck",
-   "perk": null
+    "task_id": "P1-T08",
+    "skill": "cws-ledgercheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P1-T09",
-   "skill": "cws-ledgercheck",
-   "perk": null
+    "task_id": "P1-T09",
+    "skill": "cws-ledgercheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P1-T10",
-   "skill": "cws-mutate",
-   "perk": null
+    "task_id": "P1-T10",
+    "skill": "cws-mutate",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P2-T01",
-   "skill": "cws-redteam",
-   "perk": null
+    "task_id": "P2-T01",
+    "skill": "cws-redteam",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P2-T02",
-   "skill": "cws-redteam",
-   "perk": null
+    "task_id": "P2-T02",
+    "skill": "cws-redteam",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P2-T03",
-   "skill": "cws-redteam",
-   "perk": null
+    "task_id": "P2-T03",
+    "skill": "cws-redteam",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P2-T04",
-   "skill": "cws-redteam",
-   "perk": null
+    "task_id": "P2-T04",
+    "skill": "cws-redteam",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P2-T05",
-   "skill": "cws-redteam",
-   "perk": null
+    "task_id": "P2-T05",
+    "skill": "cws-redteam",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P2-T06",
-   "skill": "cws-redteam",
-   "perk": null
+    "task_id": "P2-T06",
+    "skill": "cws-redteam",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P2-T07",
-   "skill": "cws-bench",
-   "perk": null
+    "task_id": "P2-T07",
+    "skill": "cws-bench",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P2-T08",
-   "skill": "cws-redteam",
-   "perk": null
+    "task_id": "P2-T08",
+    "skill": "cws-redteam",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P2-T09",
-   "skill": "cws-bench",
-   "perk": null
+    "task_id": "P2-T09",
+    "skill": "cws-bench",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P2-T10",
-   "skill": "cws-chaos",
-   "perk": null
+    "task_id": "P2-T10",
+    "skill": "cws-chaos",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P2-T11",
-   "skill": "cws-redteam",
-   "perk": null
+    "task_id": "P2-T11",
+    "skill": "cws-redteam",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P3-T01",
-   "skill": "cws-release",
-   "perk": null
+    "task_id": "P2-T12",
+    "skill": "cws-redteam",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P3-T02",
-   "skill": "cws-release",
-   "perk": null
+    "task_id": "P3-T01",
+    "skill": "cws-release",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P3-T03",
-   "skill": "cws-release",
-   "perk": null
+    "task_id": "P3-T02",
+    "skill": "cws-release",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P3-T04",
-   "skill": "cws-release",
-   "perk": null
+    "task_id": "P3-T03",
+    "skill": "cws-release",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P3-T05",
-   "skill": "cws-release",
-   "perk": null
+    "task_id": "P3-T04",
+    "skill": "cws-release",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P3-T06",
-   "skill": "cws-release",
-   "perk": null
+    "task_id": "P3-T05",
+    "skill": "cws-release",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P3-T07",
-   "skill": "cws-release",
-   "perk": null
+    "task_id": "P3-T06",
+    "skill": "cws-release",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P3-T08",
-   "skill": "alchemy",
-   "perk": null
+    "task_id": "P3-T07",
+    "skill": "cws-release",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P3-T09",
-   "skill": "cws-release",
-   "perk": null
+    "task_id": "P3-T08",
+    "skill": "alchemy",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P3-T10",
-   "skill": "cws-release",
-   "perk": null
+    "task_id": "P3-T09",
+    "skill": "cws-release",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P3-T11",
-   "skill": "cws-release",
-   "perk": null
+    "task_id": "P3-T10",
+    "skill": "cws-release",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P3-T12",
-   "skill": "cws-release",
-   "perk": null
+    "task_id": "P3-T11",
+    "skill": "cws-release",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P3-T13",
-   "skill": "cws-release",
-   "perk": null
+    "task_id": "P3-T12",
+    "skill": "cws-release",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P3-T14",
-   "skill": "cws-release",
-   "perk": null
+    "task_id": "P3-T13",
+    "skill": "cws-release",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P3-T15",
-   "skill": "cws-release",
-   "perk": null
+    "task_id": "P3-T14",
+    "skill": "cws-release",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P3-T16",
-   "skill": "cws-release",
-   "perk": null
+    "task_id": "P3-T15",
+    "skill": "cws-release",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P4-T01",
-   "skill": "cws-modelcheck",
-   "perk": null
+    "task_id": "P3-T16",
+    "skill": "cws-release",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P4-T02",
-   "skill": "cws-modelcheck",
-   "perk": null
+    "task_id": "P4-T01",
+    "skill": "cws-modelcheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P4-T03",
-   "skill": "cws-modelcheck",
-   "perk": null
+    "task_id": "P4-T02",
+    "skill": "cws-modelcheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P4-T04",
-   "skill": "cws-modelcheck",
-   "perk": null
+    "task_id": "P4-T03",
+    "skill": "cws-modelcheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P4-T05",
-   "skill": "cws-modelcheck",
-   "perk": null
+    "task_id": "P4-T04",
+    "skill": "cws-modelcheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P4-T06",
-   "skill": "cws-modelcheck",
-   "perk": null
+    "task_id": "P4-T05",
+    "skill": "cws-modelcheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P4-T07",
-   "skill": "cws-mutate",
-   "perk": null
+    "task_id": "P4-T06",
+    "skill": "cws-modelcheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P4-T08",
-   "skill": "cws-modelcheck",
-   "perk": null
+    "task_id": "P4-T07",
+    "skill": "cws-mutate",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P4-T09",
-   "skill": "cws-modelcheck",
-   "perk": null
+    "task_id": "P4-T08",
+    "skill": "cws-modelcheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P5-T01",
-   "skill": "cws-bench",
-   "perk": null
+    "task_id": "P4-T09",
+    "skill": "cws-modelcheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P5-T02",
-   "skill": "cws-bench",
-   "perk": null
+    "task_id": "P5-T01",
+    "skill": "cws-bench",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P5-T03",
-   "skill": "cws-bench",
-   "perk": null
+    "task_id": "P5-T02",
+    "skill": "cws-bench",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P5-T04",
-   "skill": "cws-chaos",
-   "perk": null
+    "task_id": "P5-T03",
+    "skill": "cws-bench",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P5-T05",
-   "skill": "cws-bench",
-   "perk": null
+    "task_id": "P5-T04",
+    "skill": "cws-chaos",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T01",
-   "skill": "cws-settle-sim",
-   "perk": null
+    "task_id": "P5-T05",
+    "skill": "cws-bench",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T02",
-   "skill": "cws-settle-sim",
-   "perk": null
+    "task_id": "P6-T01",
+    "skill": "cws-settle-sim",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T03",
-   "skill": "cws-settle-sim",
-   "perk": null
+    "task_id": "P6-T02",
+    "skill": "cws-settle-sim",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T04",
-   "skill": "cws-settle-sim",
-   "perk": null
+    "task_id": "P6-T03",
+    "skill": "cws-settle-sim",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T05",
-   "skill": "cws-settle-sim",
-   "perk": null
+    "task_id": "P6-T04",
+    "skill": "cws-settle-sim",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T06",
-   "skill": "cws-settle-sim",
-   "perk": null
+    "task_id": "P6-T05",
+    "skill": "cws-settle-sim",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T07",
-   "skill": "cws-modelcheck",
-   "perk": null
+    "task_id": "P6-T06",
+    "skill": "cws-settle-sim",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T08",
-   "skill": "cws-settle-sim",
-   "perk": null
+    "task_id": "P6-T07",
+    "skill": "cws-modelcheck",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T09",
-   "skill": "alchemy",
-   "perk": null
+    "task_id": "P6-T08",
+    "skill": "cws-settle-sim",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T10",
-   "skill": "cws-settle-sim",
-   "perk": null
+    "task_id": "P6-T09",
+    "skill": "alchemy",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T11",
-   "skill": "cws-settle-sim",
-   "perk": null
+    "task_id": "P6-T10",
+    "skill": "cws-settle-sim",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T12",
-   "skill": "cws-settle-sim",
-   "perk": null
+    "task_id": "P6-T11",
+    "skill": "cws-settle-sim",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T13",
-   "skill": "cws-settle-sim",
-   "perk": null
+    "task_id": "P6-T12",
+    "skill": "cws-settle-sim",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T14",
-   "skill": "cws-settle-sim",
-   "perk": null
+    "task_id": "P6-T13",
+    "skill": "cws-settle-sim",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T15",
-   "skill": "cws-settle-sim",
-   "perk": null
+    "task_id": "P6-T14",
+    "skill": "cws-settle-sim",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T16",
-   "skill": "cws-bench",
-   "perk": null
+    "task_id": "P6-T15",
+    "skill": "cws-settle-sim",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T17",
-   "skill": "cws-chaos",
-   "perk": null
+    "task_id": "P6-T16",
+    "skill": "cws-bench",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T18",
-   "skill": "cws-settle-sim",
-   "perk": null
+    "task_id": "P6-T17",
+    "skill": "cws-chaos",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T19",
-   "skill": "alchemy",
-   "perk": null
+    "task_id": "P6-T18",
+    "skill": "cws-settle-sim",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T20",
-   "skill": "cws-settle-sim",
-   "perk": null
+    "task_id": "P6-T19",
+    "skill": "alchemy",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   },
   {
-   "task_id": "P6-T21",
-   "skill": "cws-settle-sim",
-   "perk": null
+    "task_id": "P6-T20",
+    "skill": "cws-settle-sim",
+    "perk": null,
+    "vars": {},
+    "redeem": true
+  },
+  {
+    "task_id": "P6-T21",
+    "skill": "cws-settle-sim",
+    "perk": null,
+    "vars": {},
+    "redeem": true
   }
- ]
-}
+]

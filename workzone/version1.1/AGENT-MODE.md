@@ -58,8 +58,9 @@ never runs anything, the **worker machine** executes, only governed information 
 This is **govd-as-executor**, and it is the *assembly* of primitives that already exist, not new ground:
 `exod` as a remote daemon over mTLS (**P2-T02**), the executor-as-thin-client when `EXOD_URL` is set
 (**P2-T11**, redeemed), `cws-neoclaw/run` forwarding a sub-claim to a node (built), gated by the two
-keystones below. It is the v1.1 → agent-mode **bridge**, not a DAG task — the integration the remaining tasks
-compose toward.
+keystones below. It is now a **tracked task — `P2-T12`** (validated_by `cws-redteam`, deps `P1-T08` + `P2-T05`
++ `P2-T11`) and the **gate of milestone `M7` — Agent-mode**, so `cws-pm` / `cws-observe` report the stage's
+closure alongside the SV cones (first report: **M7 7/10, open**).
 
 ## 4. The remaining tail, re-grouped as the agent-mode roadmap
 
@@ -106,10 +107,13 @@ Build the keystone (**P1-T08 → P2-T05**), assemble **govd-as-executor**, and t
 longer a metaphor — it is the running system: a **cortex on a VPS that can think about anything and can only
 *act* by asking the kernel, which holds every limb and every secret.**
 
-## 6. Disposition
+## 6. Disposition — now a *tracked* stage
 
-This is a **reframe**, not a re-plan. The 90-task DAG, the `_swarm_manifest`, the done-ledger, and the M0–M6
-cones are unchanged — `cws-observe`/`cws-pm` still grade against them. What changed is the *reading* of the
-tail: it is no longer "20 odds-and-ends, 6 of them host-blocked," it is the **agent-mode build-out**, with a
-named keystone (P1-T08 + P2-T05), a named integration (govd-as-executor), and the recognition that the
-Linux node dissolves most of the "blocked" set. See [`pm-report.md`](pm-report.md) for the live board.
+Began as a **reframe**; promoted to a **tracked stage** (2026-06-22). The change is **additive**: the swarm
+gains exactly one new task, **`P2-T12` (govd-as-executor)**, and one new milestone, **`M7` — Agent-mode**
+(gate `P2-T12`); the DAG goes **90 → 91**. The **M0–M6 cones, the done-ledger, and every existing task are
+unchanged** — the keystone tasks `P1-T08` + `P2-T05` were already in the DAG; M7 just draws the cone around
+them + the integration. `cws-pm` / `cws-observe` now report **M7** alongside the SV cones (first report:
+**M7 7/10, open** — the 7 are the foundational primitives already redeemed; the 3 open are the keystone
+`P1-T08` + `P2-T05` and the integration `P2-T12`). Generator: `generate_swarm.py` (single source). See
+[`pm-report.md`](pm-report.md) / `runs/pm-agentmode-first/pm.md` for the board.

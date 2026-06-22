@@ -3,13 +3,13 @@
 Generated through govd (dogfood): `cws-pm/run` (DRY_RUN board) + `cws-observe/status` (chain + milestones),
 chip `132cd6c9` (lean), done-ledger-v2 head seq 61.
 
-## Headline — the full SV security ladder is CLOSED
-**All 7 milestone cones closed (M0 + SV-1…SV-6), 0 open rungs.** `done_ledger_chain: ok` (tamper-checked).
-**70 / 90 tasks redeemed (78%).** `validators_missing: []` — every validator skill is built; `blocked:validator: 0`.
-Latest (non-cone P6 tail, all perk-bound): **P6-T06** money↔work cross-check (reward_verify), **P6-T10**
-bounty + reverse auction (markets), **P6-T13** principal reputation — seq 58-60. The P6 ready tail is done
-(remaining P6-T08/T14 need live LLM receipts / Stripe sandbox). **P4-T06** — the settlement lifecycle
-formally proven (TLC + Apalache, money mutants caught) — redeemed seq 61.
+## Headline — the SV ladder is CLOSED; the agent-mode stage (M7) is now tracked
+**All 7 SV cones closed (M0 + SV-1…SV-6), 0 open rungs.** `done_ledger_chain: ok` (tamper-checked).
+**70 / 91 tasks redeemed (77%).** `validators_missing: []`; `blocked:validator: 0`. The DAG grew **90 → 91**:
+a new **M7 — Agent-mode** milestone + one new task **P2-T12 (govd-as-executor)** now track the kernel-for-agents
+build-out (see [`../AGENT-MODE.md`](../AGENT-MODE.md)). Recent redemptions (non-cone tail, all perk-bound):
+**P6-T06** reward_verify, **P6-T10** markets, **P6-T13** reputation (seq 58-60), **P4-T06** settlement lifecycle
+formally proven — TLC + Apalache, money mutants caught (seq 61).
 
 | cone | rung | redeemed/closure | state |
 |------|------|------------------|-------|
@@ -20,6 +20,7 @@ formally proven (TLC + Apalache, money mutants caught) — redeemed seq 61.
 | M4 | SV-4 supply chain | 9/9 | ✓ CLOSED |
 | M5 | SV-5 formal proof | 8/8 | ✓ CLOSED |
 | M6 | SV-6 money lifecycle | 21/21 | ✓ CLOSED |
+| **M7** | **AGENT — kernel runs the agent's intent** | **7/10** | ○ open — gate **P2-T12**; keystone P1-T08 + P2-T05 |
 
 ## Phase board (DRY_RUN) — 70 redeemed · 11 ready · 9 dep-blocked · 0 failed
 | phase | redeemed | ready | dep-blocked | note |
