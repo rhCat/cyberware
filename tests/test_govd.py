@@ -724,10 +724,32 @@ def test_store_persist_is_crash_atomic(tmp_path):
     store.create("run-atomic-0001", {"run_id": "run-atomic-0001", "ts": "2026-06-22T00:00:00Z",
                                      "skill": "fs", "perk": "read", "decision": "allow", "events": []})
     rundir = os.path.join(store.root, "run-atomic-0001")
-    files = sorted(os.listdir(rundir))
-    assert not any(f.endswith(".tmp") for f in files)            # the temp file was renamed away, not left
+    assert [f for f in os.listdir(rundir) if ".tmp" in f] == []  # the temp file was renamed away, not left
     rec = json.load(open(store._path("run-atomic-0001")))        # the persisted record is complete + valid JSON
     assert rec["run_id"] == "run-atomic-0001" and rec["decision"] == "allow"
+
+
+def test_store_persist_concurrent_same_run_no_tmp_race(tmp_path):
+    """Unique-per-writer tmp names: many concurrent appends to the SAME run_id never collide on a shared tmp
+    (no FileNotFoundError dropping a provenance event), leave no .tmp litter, and the final record is valid."""
+    store = govd.Store(str(tmp_path / "rr"))
+    store.create("rid-conc", {"run_id": "rid-conc", "ts": "t", "skill": "fs", "perk": "read",
+                              "decision": "allow", "events": []})
+    errors = []
+
+    def hammer(n):
+        for i in range(40):
+            try:
+                store.append("rid-conc", {"type": "granted", "ts": "t", "step": str(n * 100 + i)})
+            except OSError as e:
+                errors.append(e)
+    threads = [threading.Thread(target=hammer, args=(n,)) for n in range(8)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert errors == []                                          # no same-tmp race -> no dropped provenance events
+    rundir = os.path.join(store.root, "rid-conc")
+    assert [f for f in os.listdir(rundir) if ".tmp" in f] == []  # no temp litter
+    json.load(open(store._path("rid-conc")))                     # the final record is valid JSON
 
 
 def test_require_closed_auth_refuses_remote_without_principals(monkeypatch):

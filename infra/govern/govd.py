@@ -354,16 +354,25 @@ class Store:
             self.runs.pop(next(iter(self.runs)), None)
 
     def _persist(self, run_id, snapshot):
-        # crash-atomic: write to a temp file, fsync, then os.replace (atomic rename) — a crash mid-write can
-        # never leave a torn/partial run record on disk (the audit ledger stays consistent across restarts).
+        # crash-atomic: write to a UNIQUE temp file, fsync, then os.replace (atomic rename) — a crash mid-write
+        # never leaves a torn/partial record, and a unique-per-writer tmp name means two concurrent persists of
+        # the SAME run_id can't race on a shared tmp (the pattern infra/cwp/ledger.py uses). Clean the tmp on
+        # any error path so a failed write never litters the run dir.
         os.makedirs(os.path.join(self.root, run_id), exist_ok=True)
         path = self._path(run_id)
-        tmp = path + ".tmp"
-        with open(tmp, "w") as f:
-            f.write(snapshot)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, path)
+        tmp = f"{path}.tmp.{os.getpid()}.{uuid.uuid4().hex[:8]}"
+        try:
+            with open(tmp, "w") as f:
+                f.write(snapshot)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, path)
+        except BaseException:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            raise
 
     def create(self, run_id, record):
         with self.lock:
