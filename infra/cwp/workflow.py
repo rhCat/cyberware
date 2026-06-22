@@ -39,56 +39,9 @@ APALACHE_MC = os.environ.get("APALACHE_MC") or shutil.which("apalache-mc")
 # }
 
 
-def _tla_val(v):
-    if isinstance(v, bool):
-        return "TRUE" if v else "FALSE"
-    return str(v)
-
-
-def emit_tla(wf: dict) -> str:
-    """Emit the workflow as a TLA+ module with Apalache @type annotations + INVARIANT-bearing predicates."""
-    name = wf["name"]
-    flags = wf.get("flags", {})
-    varnames = ["pc"] + list(flags)
-    lines = [f"---- MODULE {name} ----", "EXTENDS Naturals, TLC", ""]
-
-    # typed VARIABLES (Apalache reads the @type annotation on the line above each name)
-    lines.append("VARIABLES")
-    decls = [("pc", "Str")] + [(f, spec["type"]) for f, spec in flags.items()]
-    for i, (v, ty) in enumerate(decls):
-        lines.append(f"  \\* @type: {ty};")
-        lines.append(f"  {v}" + ("," if i < len(decls) - 1 else ""))
-    lines.append("")
-
-    states_set = "{" + ", ".join(f'"{s}"' for s in wf["states"]) + "}"
-    lines.append(f"States == {states_set}")
-    init = [f'pc = "{wf["entry"]}"'] + [f"{f} = {_tla_val(spec['init'])}" for f, spec in flags.items()]
-    lines.append("Init ==\n  /\\ " + "\n  /\\ ".join(init))
-
-    # transitions; a terminal state self-loops so the spec never deadlocks on it
-    disj = []
-    for t in wf["transitions"]:
-        conj = [f'pc = "{t["from"]}"', f'pc\' = "{t["to"]}"']
-        sets = t.get("set", {})
-        for f in flags:
-            conj.append(f"{f}' = {_tla_val(sets[f])}" if f in sets else f"UNCHANGED {f}")
-        disj.append("(" + " /\\ ".join(conj) + ")")
-    terminal = wf["states"][-1]
-    keep = " /\\ ".join([f'pc = "{terminal}"', "UNCHANGED pc"] + [f"UNCHANGED {f}" for f in flags])
-    disj.append("(" + keep + ")")
-    lines.append("Next ==\n  \\/ " + "\n  \\/ ".join(disj))
-
-    unchanged = "<<" + ", ".join(varnames) + ">>"
-    lines.append(f"Spec == Init /\\ [][Next]_{unchanged}")
-    lines.append("")
-    # the invariants (typing invariant always present; plus the workflow's own)
-    type_inv = ["pc \\in States"] + [
-        f"{f} \\in BOOLEAN" if spec["type"] == "Bool" else f"{f} \\in Nat" for f, spec in flags.items()]
-    lines.append("TypeOK == " + " /\\ ".join(type_inv))
-    for iname, pred in wf.get("invariants", {}).items():
-        lines.append(f"{iname} == {pred}")
-    lines.append("====")
-    return "\n".join(lines) + "\n"
+# the workflow -> TLA+ emitter lives in a prose-clean core (P4-T07): tests/test_tla_emit.py golden-pins it so
+# cws-mutate scores it >=0.90 (any token flip changes the emitted module). Re-exported here; behaviour identical.
+from infra.cwp.tla_emit import _tla_val, emit_tla  # noqa: E402,F401
 
 
 def invariant_names(wf: dict) -> list:
