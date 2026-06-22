@@ -714,3 +714,51 @@ def test_govern_response_carries_a_traceparent(server):
     from infra.govern import tracing
     _code, v = claim(base, "fs", "find_large", var_keys=["SEARCH_DIR"])
     assert tracing.parse_traceparent(v.get("traceparent")) is not None
+
+
+# ── v1.1 hardening: crash-atomic persistence + fail-closed remote auth ────────────────────────────────
+
+def test_store_persist_is_crash_atomic(tmp_path):
+    """A run record is written via a temp file + os.replace — never a torn/partial file, no .tmp left behind."""
+    store = govd.Store(str(tmp_path / "rr"))
+    store.create("run-atomic-0001", {"run_id": "run-atomic-0001", "ts": "2026-06-22T00:00:00Z",
+                                     "skill": "fs", "perk": "read", "decision": "allow", "events": []})
+    rundir = os.path.join(store.root, "run-atomic-0001")
+    assert [f for f in os.listdir(rundir) if ".tmp" in f] == []  # the temp file was renamed away, not left
+    rec = json.load(open(store._path("run-atomic-0001")))        # the persisted record is complete + valid JSON
+    assert rec["run_id"] == "run-atomic-0001" and rec["decision"] == "allow"
+
+
+def test_store_persist_concurrent_same_run_no_tmp_race(tmp_path):
+    """Unique-per-writer tmp names: many concurrent appends to the SAME run_id never collide on a shared tmp
+    (no FileNotFoundError dropping a provenance event), leave no .tmp litter, and the final record is valid."""
+    store = govd.Store(str(tmp_path / "rr"))
+    store.create("rid-conc", {"run_id": "rid-conc", "ts": "t", "skill": "fs", "perk": "read",
+                              "decision": "allow", "events": []})
+    errors = []
+
+    def hammer(n):
+        for i in range(40):
+            try:
+                store.append("rid-conc", {"type": "granted", "ts": "t", "step": str(n * 100 + i)})
+            except OSError as e:
+                errors.append(e)
+    threads = [threading.Thread(target=hammer, args=(n,)) for n in range(8)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert errors == []                                          # no same-tmp race -> no dropped provenance events
+    rundir = os.path.join(store.root, "rid-conc")
+    assert [f for f in os.listdir(rundir) if ".tmp" in f] == []  # no temp litter
+    json.load(open(store._path("rid-conc")))                     # the final record is valid JSON
+
+
+def test_require_closed_auth_refuses_remote_without_principals(monkeypatch):
+    """A REMOTE govd with no principals registry is auth-fail-open — refuse to start (unless the operator
+    explicitly overrides). Local mode + a present registry + the override all proceed."""
+    monkeypatch.delenv("CYBERWARE_ALLOW_OPEN", raising=False)
+    with pytest.raises(SystemExit):
+        govd.require_closed_auth({"mode": "remote", "principals": {}})
+    govd.require_closed_auth({"mode": "remote", "principals": {"a": {"token_sha": "x"}}})   # has auth -> ok
+    govd.require_closed_auth({"mode": "local", "principals": {}})                            # loopback -> exempt
+    monkeypatch.setenv("CYBERWARE_ALLOW_OPEN", "1")
+    govd.require_closed_auth({"mode": "remote", "principals": {}})                           # explicit override -> ok

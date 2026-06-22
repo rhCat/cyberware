@@ -354,8 +354,25 @@ class Store:
             self.runs.pop(next(iter(self.runs)), None)
 
     def _persist(self, run_id, snapshot):
+        # crash-atomic: write to a UNIQUE temp file, fsync, then os.replace (atomic rename) — a crash mid-write
+        # never leaves a torn/partial record, and a unique-per-writer tmp name means two concurrent persists of
+        # the SAME run_id can't race on a shared tmp (the pattern infra/cwp/ledger.py uses). Clean the tmp on
+        # any error path so a failed write never litters the run dir.
         os.makedirs(os.path.join(self.root, run_id), exist_ok=True)
-        open(self._path(run_id), "w").write(snapshot)
+        path = self._path(run_id)
+        tmp = f"{path}.tmp.{os.getpid()}.{uuid.uuid4().hex[:8]}"
+        try:
+            with open(tmp, "w") as f:
+                f.write(snapshot)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, path)
+        except BaseException:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            raise
 
     def create(self, run_id, record):
         with self.lock:
@@ -955,9 +972,22 @@ def bind_server(host, ports, handler=Handler):
     return None, None
 
 
+def require_closed_auth(cfg):
+    """Fail CLOSED before exposing a network control plane: a REMOTE (0.0.0.0-bound) govd with NO principals
+    registry accepts EVERY request as principal 'local' — an unauthenticated /govern. Refuse to start unless
+    the operator explicitly opts into open mode. Local (loopback) is exempt; the agent-mode deployment ALWAYS
+    sets GOVD_PRINCIPALS, so this never fires in a correct remote setup."""
+    if (cfg.get("mode") == "remote" and not cfg.get("principals")
+            and os.environ.get("CYBERWARE_ALLOW_OPEN") != "1"):
+        raise SystemExit(
+            "govd: REMOTE mode with NO principals registry is auth-fail-OPEN (every request becomes principal "
+            "'local'). Set GOVD_PRINCIPALS to a registry, or export CYBERWARE_ALLOW_OPEN=1 to override.")
+
+
 def serve(cfg):
     Handler.timeout = cfg.get("socket_timeout", SOCKET_TIMEOUT)
     ensure_monitor_token(cfg)                            # final mode is known here (after --mode)
+    require_closed_auth(cfg)                              # refuse a network-exposed plane with auth off
     store = Store(cfg["record_root"])
     if cfg["mode"] == "remote":
         host, ports = cfg["remote"]["host"], [cfg["remote"]["port"]]
