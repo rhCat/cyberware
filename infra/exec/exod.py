@@ -15,6 +15,7 @@ The verification surface lives in exodverify.py (prose-clean, the R3 mutation ta
 daemon, signs results, records authoritative status, and re-exports the verifier so callers keep one import.
 """
 from __future__ import annotations
+import dataclasses
 import hashlib
 import json
 import os
@@ -22,6 +23,7 @@ import socket
 import time
 
 from infra.cwp import sign
+from infra.exec import vault as _vaultmod
 from infra.exec.grantverify import _issuer, grant_body, verify_grant
 from infra.exec.sandbox import core_profile, run_confined
 from infra.exec.exodverify import (  # noqa: F401  (single source of truth for the verify surface)
@@ -42,13 +44,15 @@ class Exod:
     issued capability grants (govd's grant key). `runner` runs a confined step (injectable so the channel
     logic is testable off-Linux); the default is the real bwrap sandbox."""
 
-    def __init__(self, signing_key, *, grant_issuer_pub, runner=run_confined, profile_factory=core_profile):
+    def __init__(self, signing_key, *, grant_issuer_pub, runner=run_confined, profile_factory=core_profile,
+                 vault=None):
         if _principal(grant_issuer_pub) == _principal(signing_key.public_key()):
             raise ValueError("exod identity key must differ from the grant-issuer key (no self-issued grants)")
         self._sk = signing_key
         self._issuer_pub = grant_issuer_pub
         self._runner = runner
         self._profile = profile_factory
+        self._vault = vault                 # the limb resolves grant-authorized secrets server-side (P2-T12)
         self._grant_nonces = NonceCache()   # fast per-instance guard; the durable one is the ledger (below)
 
     @property
@@ -97,11 +101,24 @@ class Exod:
         #    still-valid grant. This is the fast in-memory guard; the durable one is the ledger (result nonce).
         if gnonce is None or not self._grant_nonces.spend(_issuer(self._issuer_pub), gnonce):
             return refuse("grant:replay")
-        # 5. run confined + sign the authoritative outcome, bound to the grant nonce, with an ATTESTED meter
+        # 5. resolve the GRANT-authorized credentials server-side (the limb holds the vault — never the agent,
+        #    never govd's HTTP plane) and inject them into the CONFINED step's env: they land via bwrap
+        #    --setenv AFTER --clearenv, so the secret reaches the porter yet never the host/agent env. The set
+        #    is exactly what govd signed into the grant (credentials=), so it is authorized + run-bound.
+        prof = self._profile(req["workspace"])
+        creds = gbody.get("credentials") or []
+        if creds:
+            if self._vault is None:
+                return refuse("vault:unavailable")
+            try:
+                prof = dataclasses.replace(prof, env=_vaultmod.inject_step_env(dict(prof.env), self._vault, creds))
+            except Exception:
+                return refuse("vault:resolve_failed")
+        # 6. run confined + sign the authoritative outcome, bound to the grant nonce, with an ATTESTED meter
         #    (P2-T07): exod itself measures the step's wall time and signs it, so the meter originates from
         #    exod and the agent cannot fabricate it — the proto-receipt a settlement plane will later trust.
         t0 = time.perf_counter()
-        p = self._runner(self._profile(req["workspace"]), req["argv"])
+        p = self._runner(prof, req["argv"])
         meter = {"wall_ms": round((time.perf_counter() - t0) * 1000, 3), "by": "exod"}
         status = "ok" if p.returncode == 0 else "error"
         return self._sign_result(run_id=run_id, plan_sha=plan_sha, step=step, exit_code=p.returncode,
