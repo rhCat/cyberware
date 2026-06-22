@@ -48,3 +48,13 @@ gate any security guarantee; it's optional hardening.
 v1.1's security thesis is **complete and verified**: every rung of SV-1…SV-6 is closed, chain-verified, and
 (for M3) backed by a real measurement on hardware. What's left is an optional non-security tail that needs
 per-task perk resolution + a few absent subjects — not a gap in the guarantees.
+
+## The remaining tail, reframed — agent-mode (see [`../AGENT-MODE.md`](../AGENT-MODE.md))
+The kernel is built and hardened (SV ladder closed); the remaining tail *is* the **kernel-for-agents**
+build-out. Re-read by layer: the **keystone** is the syscall boundary — **P1-T08** (auth: *who* is calling) +
+**P2-T05** (double-blind secrets: the limb holds the credential, the cortex its name); the **integration** is
+**govd-as-executor** (move `run_governed` server-side so the agent posts intent and the worker executes). Most
+of the "host-blocked" set (P2-T04 gVisor, P5-T05 exod-trace, P5-T01/T04 Postgres) is **not blocked** — it just
+runs on the detached **Linux node** (the neoclaw target), which is the whole point. Critical path:
+**P1-T08 → P2-T05 → govd-as-executor → P5-T03**, with the node-side limb (isolation / provenance / durability)
+in parallel.
