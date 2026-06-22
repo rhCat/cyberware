@@ -15,6 +15,7 @@
   ],
   "executor": "local-code",
   "validated_by": "cws-redteam",
+  "validated_perk": "rt-govd-executor",
   "bootstrap_exempt": false,
   "validation_available_after": "P2-T08",
   "skill": "cws-redteam",
