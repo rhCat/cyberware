@@ -1,15 +1,15 @@
 # cyberware v1.1 — project status (2026-06-22)
 
 Generated through govd (dogfood): `cws-pm/run` (DRY_RUN board) + `cws-observe/status` (chain + milestones),
-chip `132cd6c9` (lean), done-ledger-v2 head seq 64.
+chip `132cd6c9` (lean), done-ledger-v2 head seq 66.
 
-## Headline — the SV ladder is CLOSED; the agent-mode stage (M7) is now tracked
-**All 7 SV cones closed (M0 + SV-1…SV-6), 0 open rungs.** `done_ledger_chain: ok` (tamper-checked).
-**73 / 91 tasks redeemed (80%).** `validators_missing: []`; `blocked:validator: 0`. The DAG grew **90 → 91**:
+## Headline — the SV ladder is CLOSED; the agent-mode stage (M7) is now CLOSED too
+**All 8 cones closed (M0 + SV-1…SV-6 + M7 Agent-mode), 0 open rungs.** `done_ledger_chain: ok` (tamper-checked).
+**75 / 91 tasks redeemed (82%).** `validators_missing: []`; `blocked:validator: 0`. The DAG grew **90 → 91**:
 a new **M7 — Agent-mode** milestone + one new task **P2-T12 (govd-as-executor)** now track the kernel-for-agents
 build-out (see [`../AGENT-MODE.md`](../AGENT-MODE.md)). Recent redemptions (non-cone tail, all perk-bound):
 **P6-T06** reward_verify, **P6-T10** markets, **P6-T13** reputation (seq 58-60), **P4-T06** settlement lifecycle
-formally proven — TLC + Apalache, money mutants caught (seq 61); **P6-T03** escrow expiry/auto-refund + **P6-T07** code↔blueprint bisimulation (seq 62-63); **P1-T08** govd Bearer-principal auth + token-bucket (seq 64) — agent-mode keystone #1.
+formally proven — TLC + Apalache, money mutants caught (seq 61); **P6-T03** escrow expiry/auto-refund + **P6-T07** code↔blueprint bisimulation (seq 62-63); **P1-T08** govd Bearer-principal auth + token-bucket (seq 64); **P2-T05** double-blind secrets (seq 65); **P2-T12** govd-as-executor (seq 66) — **M7 Agent-mode CLOSED**.
 
 | cone | rung | redeemed/closure | state |
 |------|------|------------------|-------|
@@ -20,7 +20,7 @@ formally proven — TLC + Apalache, money mutants caught (seq 61); **P6-T03** es
 | M4 | SV-4 supply chain | 9/9 | ✓ CLOSED |
 | M5 | SV-5 formal proof | 8/8 | ✓ CLOSED |
 | M6 | SV-6 money lifecycle | 21/21 | ✓ CLOSED |
-| **M7** | **AGENT — kernel runs the agent's intent** | **8/10** | ○ open — gate **P2-T12**; keystone P1-T08 ✓, P2-T05 next |
+| **M7** | **AGENT — kernel runs the agent's intent** | **10/10** | ✓ CLOSED (P1-T08 auth + P2-T05 double-blind secrets + P2-T12 govd-as-executor) |
 
 ## Phase board (DRY_RUN) — 70 redeemed · 11 ready · 9 dep-blocked · 0 failed
 | phase | redeemed | ready | dep-blocked | note |
