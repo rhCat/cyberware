@@ -4,6 +4,7 @@ Puts infra/ on sys.path so the modules import as the agent runs them (`python3 i
 and provides fixtures for run dirs, sample repos, ledgers, and the compile→execute round-trip.
 """
 from __future__ import annotations
+import hashlib
 import json
 import shlex
 import subprocess
@@ -49,7 +50,20 @@ def compiler_shaped_script(path: Path, store: Path, steps):
 
     `steps` is a list of bash bodies (one per step); the wrapper provides --list/--step/--all.
     """
+    # P1-T06: the executor derives WHICH steps to run from the perk's authenticity-hashed manifesto
+    # sequence (the blessed plan), not the script's own --list — and AUTHENTICATES that manifesto against its
+    # blessed sha256 in the skill index.json. A real compiled script is always backed by such a perk dir, so
+    # the mock must be too — a faithful manifesto, a SNIP pointing at it, and an index.json blessing the
+    # manifesto's sha (no porter entries there, so per-step snippet-verify stays off: these tests exercise
+    # the channel, not drift).
+    perk = path.parent / "_snip" / "sk" / "perks" / "pk"
+    (perk / "src").mkdir(parents=True, exist_ok=True)
+    mbody = json.dumps({"sequence": [f"s{i}" for i in range(1, len(steps) + 1)]}).encode()
+    (perk / "manifesto.json").write_bytes(mbody)
+    (path.parent / "_snip" / "sk" / "index.json").write_text(
+        json.dumps({"files": {"perks/pk/manifesto.json": hashlib.sha256(mbody).hexdigest()}}))
     lines = ["#!/usr/bin/env bash", "set -uo pipefail",
+             f"SNIP={shlex.quote(str(perk / 'src'))}",
              f"export RECORD_STORE={shlex.quote(str(store))}", 'mkdir -p "$RECORD_STORE"', ""]
     for i, body in enumerate(steps, 1):
         lines += [f"step{i}() {{", f'  echo "[step {i}]"', f"  {body}", "}", ""]

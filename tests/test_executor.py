@@ -74,6 +74,17 @@ def test_upstream_step_must_run_first(tmp_path):
     assert r.returncode == 5 and "UPSTREAM" in r.stdout
 
 
+def test_upstream_satisfied_allows_next_step(tmp_path):
+    """The complement of the block: once step 1 is RECORDED run-ok, step 2 is allowed. Pins that the ran-set
+    is built from status=='ok' records (a successfully-run upstream UNblocks the next step)."""
+    store = tmp_path / "out"
+    s = compiler_shaped_script(tmp_path / "run.sh", store, ['echo a', 'echo b'])
+    assert run_cli("executor", "--script", s, "--step", "1").returncode == 0
+    r = run_cli("executor", "--script", s, "--step", "2")   # upstream (1) ran ok -> allowed
+    assert r.returncode == 0
+    assert {x["step"] for x in ledger(store)["runs"] if x.get("status") == "ok"} == {"1", "2"}
+
+
 def test_bad_step_refused_without_traceback(tmp_path):
     store = tmp_path / "out"
     s = compiler_shaped_script(tmp_path / "run.sh", store, ['echo a'])
@@ -95,8 +106,14 @@ def _compiled_with_snippet(tmp_path, porter_body="echo ok"):
     porter = src / "tool.sh"
     porter.write_text("#!/usr/bin/env bash\n" + porter_body + "\n")
     blessed = hashlib.sha256(porter.read_bytes()).hexdigest()
-    (tmp_path / "chip" / "sk" / "index.json").write_text(
-        json.dumps({"files": {"perks/pk/src/tool.sh": blessed}}))
+    # P1-T06: the executor derives the step→tool map from the perk's manifesto sequence (the blessed plan),
+    # not the script's --list, and AUTHENTICATES the manifesto against its blessed sha — so a faithful
+    # compiled-script mock ships the manifesto AND blesses its sha in index.json (as a real index does).
+    mbody = json.dumps({"sequence": ["tool"]}).encode()
+    (tmp_path / "chip" / "sk" / "perks" / "pk" / "manifesto.json").write_bytes(mbody)
+    (tmp_path / "chip" / "sk" / "index.json").write_text(json.dumps({"files": {
+        "perks/pk/src/tool.sh": blessed,
+        "perks/pk/manifesto.json": hashlib.sha256(mbody).hexdigest()}}))
     store = tmp_path / "rec"
     run = tmp_path / "run.sh"
     run.write_text(
@@ -153,3 +170,69 @@ def test_snippet_refused_is_evidence_not_corruption(tmp_path):
     spec.loader.exec_module(lv)
     _records, bad, mode = lv.verify(json.loads((store / "run-ledger.json").read_text()))
     assert mode == "structural" and bad == []
+
+
+def _compiled_with_snippets(tmp_path, tools):
+    """N-step variant of _compiled_with_snippet: one porter per tool, each blessed in index.json, with a
+    faithful manifesto sequence. Returns (run.sh, store, [porter_paths], [blessed_digests])."""
+    src = tmp_path / "chip" / "sk" / "perks" / "pk" / "src"
+    src.mkdir(parents=True)
+    porters, blessed = [], {}
+    for t in tools:
+        p = src / f"{t}.sh"
+        p.write_text("#!/usr/bin/env bash\necho ok\n")
+        porters.append(p)
+        blessed[f"perks/pk/src/{t}.sh"] = hashlib.sha256(p.read_bytes()).hexdigest()
+    mbody = json.dumps({"sequence": list(tools)}).encode()
+    (tmp_path / "chip" / "sk" / "perks" / "pk" / "manifesto.json").write_bytes(mbody)
+    blessed["perks/pk/manifesto.json"] = hashlib.sha256(mbody).hexdigest()   # the manifesto is blessed too
+    (tmp_path / "chip" / "sk" / "index.json").write_text(json.dumps({"files": blessed}))
+    store = tmp_path / "rec"
+    run = tmp_path / "run.sh"
+    lines = ["#!/usr/bin/env bash", "# COMPILED by cyberware · skill=sk perk=pk",
+             f"SNIP={src}", f"RECORD_STORE={store}"]
+    for i, t in enumerate(tools, 1):
+        lines += [f"step{i}() {{   # {t}", f'  echo "[step {i}] {t}"', f'  bash "$SNIP/{t}.sh" || exit $?', "}"]
+    listing = "\\n".join(f"{i}\\t{t}" for i, t in enumerate(tools, 1))
+    lines += ['case "${1:-}" in', f'  --list) printf "{listing}\\n" ;;',
+              '  --step) shift; "step${1:?step number}" ;;',
+              '  --all) ' + " && ".join(f"step{i}" for i in range(1, len(tools) + 1)) + " ;;",
+              '  *) echo usage >&2; exit 2 ;;', "esac"]
+    run.write_text("\n".join(lines) + "\n")
+    return run, store, porters, [blessed[f"perks/pk/src/{t}.sh"] for t in tools]
+
+
+def test_refused_step_does_not_satisfy_a_downstream_upstream_requirement(tmp_path):
+    """A snippet-refused step must NOT count as 'run' for the next step's upstream gate — the ran-set is
+    status=='ok' records only. (Without the status check, a refused step still carries a 'step' key, so it
+    would falsely UNblock its successor.) Pins the 'and' in the ran-set comprehension."""
+    run, store, porters, _ = _compiled_with_snippets(tmp_path, ["tool1", "tool2"])
+    porters[0].write_text(porters[0].read_text() + "# drift\n")     # step1 porter no longer matches blessed
+    assert run_cli("executor", "--script", run, "--step", "1").returncode == 8   # snippet_refused, NOT ok
+    r = run_cli("executor", "--script", run, "--step", "2")
+    assert r.returncode == 5 and "UPSTREAM" in r.stdout             # step1 refused -> step2 still blocked
+
+
+def test_manifest_swap_cannot_decouple_step_tool_from_snippet_verify(tmp_path):
+    """SECURITY (the P1-T06 blocker): mutating a porter AND renaming it in the sibling manifesto (so the
+    step→tool map would name a tool NOT in the blessed set, making snippet-verify silently no-op) must NOT
+    run the tampered porter. The executor authenticates the manifesto against its blessed index.json sha, so
+    the swap fails the plan check and the step is refused — the tampered porter never executes."""
+    run, store, porters, _ = _compiled_with_snippets(tmp_path, ["tool1"])
+    assert run_cli("executor", "--script", run, "--step", "1").returncode == 0   # clean blessing run
+    porters[0].write_text(porters[0].read_text() + "\necho INJECTED-VIA-MANIFEST-DECOUPLE\n")
+    mpath = tmp_path / "chip" / "sk" / "perks" / "pk" / "manifesto.json"
+    mpath.write_text(json.dumps({"sequence": ["renamed_so_snippet_check_misses"]}))   # post-bless swap
+    r = run_cli("executor", "--script", run, "--step", "1")
+    assert r.returncode != 0                                         # refused, not run
+    assert "INJECTED-VIA-MANIFEST-DECOUPLE" not in r.stdout          # the tampered porter never executed
+
+
+def test_missing_manifesto_fails_closed_for_all_and_step(tmp_path):
+    """The fail-closed contract end-to-end: a compiled script whose blessed plan (manifesto) is absent
+    declares no steps — BOTH --step and --all refuse (exit 2), never a silent exit-0 'done (governed)'."""
+    run, store, _porters, _ = _compiled_with_snippets(tmp_path, ["tool1"])
+    (tmp_path / "chip" / "sk" / "perks" / "pk" / "manifesto.json").unlink()      # delete the blessed plan
+    assert run_cli("executor", "--script", run, "--step", "1").returncode == 2
+    r = run_cli("executor", "--script", run, "--all")
+    assert r.returncode == 2 and "no declared steps" in r.stdout     # NOT a silent successful full run
