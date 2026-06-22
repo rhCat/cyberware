@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse, hashlib, json, os, re, subprocess, sys, time
 
 from infra.govern.oversight import scan
+from infra.govern.plan_steps import plan_steps  # P1-T06 step-truth from the blessed manifesto, not --list
 from infra.govern.snippetverify import snippet_decision  # per-step TOCTOU decision (R3 mutation target)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -146,13 +147,19 @@ def main():
     #     CYBERWARE_ALLOW_ROOT=1 is the operator escape for root-only test/CI runners (never set in prod).
     noroot_gate(os.geteuid(), ledger, lpath, allow_root=os.environ.get("CYBERWARE_ALLOW_ROOT") == "1")
 
-    # which steps — both paths validate against the script's own --list
-    listing = subprocess.run(["bash", script, "--list"], capture_output=True, text=True).stdout
-    rows = [ln.split("\t") for ln in listing.strip().splitlines() if ln.strip()]
-    declared = [r[0].strip() for r in rows]
-    step_tool = {r[0].strip(): r[1].strip() for r in rows if len(r) > 1}   # step -> tool, for snippet verify
+    # which steps — the BLESSED PLAN is the sole source of step truth (P1-T06), never the script's own
+    # `--list`. The step ids + step→tool map come from the perk's authenticity-hashed manifesto sequence
+    # (the same structure govd blessed as plan["sequence"]); the script is never executed to discover them.
     blessed, snip = _blessed_snippets(script)                              # {} / None for non-compiler scripts
+    declared, step_tool = plan_steps(snip)                                 # step -> tool, for snippet verify
     snip_verify = bool(snip and blessed and step_tool)
+    if not declared:
+        # fail CLOSED, never SILENT: a compiled script whose blessed plan (perk manifesto) is missing,
+        # empty, unblessed, or tampered declares no steps — refuse the run rather than `--all`-succeeding
+        # having executed nothing (an exit-0 "done" for a zero-step run would mask a skipped/un-governed run).
+        print("  [PLAN] no declared steps — the blessed plan (perk manifesto) is missing, empty, "
+              "unblessed, or tampered — REFUSED")
+        sys.exit(2)
     if a.all:
         steps = declared
     elif a.step:
