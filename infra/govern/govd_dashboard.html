@@ -194,9 +194,10 @@ function overview(main, s){
     const p=s.decisions_page||{page:decPage,pages:1,total:(s.decisions||[]).length};
     if(p.pages>1 || decPage>1){
       const pg=el("div","pager");
-      const older=el("button",null,"‹ older"); older.disabled=p.page>=p.pages; older.onclick=()=>gotoDecPage(decPage+1);
-      const newer=el("button",null,p.page>1?"newer ›":"● live"); newer.disabled=p.page<=1; newer.onclick=()=>gotoDecPage(decPage-1);
-      pg.appendChild(older); pg.appendChild(el("span","pginfo"," page "+p.page+" / "+p.pages+" · "+p.total+" decisions ")); pg.appendChild(newer);
+      // drive targets, disabled-state, AND label all from the server-clamped p.page (one source of truth)
+      const older=el("button",null,"‹ older"); older.disabled=p.page>=p.pages; older.onclick=()=>gotoDecPage(p.page+1);
+      const newer=el("button",null,p.page>1?"newer ›":"● live"); newer.disabled=p.page<=1; newer.onclick=()=>gotoDecPage(p.page-1);
+      pg.appendChild(older); pg.appendChild(el("span","pginfo"," page "+p.page+" / "+p.pages+" · last "+p.total+" decisions ")); pg.appendChild(newer);
       dc.b.appendChild(pg);
     }
   }
@@ -353,7 +354,9 @@ async function gotoDecPage(n){
   try{
     const r=await fetch("/monitor/state?token="+enc(token)+"&dec_page="+decPage,{cache:"no-store"});
     if(r.status===403){ token=""; sessionStorage.removeItem("govd_monitor_token"); askToken(); return; }
-    state.snap=await r.json(); dot.className="dot"; stamp.textContent="browsing decisions · page "+decPage; render();
+    state.snap=await r.json();
+    decPage=(state.snap.decisions_page||{}).page||decPage;   // track the server-clamped page (label/targets stay in sync)
+    dot.className="dot"; stamp.textContent="browsing decisions · page "+decPage; render();
   }catch(e){ dot.className="dot err"; }
 }
 tick();

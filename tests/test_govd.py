@@ -659,3 +659,16 @@ def test_monitor_stream_requires_token(server):
     with pytest.raises(urllib.error.HTTPError) as e:
         urllib.request.urlopen(base + "/monitor/stream")
     assert e.value.code == 403
+
+
+def test_monitor_stream_caps_concurrent_connections(server):
+    """At most SSE_MAX_STREAMS streams run at once; past the cap the endpoint 503s (bounds thread/socket use).
+    Drive the cap deterministically by pre-loading the live-stream counter rather than opening 32 sockets."""
+    base, _, _ = server
+    govd._SSE_ACTIVE[0] = govd.SSE_MAX_STREAMS
+    try:
+        with pytest.raises(urllib.error.HTTPError) as e:
+            urllib.request.urlopen(base + "/monitor/stream?token=admin", timeout=5)
+        assert e.value.code == 503
+    finally:
+        govd._SSE_ACTIVE[0] = 0                                    # reset the shared counter for other tests

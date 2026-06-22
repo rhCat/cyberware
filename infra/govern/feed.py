@@ -27,3 +27,16 @@ def sse_frame(obj):
 
 def digest(obj):
     return hashlib.sha256(json.dumps(obj, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def clamp_interval(raw, default=1.0, lo=0.1, hi=60.0):
+    """A FINITE, bounded SSE poll interval from a raw env value. A missing / non-numeric / NaN value falls
+    back to `default`; the result is clamped to [lo, hi] so inf/huge never freeze disconnect detection (nor
+    crash on sleep(inf)); tiny/negative never busy-loops."""
+    try:
+        v = float(raw) if raw not in (None, "") else default
+    except (TypeError, ValueError):
+        v = default
+    if v != v:                              # NaN
+        v = default
+    return min(max(lo, v), hi)

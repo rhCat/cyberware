@@ -49,3 +49,15 @@ def test_digest_is_stable_and_change_sensitive():
     assert feed.digest(a) == feed.digest({"y": [1, 2], "x": 1})     # key order does not matter (stable)
     assert feed.digest(a) != feed.digest({"x": 2, "y": [1, 2]})     # a real change flips the digest
     assert len(feed.digest(a)) == 64                                 # sha256 hex
+
+
+def test_clamp_interval_bounds_and_fallbacks():
+    assert feed.clamp_interval("0.5") == 0.5                         # a sane value passes through
+    assert feed.clamp_interval(None) == 1.0                          # missing -> default
+    assert feed.clamp_interval("") == 1.0
+    assert feed.clamp_interval("nope") == 1.0                        # non-numeric -> default (no crash)
+    assert feed.clamp_interval("nan") == 1.0                         # NaN -> default
+    assert feed.clamp_interval("inf") == 60.0                        # inf -> upper bound (no sleep(inf) crash)
+    assert feed.clamp_interval("1e9") == 60.0                        # huge -> upper bound (disconnect stays detectable)
+    assert feed.clamp_interval("0") == 0.1                           # too-small -> lower bound (no busy loop)
+    assert feed.clamp_interval("-5") == 0.1                          # negative -> lower bound

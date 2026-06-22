@@ -61,6 +61,9 @@ MAX_WS_FRAME = 1 << 20                                       # refuse a WebSocke
 SOCKET_TIMEOUT = 600                                         # per-read socket timeout (s) — kills slowloris
 SNAPSHOT_RUNS = 150  # most-recent runs the dashboard lists/aggregates
 DECISIONS_PER_PAGE = 200  # default page size for the paginated decisions feed (P5-T02)
+SSE_MAX_STREAMS = 32      # cap on concurrent /monitor/stream connections (P5-T02; bounds thread/socket use)
+_SSE_LOCK = threading.Lock()
+_SSE_ACTIVE = [0]         # live SSE stream count (list = a mutable box guarded by _SSE_LOCK)
 MAX_RUNS = 8192                                             # in-memory run cap; oldest evicted (disk retained)
 
 
@@ -693,19 +696,26 @@ class Handler(BaseHTTPRequestHandler):
         The server re-derives the value-free snapshot every GOVD_SSE_INTERVAL seconds and pushes a `data:`
         event ONLY when the snapshot content (sans the volatile `now` stamp) changes; otherwise it writes an
         SSE keep-alive comment so a broken connection is detected promptly. Metadata only — same value-free
-        snapshot as /monitor/state. A write to a disconnected client raises, ending the (daemon) thread."""
+        snapshot as /monitor/state. A write to a disconnected client raises, ending the (daemon) thread.
+
+        Bounded against resource accumulation: the interval is clamped finite to [0.1, 60]s (so a misconfigured
+        env value can neither crash the thread via sleep(inf) nor freeze disconnect detection); at most
+        SSE_MAX_STREAMS run concurrently (503 past the cap); and a short per-write socket timeout reaps a stuck
+        sendall (a non-reading/half-closed client) in seconds rather than the 600s connection ceiling."""
+        interval = feed.clamp_interval(os.environ.get("GOVD_SSE_INTERVAL"))   # finite, bounded [0.1, 60]
+        with _SSE_LOCK:
+            if _SSE_ACTIVE[0] >= SSE_MAX_STREAMS:
+                return self._json(503, {"error": f"too many monitor streams (max {SSE_MAX_STREAMS})"})
+            _SSE_ACTIVE[0] += 1
         try:
-            interval = max(0.1, float(os.environ.get("GOVD_SSE_INTERVAL") or "1.0"))
-        except ValueError:
-            interval = 1.0
-        self.send_response(200)
-        self.send_header("Content-Type", "text/event-stream")
-        self.send_header("Cache-Control", "no-cache")
-        self.send_header("Connection", "keep-alive")
-        self.send_header("X-Accel-Buffering", "no")       # tell any reverse proxy not to buffer the stream
-        self.end_headers()
-        last = None
-        try:
+            self.connection.settimeout(min(interval * 5, 15))   # reap a stuck write in seconds, not the 600s ceiling
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("X-Accel-Buffering", "no")   # tell any reverse proxy not to buffer the stream
+            self.end_headers()
+            last = None
             self.wfile.write(b"retry: 2000\n\n")          # client auto-reconnect backoff
             self.wfile.flush()
             while True:
@@ -716,7 +726,10 @@ class Handler(BaseHTTPRequestHandler):
                 last = d
                 time.sleep(interval)
         except (BrokenPipeError, ConnectionResetError, OSError):
-            return                                        # client gone — let the daemon thread exit cleanly
+            return                                        # client gone / stuck write reaped — daemon thread exits
+        finally:
+            with _SSE_LOCK:
+                _SSE_ACTIVE[0] -= 1
 
     def _dashboard(self):
         try:
