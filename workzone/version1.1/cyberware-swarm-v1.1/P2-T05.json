@@ -13,6 +13,7 @@
   ],
   "executor": "governed-channel",
   "validated_by": "cws-redteam",
+  "validated_perk": "rt-secret-isolation",
   "bootstrap_exempt": false,
   "validation_available_after": "P2-T08",
   "skill": "cws-redteam",
