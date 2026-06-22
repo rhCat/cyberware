@@ -21,6 +21,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from infra.cwp import sign
+from infra.exec import vault as _vaultmod
 from infra.exec.exod import Exod, meter_of, record_step_result, request_step
 from infra.exec.exodverify import STEP_RESULT_TYPE, NonceCache, result_body, verify_step_result
 from infra.exec.grants import mint_grant
@@ -288,3 +289,43 @@ def test_end_to_end_real_sandbox(tmp_path):
     body = result_body(env)
     assert body["status"] == "ok" and body["exit"] == 0
     assert verify_step_result(exod.public_key, env, expect_run_id="R1")[0]
+
+
+# ── P2-T12 (exod-delegation): server-side credential injection in the confined limb ──────────────────
+
+def test_exod_injects_grant_authorized_credentials_into_the_confined_step():
+    """The limb resolves the GRANT's credential NAMES via its vault and injects them into the CONFINED step's
+    profile env (→ bwrap --setenv after --clearenv) — never the agent, never govd. Ungranted creds absent."""
+    isk, ipub = _kp()
+    secret = "SEKRET-" + "z" * 16
+    vault = _vaultmod.EnvStubVault({"api-key": secret, "other": "nope"})
+    stub = _Stub(rc=0, out="x")
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=stub, vault=vault)
+    g = mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g1",
+                   capabilities=["run"], credentials=["api-key"])           # only api-key is granted
+    env = exod.run_step(dict(run_id="R1", plan_sha="P1", step="1", argv=["x"], workspace="/ws", grant=g),
+                        now=1000)
+    assert result_body(env)["status"] == "ok"
+    prof, _argv = stub.calls[-1]
+    assert prof.env.get("CWS_SECRET_API_KEY") == secret                      # the granted secret reached the step
+    assert _vaultmod.secret_bytes_in(prof.env, secret) == 1                  # exactly once, in the step env only
+    assert "CWS_SECRET_OTHER" not in prof.env                                # the ungranted credential is NOT injected
+
+
+def test_exod_refuses_when_credentials_granted_but_no_vault():
+    """Fail closed: a grant that authorizes credentials but no vault is attached -> refuse, never run."""
+    isk, ipub = _kp()
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=_Stub())   # no vault
+    g = mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g1",
+                   capabilities=["run"], credentials=["api-key"])
+    env = exod.run_step(dict(run_id="R1", plan_sha="P1", step="1", argv=["x"], workspace="/ws", grant=g),
+                        now=1000)
+    assert result_body(env)["status"] == "refused"
+
+
+def test_exod_no_credentials_runs_without_vault():
+    """A grant with no credentials needs no vault — the step runs confined as before (back-compat)."""
+    isk, ipub = _kp()
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=_Stub(rc=0, out="x"))
+    env = exod.run_step(_req(isk), now=1000)                                  # _req mints a no-credentials grant
+    assert result_body(env)["status"] == "ok"
