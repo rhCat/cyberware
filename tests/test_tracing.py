@@ -14,6 +14,9 @@ def test_parse_valid_and_rejects_malformed_or_zero():
     assert T.parse_traceparent("00-xyz-bbbb-01") is None                 # non-hex
     assert T.parse_traceparent("00-" + "0" * 32 + "-" + "b" * 16 + "-01") is None   # all-zero trace id invalid
     assert T.parse_traceparent("00-" + "a" * 32 + "-" + "0" * 16 + "-01") is None   # all-zero span id invalid
+    valid = "00-" + "a" * 32 + "-" + "b" * 16 + "-01"
+    assert T.parse_traceparent(valid + "\n") is None                                 # trailing newline rejected (fullmatch)
+    assert T.parse_traceparent(valid + " ") is None and T.parse_traceparent("x" + valid) is None
 
 
 def test_new_and_child_preserve_trace_and_change_span():

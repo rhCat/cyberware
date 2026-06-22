@@ -14,13 +14,13 @@ import secrets
 CWRUN_PREDICATE = "https://cyberware.dev/run/v1"          # cyberware/run@v1
 _ZERO_TRACE = "0" * 32
 _ZERO_SPAN = "0" * 16
-_TP = re.compile(r"^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$")
+_TP = re.compile(r"00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})")
 _SPAN_EVENTS = ("granted", "step_result", "step_refused")
 
 
 def parse_traceparent(s):
     """W3C traceparent -> {version, trace_id, span_id, flags}; None if malformed / all-zero id."""
-    m = _TP.match(s or "")
+    m = _TP.fullmatch(s or "")          # fullmatch (not match) so a trailing newline can't slip through `$`
     if m is None:
         return None
     trace_id, span_id, flags = m.groups()

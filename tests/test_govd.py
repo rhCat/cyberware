@@ -683,18 +683,24 @@ def test_trace_and_intoto_endpoints_by_run_id(server):
     from infra.govern import tracing
     tp = "00-" + "a" * 32 + "-" + "b" * 16 + "-01"
     rid = "traceabc12345678"
+    secret_tok = "SEKRET-session-token-value"
     store.create(rid, {"run_id": rid, "ts": "2026-06-22T00:00:00Z", "skill": "fs", "perk": "read",
                        "decision": "allow", "principal": "local", "plan_sha": "feedface", "traceparent": tp,
-                       "token": "t", "events": [{"type": "granted", "step": "1", "span": tracing.child_span(tp)},
-                                                {"type": "step_result", "step": "1", "status": "ok",
-                                                 "span": tracing.child_span(tp)}]})
-    tr = json.loads(urllib.request.urlopen(base + "/trace/" + rid + "?token=admin").read())
+                       "token": secret_tok,
+                       "events": [{"type": "granted", "step": "1", "span": tracing.child_span(tp)},
+                                  {"type": "step_result", "step": "1", "status": "ok",
+                                   "span": tracing.child_span(tp)}]})
+    trace_body = urllib.request.urlopen(base + "/trace/" + rid + "?token=admin").read().decode()
+    tr = json.loads(trace_body)
     assert tr["trace_id"] == "a" * 32
     assert [s["plane"] for s in tr["spans"]] == ["claim", "granted", "step_result"]   # full cross-plane trace
 
-    att = json.loads(urllib.request.urlopen(base + "/intoto/" + rid + "?token=admin").read())
+    intoto_body = urllib.request.urlopen(base + "/intoto/" + rid + "?token=admin").read().decode()
+    att = json.loads(intoto_body)
     assert att["predicateType"] == "https://cyberware.dev/run/v1"      # cyberware/run@v1
     assert att["predicate"]["trace_id"] == "a" * 32 and att["subject"][0]["digest"]["sha256"] == "feedface"
+    # value-free: the run's session token never crosses to the trace/provenance plane
+    assert secret_tok not in trace_body and secret_tok not in intoto_body
 
     for ep in ("/trace/", "/intoto/"):
         with pytest.raises(urllib.error.HTTPError) as e:

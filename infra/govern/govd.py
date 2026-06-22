@@ -669,13 +669,15 @@ class Handler(BaseHTTPRequestHandler):
             # value-free, monitor-gated like /monitor/run.
             if not self._monitor_authed(cfg):
                 return self._json(403, {"error": "missing/invalid monitor token"})
-            tr = tracing.trace_of(store.get(urllib.parse.unquote(path[len("/trace/"):])) or {})
+            # run_detail strips the session token at the data boundary — the value-free guarantee never rests
+            # only on tracing.py's allowlist (defence in depth: a future field add can't launder the token).
+            tr = tracing.trace_of(store.run_detail(urllib.parse.unquote(path[len("/trace/"):])) or {})
             return self._json(200 if tr else 404, tr or {"error": "unknown run_id or no trace"})
         if path.startswith("/intoto/"):
             # P5-T05: the run's in-toto cyberware/run@v1 provenance attestation by run_id (value-free).
             if not self._monitor_authed(cfg):
                 return self._json(403, {"error": "missing/invalid monitor token"})
-            rec = store.get(urllib.parse.unquote(path[len("/intoto/"):]))
+            rec = store.run_detail(urllib.parse.unquote(path[len("/intoto/"):]))   # token-stripped copy
             return self._json(200 if rec else 404,
                               tracing.intoto_statement(rec) if rec else {"error": "unknown run_id"})
         if self.path.startswith("/ledger/"):
