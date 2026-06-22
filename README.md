@@ -190,7 +190,7 @@ The infra is covered by a real suite under [`tests/`](tests/) — the governance
 - **integration** — the executor channel: tamper snapshot + drift refusal, **in-channel oversight**
   refuse/waive, the upstream gate, step validation, provenance; and the full
   validate→compose→compile→oversee→execute pipeline.
-- **per-perk contract** — every one of the 139 perks (across 38 skills) compiles to a clean, consistent,
+- **per-perk contract** — every one of the 140 perks (across 38 skills) compiles to a clean, consistent,
   oversight-clear script.
 - **in-skill self-tests** — each skill carries its OWN proof: `perks/<perk>/test/case.json`, run
   end-to-end **through the governed executor** on shipped fixtures (`infra.tool.skilltest`, discovered by

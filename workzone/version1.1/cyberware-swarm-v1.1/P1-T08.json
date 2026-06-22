@@ -11,6 +11,7 @@
   "depends_on": [],
   "executor": "governed-channel",
   "validated_by": "cws-ledgercheck",
+  "validated_perk": "principal",
   "bootstrap_exempt": false,
   "validation_available_after": "P1-T09",
   "skill": "cws-ledgercheck",
