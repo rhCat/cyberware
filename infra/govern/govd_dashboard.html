@@ -140,7 +140,7 @@ async function refreshDetail(){
 function viewSig(){
   // everything the DOM is built from, EXCEPT the per-poll clock (snap.now) — so an idle poll is a no-op.
   const s = state.snap ? {...state.snap, now:0} : null;
-  return JSON.stringify([state.selected, state.tab, s, state.detail]);
+  return JSON.stringify([state.selected, state.tab, decPage, s, state.detail]);
 }
 
 function render(){
@@ -190,6 +190,17 @@ function overview(main, s){
     const c3=el("td"); c3.appendChild(badge(x.decision)); if(x.destructive) c3.appendChild(el("span","tag-dest"," D")); tr.appendChild(c3);
     const note=(x.problems&&x.problems.length)?x.problems.join(", "):(x.needs_approve&&x.needs_approve.length?("approve: "+x.needs_approve.join(",")):""); tr.appendChild(el("td",null,note)); dt.appendChild(tr); }
   if(!(s.decisions||[]).length) dc.b.appendChild(el("div","empty","no decisions yet")); else dc.b.appendChild(dt);
+  {                                                     // P5-T02: pager — page 1 is the live (SSE) feed; older pages are a paused fetch
+    const p=s.decisions_page||{page:decPage,pages:1,total:(s.decisions||[]).length};
+    if(p.pages>1 || decPage>1){
+      const pg=el("div","pager");
+      // drive targets, disabled-state, AND label all from the server-clamped p.page (one source of truth)
+      const older=el("button",null,"‹ older"); older.disabled=p.page>=p.pages; older.onclick=()=>gotoDecPage(p.page+1);
+      const newer=el("button",null,p.page>1?"newer ›":"● live"); newer.disabled=p.page<=1; newer.onclick=()=>gotoDecPage(p.page-1);
+      pg.appendChild(older); pg.appendChild(el("span","pginfo"," page "+p.page+" / "+p.pages+" · last "+p.total+" decisions ")); pg.appendChild(newer);
+      dc.b.appendChild(pg);
+    }
+  }
   main.appendChild(dc.s);
 
   const fd=sect("Live event feed"); const tl=el("div","tl");
@@ -311,18 +322,44 @@ function scriptTab(panel, d){
   if(!any) panel.appendChild(el("div","empty","no script — rejected before a plan was built, or a non-allow run restored after restart (only allowed runs persist their plan)"));
 }
 
+// P5-T02: one-shot fetch validates the token + draws the first frame, then the live feed is PUSHED over a
+// single Server-Sent-Events connection (replacing the old 1.5s poll). Page 1 of decisions is live; older
+// pages are a paused one-off fetch.
+let es=null, decPage=1;
 async function tick(){
   if(!token){ askToken(); return; }
   try{
     const r=await fetch("/monitor/state?token="+enc(token),{cache:"no-store"});
     if(r.status===403){ dot.className="dot err"; sessionStorage.removeItem("govd_monitor_token"); token=""; askToken(); return; }
-    state.snap=await r.json();
-    if(state.selected){ const d=await fetch("/monitor/run/"+enc(state.selected)+"?token="+enc(token),{cache:"no-store"}); state.detail=d.ok?await d.json():null; }
-    dot.className="dot live"; stamp.textContent="updated "+fmt(state.snap.now)+" · "+LOCAL_TZ;   // local tz, ticks every poll…
-    if(viewSig()!==lastSig) render();                                             // …but the DOM rebuilds ONLY on a real change
-  }catch(e){ dot.className="dot err"; stamp.textContent="disconnected — retrying"; }
+    state.snap=await r.json(); decPage=1;
+    dot.className="dot live"; stamp.textContent="updated "+fmt(state.snap.now)+" · "+LOCAL_TZ;
+    render(); if(state.selected) refreshDetail();
+    connectStream();
+  }catch(e){ dot.className="dot err"; stamp.textContent="disconnected — retrying"; setTimeout(tick, 2000); }
 }
-tick(); setInterval(tick, 1500);
+function connectStream(){
+  if(es) es.close();
+  es=new EventSource("/monitor/stream?token="+enc(token));
+  es.onmessage=(ev)=>{ if(decPage!==1) return;                 // browsing an older page — don't clobber the paused view
+    try{ state.snap=JSON.parse(ev.data);
+      dot.className="dot live"; stamp.textContent="live "+fmt(state.snap.now)+" · "+LOCAL_TZ;
+      if(viewSig()!==lastSig) render();
+      if(state.selected) refreshDetail();
+    }catch(e){} };
+  es.onerror=()=>{ dot.className="dot err"; stamp.textContent="reconnecting…"; };   // EventSource auto-reconnects (retry: 2000)
+}
+async function gotoDecPage(n){
+  decPage=Math.max(1,n);
+  if(decPage===1){ tick(); return; }                            // back to the live (page 1) feed
+  try{
+    const r=await fetch("/monitor/state?token="+enc(token)+"&dec_page="+decPage,{cache:"no-store"});
+    if(r.status===403){ token=""; sessionStorage.removeItem("govd_monitor_token"); askToken(); return; }
+    state.snap=await r.json();
+    decPage=(state.snap.decisions_page||{}).page||decPage;   // track the server-clamped page (label/targets stay in sync)
+    dot.className="dot"; stamp.textContent="browsing decisions · page "+decPage; render();
+  }catch(e){ dot.className="dot err"; }
+}
+tick();
 </script>
 </body>
 </html>

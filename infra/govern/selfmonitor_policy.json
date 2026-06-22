@@ -42,6 +42,14 @@
       "note": "P1-T06 step-truth from the blessed plan — manifesto sequence AUTHENTICATED against its index.json sha (a post-bless swap cannot decouple the step→tool map from snippet-verify); prose-clean core, both sides pinned"
     },
     {
+      "module": "infra/govern/feed.py",
+      "slice": "tests/test_feed.py",
+      "cap": 20,
+      "floor": 1.0,
+      "target": 0.90,
+      "note": "P5-T02 monitor-feed core — pagination (ceil/clamp/slice) + SSE framing + change-digest behind the dashboard's SSE push; prose-clean, both sides pinned"
+    },
+    {
       "module": "infra/govern/snippetverify.py",
       "slice": "tests/test_snippetverify.py",
       "cap": 50,

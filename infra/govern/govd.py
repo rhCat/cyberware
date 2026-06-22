@@ -45,6 +45,7 @@ from infra import registry
 from infra.cwp import canonical
 from infra.govern import compiler
 from infra.govern import composer
+from infra.govern import feed        # P5-T02: SSE framing + pagination + change-digest (prose-clean core)
 from infra.govern import principals  # P1-T08: Bearer-principal auth + token-bucket rate-limit at /govern
 from infra.tool import skill_index   # verify the registry matches its committed per-skill authenticity index
 import difflib             # the inconsistency path is a plain text diff — never execute a submitted plan
@@ -59,6 +60,10 @@ MAX_BODY = 1 << 20                                           # cap a /govern req
 MAX_WS_FRAME = 1 << 20                                       # refuse a WebSocket frame larger than 1 MiB
 SOCKET_TIMEOUT = 600                                         # per-read socket timeout (s) — kills slowloris
 SNAPSHOT_RUNS = 150  # most-recent runs the dashboard lists/aggregates
+DECISIONS_PER_PAGE = 200  # default page size for the paginated decisions feed (P5-T02)
+SSE_MAX_STREAMS = 32      # cap on concurrent /monitor/stream connections (P5-T02; bounds thread/socket use)
+_SSE_LOCK = threading.Lock()
+_SSE_ACTIVE = [0]         # live SSE stream count (list = a mutable box guarded by _SSE_LOCK)
 MAX_RUNS = 8192                                             # in-memory run cap; oldest evicted (disk retained)
 
 
@@ -413,15 +418,17 @@ class Store:
             rec = dict(rec) if rec else None
         return {k: v for k, v in rec.items() if k != "token"} if rec else None
 
-    def monitor_snapshot(self):
-        """A value-free snapshot for the dashboard: recent decisions, the recent runs with per-step
-        progress, aggregate tool usage, and totals. Metadata only — no tokens, no values, no output."""
+    def monitor_snapshot(self, dec_page=1, dec_limit=DECISIONS_PER_PAGE):
+        """A value-free snapshot for the dashboard: a PAGE of recent decisions (newest first, P5-T02), the
+        recent runs with per-step progress, aggregate tool usage, and totals. Metadata only — no tokens, no
+        values, no output. `dec_page`/`dec_limit` page the decisions feed; `decisions_page` carries the
+        page/pages/total/limit so the dashboard can navigate without a growing payload."""
         with self.lock:
             decisions = list(self.decisions)
             allruns = [dict(r) for r in self.runs.values()]
         runs = sorted(allruns, key=lambda r: r.get("ts") or "", reverse=True)[:SNAPSHOT_RUNS]
         totals = collections.Counter(d["decision"] for d in decisions)
-        tools, run_views, feed = {}, [], []
+        tools, run_views, step_feed = {}, [], []
         for r in runs:
             seq = r.get("seq", [])
             ev = r.get("events", [])
@@ -449,12 +456,14 @@ class Store:
                               "failed": any(s["state"] == "error" for s in steps),   # an allowed run whose step erred
                               "progress": f"{done}/{len(seq)}" if seq else "-"})
             for e in ev:
-                feed.append({"run_id": r["run_id"], "skill": r.get("skill"), "perk": r.get("perk"), **e})
+                step_feed.append({"run_id": r["run_id"], "skill": r.get("skill"), "perk": r.get("perk"), **e})
         run_views.sort(key=lambda r: r["ts"] or "", reverse=True)
-        feed.sort(key=lambda e: e.get("ts") or "", reverse=True)
+        step_feed.sort(key=lambda e: e.get("ts") or "", reverse=True)
+        dec = feed.paginate(list(reversed(decisions)), dec_page, dec_limit)   # newest-first, one page
         return {"now": now(), "totals": dict(totals), "runs_live": len(allruns),
-                "decisions": list(reversed(decisions))[:200], "runs": run_views,
-                "tools": tools, "feed": feed[:120]}
+                "decisions": dec["items"],
+                "decisions_page": {k: dec[k] for k in ("page", "pages", "total", "limit")},
+                "runs": run_views, "tools": tools, "feed": step_feed[:120]}
 
 
 def authorize_step(store, run_id, step, plan_sha):
@@ -637,7 +646,16 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/monitor/state":
             if not self._monitor_authed(cfg):
                 return self._json(403, {"error": "missing/invalid monitor token (?token= or X-Govd-Monitor)"})
-            return self._json(200, store.monitor_snapshot())
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            try:                                          # P5-T02: page the decisions feed (clamped in feed.paginate)
+                dp, dl = int(qs.get("dec_page", ["1"])[0]), int(qs.get("dec_limit", [str(DECISIONS_PER_PAGE)])[0])
+            except ValueError:
+                dp, dl = 1, DECISIONS_PER_PAGE
+            return self._json(200, store.monitor_snapshot(dec_page=dp, dec_limit=dl))
+        if path == "/monitor/stream":
+            if not self._monitor_authed(cfg):
+                return self._json(403, {"error": "missing/invalid monitor token (?token= or X-Govd-Monitor)"})
+            return self._monitor_stream(store)
         if path.startswith("/monitor/run/"):
             if not self._monitor_authed(cfg):
                 return self._json(403, {"error": "missing/invalid monitor token"})
@@ -672,6 +690,46 @@ class Handler(BaseHTTPRequestHandler):
         q = urllib.parse.urlparse(self.path).query
         got = str(self.headers.get("X-Govd-Monitor") or urllib.parse.parse_qs(q).get("token", [""])[0])
         return bool(want) and hmac.compare_digest(got, want)
+
+    def _monitor_stream(self, store):
+        """P5-T02 — Server-Sent Events push: one long-lived connection replaces the dashboard's 1.5s poll.
+        The server re-derives the value-free snapshot every GOVD_SSE_INTERVAL seconds and pushes a `data:`
+        event ONLY when the snapshot content (sans the volatile `now` stamp) changes; otherwise it writes an
+        SSE keep-alive comment so a broken connection is detected promptly. Metadata only — same value-free
+        snapshot as /monitor/state. A write to a disconnected client raises, ending the (daemon) thread.
+
+        Bounded against resource accumulation: the interval is clamped finite to [0.1, 60]s (so a misconfigured
+        env value can neither crash the thread via sleep(inf) nor freeze disconnect detection); at most
+        SSE_MAX_STREAMS run concurrently (503 past the cap); and a short per-write socket timeout reaps a stuck
+        sendall (a non-reading/half-closed client) in seconds rather than the 600s connection ceiling."""
+        interval = feed.clamp_interval(os.environ.get("GOVD_SSE_INTERVAL"))   # finite, bounded [0.1, 60]
+        with _SSE_LOCK:
+            if _SSE_ACTIVE[0] >= SSE_MAX_STREAMS:
+                return self._json(503, {"error": f"too many monitor streams (max {SSE_MAX_STREAMS})"})
+            _SSE_ACTIVE[0] += 1
+        try:
+            self.connection.settimeout(min(interval * 5, 15))   # reap a stuck write in seconds, not the 600s ceiling
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("X-Accel-Buffering", "no")   # tell any reverse proxy not to buffer the stream
+            self.end_headers()
+            last = None
+            self.wfile.write(b"retry: 2000\n\n")          # client auto-reconnect backoff
+            self.wfile.flush()
+            while True:
+                snap = store.monitor_snapshot()
+                d = feed.digest({k: v for k, v in snap.items() if k != "now"})
+                self.wfile.write(feed.sse_frame(snap).encode() if d != last else b": keepalive\n\n")
+                self.wfile.flush()
+                last = d
+                time.sleep(interval)
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return                                        # client gone / stuck write reaped — daemon thread exits
+        finally:
+            with _SSE_LOCK:
+                _SSE_ACTIVE[0] -= 1
 
     def _dashboard(self):
         try:

@@ -11,6 +11,7 @@
   "depends_on": [],
   "executor": "local-code",
   "validated_by": "cws-bench",
+  "validated_perk": "sse-latency",
   "bootstrap_exempt": false,
   "validation_available_after": "P2-T09",
   "skill": "cws-bench",
