@@ -668,6 +668,15 @@
       "verdict": "pass",
       "evidence_sha": "b7ab4d288a8744259584056a5a871217365c8e291bb815b2e948ed841a94118a",
       "prev": "0c80e884f997b90fa76bbbc34e061b7ec7a9a6d1276bb2b791ff75e189f53c7a"
+    },
+    {
+      "seq": 75,
+      "ts": "2026-06-22T16:12:56Z",
+      "task_id": "P6-T20",
+      "validator": "cws-settle-sim",
+      "verdict": "pass",
+      "evidence_sha": "3bd871ad7420d3c794e61937e3619240d829e44600012dfaf5b8cc7c471f07e2",
+      "prev": "ec5f129e1ceeed399daa5e349d3b28a6eada2384936548a4fed5e1d9e059b5e9"
     }
   ]
 }
