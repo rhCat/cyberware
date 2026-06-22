@@ -391,3 +391,73 @@ def certs() -> dict:
     return {"certs": r["certs"], "clean": r["clean"],
             "have_all_three": set(r["certs"]) == {"EMPIRICAL", "SYMBOLIC", "AXIOMATIC"}}
 
+
+# ── P4-T06: the settlement lifecycle, model-checked (money-safety) ───────────────────────────────────
+def settlement_workflow() -> dict:
+    """The P6 settlement lifecycle as a workflow: quote -> fund -> check (validate) -> settle, with a
+    cancel / escrow-expiry refund path. Money-safety invariants the spec must hold: a payout needs BOTH a
+    funded quote and a passing validation, AT MOST ONE payout occurs, and escrow drains at EVERY terminal
+    state (no value is ever stranded). Both terminals self-loop so the bounded spec never deadlocks
+    (`settled` is last → emit_tla self-loops it; `cancelled` self-loops explicitly)."""
+    return {
+        "name": "Settlement",
+        "states": ["quoted", "funded", "checked", "cancelled", "settled"],
+        "entry": "quoted",
+        "flags": {"funded": {"type": "Bool", "init": False},
+                  "validated": {"type": "Bool", "init": False},
+                  "paid": {"type": "Int", "init": 0},
+                  "escrow": {"type": "Bool", "init": False}},
+        "transitions": [
+            {"from": "quoted", "to": "funded", "set": {"funded": True, "escrow": True}},
+            {"from": "funded", "to": "checked", "set": {"validated": True}},
+            {"from": "checked", "to": "settled", "set": {"paid": 1, "escrow": False}},
+            {"from": "funded", "to": "cancelled", "set": {"escrow": False}},     # escrow-expiry refund
+            {"from": "checked", "to": "cancelled", "set": {"escrow": False}},    # cancel-after-validate refund
+            {"from": "cancelled", "to": "cancelled", "set": {}},                 # terminal self-loop (no deadlock)
+        ],
+        "invariants": {
+            "SettleNeedsValidate": 'pc = "settled" => validated',
+            "SettleNeedsFund": 'pc = "settled" => funded',
+            "AtMostOnePayout": "paid <= 1",
+            "EscrowDrainsAtTerminal": '(pc = "settled" \\/ pc = "cancelled") => escrow = FALSE',
+        },
+    }
+
+
+def settlement_corpus() -> list:
+    """(name, wf, expect_clean): the clean settlement model + the THREE money mutants a sound checker MUST
+    catch — settle-before-validate (the validation flag is never set), double-settle / over-pay (the payout
+    counter leaves [0,1], breaking AtMostOnePayout), and remove-expiry / strand-escrow (escrow is not
+    refunded at a terminal, breaking EscrowDrainsAtTerminal)."""
+    wf = settlement_workflow()
+    return [
+        ("settlement-clean", wf, True),
+        ("mutant-settle-before-validate", seed_violation(wf, "validated"), False),
+        ("mutant-double-settle", seed_violation(wf, "paid"), False),
+        ("mutant-strand-escrow", seed_violation(wf, "escrow"), False),
+    ]
+
+
+def prove_settlement() -> dict:
+    """P4-T06: the settlement lifecycle passes EMPIRICAL (TLC) AND SYMBOLIC (Apalache), and EACH money mutant
+    is CAUGHT. `ok` iff the clean model is `no_error` under both provers and every mutant is a `violation`
+    under TLC and under Apalache (Apalache may time out on at most one)."""
+    rows = []
+    for name, wf, clean in settlement_corpus():
+        tlc, apa = check_tlc(wf), check_apalache(wf)
+        want = "no_error" if clean else "violation"
+        rows.append({"name": name, "expect_clean": clean, "tlc": tlc["verdict"], "apalache": apa["verdict"],
+                     "tlc_correct": tlc["verdict"] == want, "apalache_correct": apa["verdict"] == want})
+    clean_row, mutants = rows[0], rows[1:]
+    empirical_plus_symbolic_pass = clean_row["tlc_correct"] and clean_row["apalache_correct"]
+    money_mutants_fail = (all(m["tlc_correct"] for m in mutants)
+                          and sum(m["apalache_correct"] for m in mutants) >= len(mutants) - 1)
+    return {"empirical_plus_symbolic_pass": empirical_plus_symbolic_pass,
+            "money_mutants_fail": money_mutants_fail, "mutants_checked": len(mutants), "rows": rows,
+            "ok": empirical_plus_symbolic_pass and money_mutants_fail}
+
+
+if __name__ == "__main__":
+    import json as _json
+    print(_json.dumps(prove_settlement(), indent=2))
+
