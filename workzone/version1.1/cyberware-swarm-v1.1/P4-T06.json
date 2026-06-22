@@ -14,6 +14,7 @@
   ],
   "executor": "governed-channel",
   "validated_by": "cws-modelcheck",
+  "validated_perk": "settlement",
   "bootstrap_exempt": false,
   "validation_available_after": "P4-T08",
   "skill": "cws-modelcheck",

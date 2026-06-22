@@ -1,14 +1,15 @@
 # cyberware v1.1 — project status (2026-06-22)
 
 Generated through govd (dogfood): `cws-pm/run` (DRY_RUN board) + `cws-observe/status` (chain + milestones),
-chip `c6e6b78c` (lean), done-ledger-v2 head seq 60.
+chip `132cd6c9` (lean), done-ledger-v2 head seq 61.
 
 ## Headline — the full SV security ladder is CLOSED
 **All 7 milestone cones closed (M0 + SV-1…SV-6), 0 open rungs.** `done_ledger_chain: ok` (tamper-checked).
-**69 / 90 tasks redeemed (77%).** `validators_missing: []` — every validator skill is built; `blocked:validator: 0`.
+**70 / 90 tasks redeemed (78%).** `validators_missing: []` — every validator skill is built; `blocked:validator: 0`.
 Latest (non-cone P6 tail, all perk-bound): **P6-T06** money↔work cross-check (reward_verify), **P6-T10**
-bounty + reverse auction (markets), **P6-T13** principal reputation — seq 58-60. The P6 ready tail is now done
-(remaining P6-T08/T14 need live LLM receipts / Stripe sandbox).
+bounty + reverse auction (markets), **P6-T13** principal reputation — seq 58-60. The P6 ready tail is done
+(remaining P6-T08/T14 need live LLM receipts / Stripe sandbox). **P4-T06** — the settlement lifecycle
+formally proven (TLC + Apalache, money mutants caught) — redeemed seq 61.
 
 | cone | rung | redeemed/closure | state |
 |------|------|------------------|-------|
@@ -20,14 +21,14 @@ bounty + reverse auction (markets), **P6-T13** principal reputation — seq 58-6
 | M5 | SV-5 formal proof | 8/8 | ✓ CLOSED |
 | M6 | SV-6 money lifecycle | 21/21 | ✓ CLOSED |
 
-## Phase board (DRY_RUN) — 69 redeemed · 12 ready · 9 dep-blocked · 0 failed
+## Phase board (DRY_RUN) — 70 redeemed · 11 ready · 9 dep-blocked · 0 failed
 | phase | redeemed | ready | dep-blocked | note |
 |-------|----------|-------|-------------|------|
 | P0 governance spine | 18 | — | — | complete |
 | P1 ledger | 8 | 2 | — | cone closed; 2 tail tasks |
 | P2 exec/isolation | 9 | 2 | — | cone closed; 2 tail tasks |
 | P3 supply chain | 14 | 1 | 1 | cone closed; tail |
-| P4 formal proof | 7 | 2 | — | cone closed; 2 tail tasks |
+| P4 formal proof | 8 | 1 | — | cone closed; P4-T06 settlement proof redeemed (P4-T07 emit-mutation left) |
 | P5 ops/observability | 0 | 3 | 2 | **unstarted** — no cone gate; not on the SV ladder |
 | P6 money | 13 | 2 | 6 | cone closed; tail T06/T10/T13 redeemed (T08/T14 need live LLM / Stripe) |
 
