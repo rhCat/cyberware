@@ -14,6 +14,7 @@
   ],
   "executor": "local-code",
   "validated_by": "cws-mutate",
+  "validated_perk": "mut-emitter",
   "bootstrap_exempt": false,
   "validation_available_after": "P4-T08",
   "skill": "cws-mutate",
