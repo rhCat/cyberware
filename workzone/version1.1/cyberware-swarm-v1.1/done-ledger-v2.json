@@ -524,6 +524,24 @@
       "verdict": "pass",
       "evidence_sha": "2631e2985cef8ad3dab653c0584542b7dc7ab47843ce865dea89abbf461acba0",
       "prev": "03164595867edd0b6c34d3824d562041243eb4caeb8876d03d6215f2e097ce01"
+    },
+    {
+      "seq": 59,
+      "ts": "2026-06-22T04:30:47Z",
+      "task_id": "P6-T10",
+      "validator": "cws-settle-sim",
+      "verdict": "pass",
+      "evidence_sha": "9f9c96ac6bfeb45b8eaaa3418d74c0a00ce400b380c1620c0e72bf15e0d6e942",
+      "prev": "1bc3e008c40f7b5d7e1b9e44fe9a6ed416baff3c0e6b5bf8b56b97f466522527"
+    },
+    {
+      "seq": 60,
+      "ts": "2026-06-22T04:33:55Z",
+      "task_id": "P6-T13",
+      "validator": "cws-settle-sim",
+      "verdict": "pass",
+      "evidence_sha": "fe549ee38cb70bb396e91d2a4973c9162017717a749e31715a30825b04578714",
+      "prev": "9d23c33f0612a708f6ba4e99ee2a81a38bf3f2db987e0c6e8ec97858ebf6e57f"
     }
   ]
 }
