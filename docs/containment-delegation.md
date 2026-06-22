@@ -68,10 +68,19 @@ net-new to the delegated path**; every one is addressed:
   now sources the perk manifesto's declared `credentials` (names only, server-authoritative); govd binds them
   onto the run record; `test_delegate` proves a granted secret reaches the confined step (and the masking
   `_rec()` fixture no longer hardcodes `[]`).
-- **5 (major) — at-most-once lost in delegated mode.** The delegated WS branch now refuses a re-sent
-  `step_request` for an already-recorded step *before* dialing exod (no double-execution / double-bill).
+- **5 (major) — at-most-once lost in delegated mode.** `Store.claim_step` atomically reserves `(run,step)`
+  under the store lock spanning the whole check→dial-exod→record window, released by `release_step`. A
+  completed (recorded ok/error) OR a concurrently in-flight step is refused *before* dialing exod — so two
+  WS sessions racing the same step cannot double-execute / double-bill, not just sequential re-sends. A step
+  exod *refused* (never ran) is recorded under a distinct `step_delegation_refused` type, outside the
+  done-set, so a transient refusal is retryable rather than wedging the run.
 - **8 (nit) — handler TypeError if the run is evicted mid-session.** The delegated branch fails closed on a
   `None` record (`run no longer resident`) instead of crashing the connection thread.
+
+A second adversarial pass on these fixes confirmed 9 findings (3 of them the same concurrency race, now
+closed by `claim_step`); the closure prose was narrowed (the gate covers the materialized SNIP closure; the
+entry `run.sh` rests on the plan-hash), and the empty-pin discriminator was hardened from a `.sh/.py`
+allowlist to a denylist (any staged non-`contracts.json` file is refused).
 
 ## Validation
 - **macOS (now):** the channel logic via the `runner=` stub + a real AF_UNIX loopback (`serve(max_requests=N)`):
@@ -95,7 +104,20 @@ net-new to the delegated path**; every one is addressed:
   mode ships; state plainly that the cooperative path runs client-side unconfined and confinement is
   delivered via exod (delegated mode) on the exec image.
 
+## Known boundary — delegated mode requires self-contained, flat-src perks
+The closure gate verifies a perk's OWN top-level `src` against the grant pin. Two perk shapes are therefore
+unsupported under delegated mode and **fail closed** (never run unverified):
+- **nested `src`** — a perk pinning a member in a subdir (e.g. `src/lib/helper.py`) is refused
+  `closure:missing` (govd materializes flat top-level src). Zero perks do this today; the build gate does not
+  yet forbid it.
+- **cross-perk sourcing** — a porter that reads a sibling perk's files (today only `codebaseqc/setup`, which
+  `cp`s from `../../audit/src`) cp-fails inside bwrap because those files are outside the workspace. The agent
+  cannot inject them (they are outside the single writable dir), so it is fail-closed, not a bypass.
+Both are cooperative-mode-only perks in practice; making delegated mode support them (recursive materialize +
+a plan-build-time self-containment check) is a v1.2 item.
+
 ## Deferred to v1.2 (explicitly out of this close)
 exod horizontal-scale/liveness (single serving thread); grant-key custody to an HSM/PKCS#11; supervised exod
 lifecycle (systemd, distinct uid, orphan reaping); SopsAgeVault as the live backend; workspace output quota;
-removing the legacy client-self-report path.
+removing the legacy client-self-report path; recursive/cross-perk closure materialization + a build-time
+self-containment gate (see *Known boundary* above).

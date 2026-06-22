@@ -125,6 +125,45 @@ def test_delegated_step_is_at_most_once(delegated):
         sock.close()
 
 
+def test_delegated_concurrent_submit_executes_a_step_at_most_once(delegated):
+    """Two WS sessions bound to the SAME run fire step_request for the same step CONCURRENTLY — the atomic
+    claim lets exactly ONE execute and refuses the other, so a non-idempotent porter cannot be double-executed
+    / double-billed even under a deliberate race (not just sequential re-sends)."""
+    from infra.govern import compiler, govd_client as gc
+    base, httpd = delegated
+    verdict = gc.fetch(base, {"skill": "fs", "perk": "find_large", "vars": {"SEARCH_DIR": "/tmp"}})
+    assert verdict["decision"] == "allow"
+    psha = compiler.plan_sha(verdict["plan"])
+    ws_host, ws_port = verdict["ws"].split("://", 1)[1].split("/", 1)[0].rsplit(":", 1)
+
+    def session():
+        s = gc._ws_connect(ws_host, int(ws_port))
+        gc._ws_send(s, json.dumps({"type": "hello", "run_id": verdict["run_id"],
+                                   "token": verdict["session_token"]}))
+        assert json.loads(gc._ws_recv(s))["authorized"] is True
+        return s
+
+    s1, s2 = session(), session()
+    barrier, out = threading.Barrier(2), {}
+
+    def fire(name, s):
+        barrier.wait()                                              # release both step_requests together
+        gc._ws_send(s, json.dumps({"type": "step_request", "step": "1", "plan_sha": psha}))
+        out[name] = json.loads(gc._ws_recv(s))
+
+    t1 = threading.Thread(target=fire, args=("a", s1))
+    t2 = threading.Thread(target=fire, args=("b", s2))
+    t1.start(); t2.start(); t1.join(5); t2.join(5)
+    try:
+        assert sorted([out["a"]["type"], out["b"]["type"]]) == ["executed", "refuse"]   # one ran, one refused
+        rec = httpd.store.get(verdict["run_id"])
+        sr = [e for e in rec["events"] if e.get("type") == "step_result"]
+        assert len(sr) == 1 and sr[0]["status"] == "ok"            # the confined porter ran EXACTLY once
+    finally:
+        for s in (s1, s2):
+            gc._ws_send(s, b"", 0x8); s.close()
+
+
 def test_delegated_without_exod_fails_closed(tmp_path):
     cfg = govd.load_config()
     cfg.update({"mode": "local", "local": {"host": "127.0.0.1", "ports": [0]},

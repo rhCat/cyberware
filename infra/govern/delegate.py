@@ -73,7 +73,13 @@ def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base,
     seen = {e.get("result_nonce") for e in (rec.get("events") or []) if e.get("result_nonce")}
     if body.get("nonce") in seen:                                    # durable per-run replay guard
         return {"status": "refused", "reason": "result_replay"}, None
-    event = {"type": "step_result", "step": step, "status": body.get("status"), "exit": body.get("exit"),
+    status = body.get("status")
+    # a step exod RAN (ok/error) is a terminal step_result that consumes the step's at-most-once budget; a
+    # step exod REFUSED (closure mismatch, vault unavailable, ...) never ran, so it is recorded under a
+    # DISTINCT type — audited as evidence, yet outside the done-set, so a transient refusal can be retried
+    # rather than wedging the run.
+    etype = "step_result" if status in ("ok", "error") else "step_delegation_refused"
+    event = {"type": etype, "step": step, "status": status, "exit": body.get("exit"),
              "authority": "exod", "exod_keyid": _principal(exod_pub), "meter": exod.meter_of(envl),
              "result_nonce": body.get("nonce")}
-    return {"status": body.get("status"), "exit": body.get("exit"), "authority": "exod"}, event
+    return {"status": status, "exit": body.get("exit"), "authority": "exod"}, event

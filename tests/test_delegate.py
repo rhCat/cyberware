@@ -89,6 +89,21 @@ def test_delegated_credential_reaches_the_confined_step_only_when_granted(tmp_pa
     assert "CWS_SECRET_OTHER" not in prof.env                       # an ungranted credential is NOT injected
 
 
+def test_delegated_refusal_is_recorded_under_a_distinct_type_not_step_result(tmp_path):
+    """A step exod REFUSES (here a credential is granted but the limb has no vault) is recorded as evidence
+    under a DISTINCT type — OUTSIDE the at-most-once done-set — so a transient refusal does not wedge the run
+    (a completed ok/error step stays a step_result and is never re-run)."""
+    gk = Ed25519PrivateKey.generate()
+    exod_obj = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=gk.public_key(), runner=_Stub(rc=0))  # NO vault
+    rec = _rec()
+    rec["credential_ids"] = ["api-key"]                              # forces exod to refuse (vault:unavailable)
+    reply, event = delegate.execute_step(rec, "1", "PSHA", exod_socket="x", grant_key=gk,
+                                         exod_pub=exod_obj.public_key, base=str(tmp_path),
+                                         request=_inproc(exod_obj), now=1000)
+    assert reply["status"] == "refused"
+    assert event["type"] == "step_delegation_refused" and event["status"] == "refused"   # not a step_result
+
+
 def test_replayed_result_nonce_is_refused(tmp_path):
     from infra.cwp import sign
     gk = Ed25519PrivateKey.generate()

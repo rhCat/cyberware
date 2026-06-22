@@ -72,9 +72,10 @@ class Exod:
         The grant authorizes a specific (run_id, plan_sha), a set of capabilities, and (optionally) the
         approved snippet digests — exod refuses the moment the request strays outside what was actually
         granted, so one grant can never be laundered into authority over a different run or command. For a
-        `run`, exod itself RE-DERIVES the digest of every file the confined step will source and requires it
-        to match the grant's pin (it trusts no digest the caller computed), so a post-grant porter/core swap
-        is refused at time of use. The signed result is bound to the GRANT's single-use nonce (not the
+        `run`, exod itself RE-DERIVES the digest of every file in the materialized SNIP closure and requires
+        it to match the grant's pin (it trusts no digest the caller computed), so a post-grant porter/core
+        swap is refused at time of use; the entry wrapper (run.sh) rests on govd's plan-hash, not this gate.
+        The signed result is bound to the GRANT's single-use nonce (not the
         caller's), so a replayed grant is detectable at the ledger even across a daemon restart. Every refusal
         is itself on exod's channel."""
         run_id, plan_sha, step = req.get("run_id"), req.get("plan_sha"), req.get("step")

@@ -52,6 +52,12 @@ def test_empty_pin_with_staged_py_is_refused(tmp_path):
     assert C.closure_decision({}, str(tmp_path)) == (True, "closure:unpinned:evil.py")
 
 
+def test_empty_pin_with_noncode_file_is_refused(tmp_path):
+    # denylist, not a suffix allowlist: ANY staged file other than contracts.json is refused under an empty pin
+    _write(str(tmp_path), "evil.env", "SECRET=1\n")
+    assert C.closure_decision({}, str(tmp_path)) == (True, "closure:unpinned:evil.env")
+
+
 # ── pinned grant: every member present at its blessed digest, re-hashed at time of use ────────────────
 
 def test_pinned_member_present_and_matching_is_ok(tmp_path):
@@ -106,3 +112,11 @@ def test_smuggled_noncode_sibling_is_refused(tmp_path):
     sha = _write(str(tmp_path), "a.sh", "echo a\n")
     _write(str(tmp_path), "evil.txt", "data")                        # not contracts.json -> still refused
     assert C.closure_decision({"a.sh": sha}, str(tmp_path)) == (True, "closure:smuggled:evil.txt")
+
+
+def test_nested_pinned_member_not_staged_fails_closed(tmp_path):
+    # delegated mode materializes flat top-level src; a perk pinning a NESTED member (unsupported) fails
+    # CLOSED with a clear closure:missing rather than running unverified — the documented flat-src boundary.
+    sha = _write(str(tmp_path), "a.sh", "echo a\n")
+    assert C.closure_decision({"a.sh": sha, "lib/helper.py": "deadbeef"}, str(tmp_path)) \
+        == (True, "closure:missing:lib/helper.py")

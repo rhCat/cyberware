@@ -293,6 +293,7 @@ class Store:
         os.makedirs(self.root, exist_ok=True)
         self.lock = threading.Lock()
         self.runs = {}                                       # insertion-ordered -> oldest is first
+        self._inflight = {}                                  # run_id -> {step}: delegated steps mid-execution
         self.max_runs = max_runs
         self.decisions = collections.deque(maxlen=500)       # every /govern verdict (metadata, for the monitor)
         self.decisions_log = os.path.join(self.root, "decisions.jsonl")  # durable, append-only: ALL verdicts
@@ -419,6 +420,34 @@ class Store:
         granted = {e["step"] for e in evs if e.get("type") == "granted"}
         done = {e["step"] for e in evs if e.get("type") == "step_result"}
         return granted, done
+
+    def claim_step(self, run_id, step):
+        """Atomically reserve (run_id, step) for ONE delegated execution. Returns True for the FIRST caller
+        only; False if the step already RAN (a recorded ok/error step_result) OR is already in flight on
+        another connection. The reservation spans the whole check->dial-exod->record window (release_step
+        clears it), so two concurrent WS sessions bound to the same run cannot both execute the same step —
+        the at-most-once / no-double-bill invariant holds under concurrency, not just sequential re-sends."""
+        with self.lock:
+            rec = self.runs.get(run_id)
+            if rec is None:
+                return False
+            done = {e["step"] for e in rec.get("events", []) if e.get("type") == "step_result"}
+            held = self._inflight.setdefault(run_id, set())
+            if step in done or step in held:
+                return False
+            held.add(step)
+            return True
+
+    def release_step(self, run_id, step):
+        """Drop the in-flight reservation once the result is recorded (or after a non-terminal refusal). A
+        completed step stays blocked by its recorded step_result; a refused step (recorded under a distinct
+        type, outside `done`) becomes retryable."""
+        with self.lock:
+            held = self._inflight.get(run_id)
+            if held is not None:
+                held.discard(step)
+                if not held:
+                    self._inflight.pop(run_id, None)
 
     def record_decision(self, summary):
         with self.lock:
@@ -941,11 +970,6 @@ class Handler(BaseHTTPRequestHandler):
                             ws_send(self.wfile, json.dumps({"type": "refuse", "step": msg.get("step"),
                                     "reason": "run no longer resident (fail-closed)"}))
                             continue
-                        _granted, done = store.steps_seen(bound)
-                        if step in done:                     # at-most-once: a completed step is never re-run
-                            ws_send(self.wfile, json.dumps({"type": "refuse", "step": msg.get("step"),
-                                    "reason": f"step {step} already executed — delegated runs are at-most-once"}))
-                            continue
                         sock = getattr(self.server, "exod_socket", None)
                         gk = getattr(self.server, "exod_grant_key", None)
                         epub = getattr(self.server, "exod_pub", None)
@@ -953,13 +977,24 @@ class Handler(BaseHTTPRequestHandler):
                             ws_send(self.wfile, json.dumps({"type": "refuse", "step": msg.get("step"),
                                     "reason": "delegated mode but exod is not configured (fail-closed)"}))
                             continue
-                        d_reply, d_event = delegate.execute_step(
-                            rec0, step, psha, exod_socket=sock, grant_key=gk, exod_pub=epub,
-                            base=getattr(self.server, "exec_workspace", os.path.join(store.root, "_work")))
-                        if d_event:
-                            store.append(bound, {**d_event, "ts": now(),
-                                                 "span": tracing.child_span((rec0 or {}).get("traceparent"))})
-                        ws_send(self.wfile, json.dumps({"type": "executed", "step": msg.get("step"), **d_reply}))
+                        # atomically claim the step BEFORE dialing exod — a completed (recorded) OR a
+                        # concurrently in-flight step is refused, so two WS sessions on the same run cannot
+                        # double-execute / double-bill. Released after the result is recorded (a non-terminal
+                        # refusal frees the claim so a transient failure can be retried).
+                        if not store.claim_step(bound, step):
+                            ws_send(self.wfile, json.dumps({"type": "refuse", "step": msg.get("step"),
+                                    "reason": f"step {step} already executed or in flight — delegated runs are at-most-once"}))
+                            continue
+                        try:
+                            d_reply, d_event = delegate.execute_step(
+                                rec0, step, psha, exod_socket=sock, grant_key=gk, exod_pub=epub,
+                                base=getattr(self.server, "exec_workspace", os.path.join(store.root, "_work")))
+                            if d_event:
+                                store.append(bound, {**d_event, "ts": now(),
+                                                     "span": tracing.child_span((rec0 or {}).get("traceparent"))})
+                            ws_send(self.wfile, json.dumps({"type": "executed", "step": msg.get("step"), **d_reply}))
+                        finally:
+                            store.release_step(bound, step)
                         continue
                     reply = {"type": "grant" if ok else "refuse", "step": msg.get("step"), "reason": reason}
                     if ok:                                       # record the grant so a result can bind to it
