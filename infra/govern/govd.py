@@ -47,6 +47,7 @@ from infra.govern import compiler
 from infra.govern import composer
 from infra.govern import feed        # P5-T02: SSE framing + pagination + change-digest (prose-clean core)
 from infra.govern import principals  # P1-T08: Bearer-principal auth + token-bucket rate-limit at /govern
+from infra.govern import tracing     # P5-T05: W3C traceparent across planes + in-toto run provenance
 from infra.tool import skill_index   # verify the registry matches its committed per-skill authenticity index
 import difflib             # the inconsistency path is a plain text diff — never execute a submitted plan
 
@@ -663,6 +664,22 @@ class Handler(BaseHTTPRequestHandler):
             if detail:                                   # attach the porters this run runs (public chip code)
                 detail["sources"] = porter_sources(detail.get("skill"), detail.get("perk"), detail.get("seq"))
             return self._json(200 if detail else 404, detail or {"error": "unknown run_id"})
+        if path.startswith("/trace/"):
+            # P5-T05: the run's cross-plane trace (claim→grant→step spans under one trace id) by run_id —
+            # value-free, monitor-gated like /monitor/run.
+            if not self._monitor_authed(cfg):
+                return self._json(403, {"error": "missing/invalid monitor token"})
+            # run_detail strips the session token at the data boundary — the value-free guarantee never rests
+            # only on tracing.py's allowlist (defence in depth: a future field add can't launder the token).
+            tr = tracing.trace_of(store.run_detail(urllib.parse.unquote(path[len("/trace/"):])) or {})
+            return self._json(200 if tr else 404, tr or {"error": "unknown run_id or no trace"})
+        if path.startswith("/intoto/"):
+            # P5-T05: the run's in-toto cyberware/run@v1 provenance attestation by run_id (value-free).
+            if not self._monitor_authed(cfg):
+                return self._json(403, {"error": "missing/invalid monitor token"})
+            rec = store.run_detail(urllib.parse.unquote(path[len("/intoto/"):]))   # token-stripped copy
+            return self._json(200 if rec else 404,
+                              tracing.intoto_statement(rec) if rec else {"error": "unknown run_id"})
         if self.path.startswith("/ledger/"):
             tail = self.path.split("/ledger/", 1)[1]
             run_id = tail.split("?", 1)[0]
@@ -802,8 +819,13 @@ class Handler(BaseHTTPRequestHandler):
         # No values, no file contents, no secrets, no command output ever enter the ledger.
         var_keys = sorted(ledger.get("var_keys") or ledger.get("vars") or [])
         plan = v.get("plan")
+        # P5-T05: the run carries ONE W3C traceparent from the agent's claim (or govd mints a sampled root);
+        # govd derives a child span per plane hop so the claim→grant→step trace is retrievable by run_id.
+        traceparent = (ledger.get("traceparent") if tracing.parse_traceparent(ledger.get("traceparent") or "")
+                       else tracing.new_traceparent())
         record = {"run_id": run_id, "ts": now(), "skill": ledger.get("skill"), "perk": ledger.get("perk"),
                   "principal": pid, "token": token, "var_keys": var_keys, "decision": v["decision"],
+                  "traceparent": traceparent,
                   "destructive": v.get("destructive", False), "approved": v.get("approved", []),
                   "plan_sha": v.get("plan_sha"), "snippet_shas": (plan or {}).get("snippet_shas", {}),
                   "seq": v.get("seq", []), "wrapper": (plan or {}).get("wrapper", ""), "tlc": v.get("tlc"),
@@ -827,6 +849,7 @@ class Handler(BaseHTTPRequestHandler):
         resp = {"run_id": run_id, "decision": v["decision"], "problems": v.get("problems", []),
                 "destructive": v.get("destructive", False), "needs_approve": v.get("needs_approve", []),
                 "plan_sha": v.get("plan_sha"), "tlc": v.get("tlc"), "ws": f"ws://{ws_host}/oversight"}
+        resp["traceparent"] = traceparent               # P5-T05: the agent propagates this to exod/the step plane
         if v["decision"] == "allow":
             resp["plan"] = plan                          # value-free: sequence + wrapper + src-closure hashes
             resp["session_token"] = token                # present this on the WS and to GET /ledger
@@ -882,7 +905,9 @@ class Handler(BaseHTTPRequestHandler):
                     ok, reason = authorize_step(store, bound, step, psha)
                     reply = {"type": "grant" if ok else "refuse", "step": msg.get("step"), "reason": reason}
                     if ok:                                       # record the grant so a result can bind to it
-                        store.append(bound, {"type": "granted", "ts": now(), "step": step, "plan_sha": psha})
+                        span = tracing.child_span((store.get(bound) or {}).get("traceparent"))   # P5-T05 hop
+                        store.append(bound, {"type": "granted", "ts": now(), "step": step,
+                                             "plan_sha": psha, "span": span})
                     else:
                         ev = {"type": "step_refused", "ts": now(), "step": step, "reason": reason}
                         # inconsistency path: investigate by PLAIN TEXT DIFF, never by executing the plan.
@@ -902,7 +927,8 @@ class Handler(BaseHTTPRequestHandler):
                         ws_send(self.wfile, json.dumps({"type": "error", "step": step, "reason": why}))
                         continue
                     ev = {"type": "step_result", "ts": now(), "step": step,
-                          "status": msg.get("status"), "exit": msg.get("exit")}
+                          "status": msg.get("status"), "exit": msg.get("exit"),
+                          "span": tracing.child_span((store.get(bound) or {}).get("traceparent"))}   # P5-T05 hop
                     rec = store.append(bound, ev)
                     ws_send(self.wfile, json.dumps({"type": "recorded" if rec else "error",
                             "step": ev["step"], "index": len(rec["events"]) if rec else None}))

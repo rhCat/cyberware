@@ -11,6 +11,7 @@
   "depends_on": [],
   "executor": "human-authoring",
   "validated_by": "cws-release",
+  "validated_perk": "security-doorbell",
   "bootstrap_exempt": false,
   "validation_available_after": "P3-T08",
   "skill": "cws-release",
