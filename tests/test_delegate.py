@@ -26,9 +26,10 @@ class _Stub:
 
 
 def _rec(run_id="R1"):
-    plan = build_plan("fs", "find_large")
-    return {"run_id": run_id, "skill": "fs", "perk": "find_large", "wrapper": plan["wrapper"],
-            "seq": plan["sequence"], "snippet_shas": plan["snippet_shas"], "credential_ids": [], "events": []}
+    plan = build_plan("fs", "find_large")                                # credential_ids comes from the PLAN,
+    return {"run_id": run_id, "skill": "fs", "perk": "find_large", "wrapper": plan["wrapper"],   # not hardcoded —
+            "seq": plan["sequence"], "snippet_shas": plan["snippet_shas"],                       # mirrors the real
+            "credential_ids": plan.get("credential_ids", []), "events": []}                      # govd record
 
 
 def _inproc(exod_obj, now=1000):
@@ -66,6 +67,26 @@ def test_forged_result_is_refused_and_recorded(tmp_path):
                                          request=_inproc(real), now=1000)
     assert reply["status"] == "refused" and reply["reason"].startswith("exod_verify")
     assert event["type"] == "forged_status_refused"                  # recorded as evidence
+
+
+def test_delegated_credential_reaches_the_confined_step_only_when_granted(tmp_path):
+    """A perk that declares credentials gets them resolved by the LIMB's vault into the CONFINED step's env in
+    delegated mode (the wiring is live, not dead) — and only the server-authorized IDs, never others."""
+    from infra.exec import vault as _vaultmod
+    gk = Ed25519PrivateKey.generate()
+    secret = "SEKRET-" + "y" * 16
+    vault = _vaultmod.EnvStubVault({"api-key": secret, "other": "nope"})
+    stub = _Stub(rc=0)
+    exod_obj = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=gk.public_key(), runner=stub, vault=vault)
+    rec = _rec()
+    rec["credential_ids"] = ["api-key"]                              # a perk that declares one credential
+    reply, _event = delegate.execute_step(rec, "1", "PSHA", exod_socket="x", grant_key=gk,
+                                          exod_pub=exod_obj.public_key, base=str(tmp_path),
+                                          request=_inproc(exod_obj), now=1000)
+    assert reply["status"] == "ok"
+    prof, _argv = stub.calls[-1]
+    assert prof.env.get("CWS_SECRET_API_KEY") == secret             # the granted secret reached the confined step
+    assert "CWS_SECRET_OTHER" not in prof.env                       # an ungranted credential is NOT injected
 
 
 def test_replayed_result_nonce_is_refused(tmp_path):

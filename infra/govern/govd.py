@@ -854,6 +854,7 @@ class Handler(BaseHTTPRequestHandler):
                   "traceparent": traceparent,
                   "destructive": v.get("destructive", False), "approved": v.get("approved", []),
                   "plan_sha": v.get("plan_sha"), "snippet_shas": (plan or {}).get("snippet_shas", {}),
+                  "credential_ids": (plan or {}).get("credential_ids", []),   # server-authorized vault IDs (names only)
                   "seq": v.get("seq", []), "wrapper": (plan or {}).get("wrapper", ""), "tlc": v.get("tlc"),
                   "tlc_tla": v.get("tlc_tla"), "tlc_log": v.get("tlc_log"),   # the model-check spec + full output
                   "problems": v.get("problems", []), "events": []}
@@ -936,6 +937,15 @@ class Handler(BaseHTTPRequestHandler):
                     if ok and delegated:
                         # P2-T12: govd NEVER runs the step — it hands a signed grant to exod the limb, which
                         # runs CONFINED + signs the authoritative status. Fail-closed if exod isn't attached.
+                        if rec0 is None:                     # the run was evicted between authorize + this read
+                            ws_send(self.wfile, json.dumps({"type": "refuse", "step": msg.get("step"),
+                                    "reason": "run no longer resident (fail-closed)"}))
+                            continue
+                        _granted, done = store.steps_seen(bound)
+                        if step in done:                     # at-most-once: a completed step is never re-run
+                            ws_send(self.wfile, json.dumps({"type": "refuse", "step": msg.get("step"),
+                                    "reason": f"step {step} already executed — delegated runs are at-most-once"}))
+                            continue
                         sock = getattr(self.server, "exod_socket", None)
                         gk = getattr(self.server, "exod_grant_key", None)
                         epub = getattr(self.server, "exod_pub", None)

@@ -24,6 +24,7 @@ import time
 
 from infra.cwp import sign
 from infra.exec import vault as _vaultmod
+from infra.exec.closureverify import closure_decision
 from infra.exec.grantverify import _issuer, grant_body, verify_grant
 from infra.exec.sandbox import core_profile, run_confined
 from infra.exec.exodverify import (  # noqa: F401  (single source of truth for the verify surface)
@@ -70,9 +71,12 @@ class Exod:
         """Verify the grant AGAINST THE REQUEST, run the step confined, and return exod's SIGNED step-result.
         The grant authorizes a specific (run_id, plan_sha), a set of capabilities, and (optionally) the
         approved snippet digests — exod refuses the moment the request strays outside what was actually
-        granted, so one grant can never be laundered into authority over a different run or command. The
-        signed result is bound to the GRANT's single-use nonce (not the caller's), so a replayed grant is
-        detectable at the ledger even across a daemon restart. Every refusal is itself on exod's channel."""
+        granted, so one grant can never be laundered into authority over a different run or command. For a
+        `run`, exod itself RE-DERIVES the digest of every file the confined step will source and requires it
+        to match the grant's pin (it trusts no digest the caller computed), so a post-grant porter/core swap
+        is refused at time of use. The signed result is bound to the GRANT's single-use nonce (not the
+        caller's), so a replayed grant is detectable at the ledger even across a daemon restart. Every refusal
+        is itself on exod's channel."""
         run_id, plan_sha, step = req.get("run_id"), req.get("plan_sha"), req.get("step")
         try:
             gbody = grant_body(req["grant"])
@@ -93,10 +97,15 @@ class Exod:
         # 2. the grant must actually carry the capability being exercised
         if required_capability not in (gbody.get("capabilities") or []):
             return refuse("capability:" + required_capability)
-        # 3. if the grant pins approved snippet digests, the step's snippet must be one of them
-        granted = set((gbody.get("snippet_shas") or {}).values())
-        if granted and req.get("snippet_sha") not in granted:
-            return refuse("snippet:not_granted")
+        # 3. INDEPENDENTLY re-derive the digest of the materialized closure the confined step will source and
+        #    require every member to match what govd signed into the grant. exod trusts NO digest the caller
+        #    computed, so a post-grant porter/core swap (the snippet TOCTOU) or a smuggled sibling is refused
+        #    at time of use; a run grant that pins a closure with no staged code is fail-closed.
+        if required_capability == "run":
+            snip_dir = (req.get("env") or {}).get("SNIP") or os.path.join(req.get("workspace") or "", "snip")
+            refuse_closure, why = closure_decision(gbody.get("snippet_shas") or {}, snip_dir)
+            if refuse_closure:
+                return refuse(why)
         # 4. spend the grant ONLY now that the request is fully authorized — a refused request never burns a
         #    still-valid grant. This is the fast in-memory guard; the durable one is the ledger (result nonce).
         if gnonce is None or not self._grant_nonces.spend(_issuer(self._issuer_pub), gnonce):

@@ -1,6 +1,8 @@
 # Containment via exod delegation (v1.1 full-close headline)
 
-**Status (2026-06-22):** the *foundation* is merged; the *live wiring* is the remaining focused effort.
+**Status (2026-06-22):** the foundation is merged AND the live wiring is **built + adversarially reviewed**;
+all 8 confirmed review findings are folded in (see *Review findings folded in* below). Remaining: push +
+PR + CI + merge, then the exec-image (Linux+bwrap) validation pass on the action-runner node.
 
 ## The decision (design-panel verdict)
 govd **delegates to exod the limb** over the UDS — it does **not** execute itself. Decisive reasons,
@@ -25,14 +27,15 @@ stub**; execution lives only in exod.
 1. **exod sidecar `__main__`** (`infra/exec/exod.py`): a CLI that loads exod's identity key + the trusted
    grant-issuer pub (`keystore.FileKeyStore`) + a `FileVault`/`SopsAgeVault`, then `Exod(...).serve(socket)`.
    This is what the exec-image sidecar/systemd unit runs.
-2. **Workspace materialization** (THE load-bearing security item — get this wrong = a snippet TOCTOU hole,
-   the P1-T06 class). Before the runner runs, the workspace must hold the blessed wrapper + the
-   **hash-verified** perk src so the grant's `snippet_shas` pin guards real code. Lift `govd_client._prepare`
-   (`govd_client.py:169-180`) server-side. OPEN QUESTION to settle first: does **govd** materialize a shared
-   workspace (exec-image shared volume) and pass the path, or does **exod** materialize from its own
-   registry keyed by `snippet_shas`? And where does the per-step porter re-hash happen (exod must re-hash at
-   time-of-use, mirroring `executor.snippet_decision`, so a post-grant mutation is refused) — do NOT trust
-   the grant's `snippet_shas` alone.
+2. **Workspace materialization + closure integrity** (THE load-bearing security item — get this wrong = a
+   snippet TOCTOU hole, the P1-T06 class). **RESOLVED:** govd materializes a per-run workspace
+   (`delegate.materialize_workspace`) — the blessed wrapper + a copy of the perk src closure — and exod
+   **itself** re-derives the digest of every staged file *at time of use* (`infra/exec/closureverify.py`,
+   its own prose-clean 1.0 mutation gate) and refuses any member that does not match the grant's signed
+   `snippet_shas` pin, plus any unpinned sibling. So the integrity check is **exod's**, against the signed
+   pin — NOT govd attesting to its own freshly-copied bytes, and NOT a digest the caller computed. This
+   closes the post-grant porter/core swap (the review's findings 1/2/4) and the empty-pin fail-open
+   (finding 6); it is cooperative-parity with `_verify_registry` + `skill_index.verify`.
 3. **ExodClient seam in `serve(cfg)`** (`govd.py`): read `exod.socket` (default `/run/cyberware/exod.sock`),
    `exod.grant_key` (govd's Ed25519 grant-issuer PRIVATE key via keystore), `exod.pub` (exod identity PUBLIC
    key); stash on `httpd`. The vault is constructed **nowhere in govd** — it lives beside exod.
@@ -51,6 +54,24 @@ stub**; execution lives only in exod.
    step (fail-closed) and `/health` shows it.
 8. **`govd_client.run_delegated()`** — a thin variant that sends `step_request` and loops on acks, spawning
    NOTHING. `run_governed` stays the legacy cooperative local-dev mode (untouched).
+
+## Review findings folded in (commit on `feat/v11-govd-delegation`)
+The mandatory adversarial review (3 attack lenses → per-finding verify) confirmed **8 findings, all
+net-new to the delegated path**; every one is addressed:
+- **1/2/4 (major) — self-referential snippet pin / swapped-core / no time-of-use re-hash.** exod trusted
+  `req['snippet_sha']` (a digest govd computed) and checked only the porter. Fix: `closureverify.closure_decision`
+  — exod re-hashes the **whole** materialized closure at time of use vs the grant pin; `req['snippet_sha']`
+  and `delegate._porter_sha` are deleted. New first-class mutation gate (12/12 killed, floor 1.0).
+- **6 (minor) — empty `snippet_shas` failed open.** Now: staged code under an empty pin is refused
+  (`closure:unpinned`); a raw-argv run with no staged closure stays runnable (keeps the SV-3 red-team oracle).
+- **3/7 (major+minor) — `credential_ids` never populated → vault injection was dead.** `compiler.build_plan`
+  now sources the perk manifesto's declared `credentials` (names only, server-authoritative); govd binds them
+  onto the run record; `test_delegate` proves a granted secret reaches the confined step (and the masking
+  `_rec()` fixture no longer hardcodes `[]`).
+- **5 (major) — at-most-once lost in delegated mode.** The delegated WS branch now refuses a re-sent
+  `step_request` for an already-recorded step *before* dialing exod (no double-execution / double-bill).
+- **8 (nit) — handler TypeError if the run is evicted mid-session.** The delegated branch fails closed on a
+  `None` record (`run no longer resident`) instead of crashing the connection thread.
 
 ## Validation
 - **macOS (now):** the channel logic via the `runner=` stub + a real AF_UNIX loopback (`serve(max_requests=N)`):

@@ -11,7 +11,6 @@ self-report. A forged/unverifiable result is recorded as evidence; an unreachabl
 (fail-closed). The real bwrap confinement runs on the exec image; the channel logic is platform-agnostic.
 """
 from __future__ import annotations
-import hashlib
 import os
 import secrets
 import shutil
@@ -44,39 +43,24 @@ def materialize_workspace(rec, base, registry=None):
     return ws, env, run_sh
 
 
-def _porter_sha(snip, rec, step):
-    """sha256 of the step's porter in the MATERIALIZED workspace (step i -> rec['seq'][i-1].sh) — the value
-    exod checks against the grant's snippet_shas pin, recomputed from the trusted server-side copy."""
-    seq = rec.get("seq") or []
-    try:
-        i = int(step) - 1
-    except (TypeError, ValueError):
-        return ""
-    if not (0 <= i < len(seq)):
-        return ""
-    porter = os.path.join(snip, str(seq[i]) + ".sh")
-    if not os.path.isfile(porter):
-        return ""
-    with open(porter, "rb") as f:
-        return hashlib.sha256(f.read()).hexdigest()
-
-
 def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base, registry=None,
                  request=exod.request_step, now=None, grant_ttl=60):
     """Delegate ONE step to exod. Returns (reply, event): `reply` is the status-only dict sent back to the
     agent; `event` is the ledger record to append (exod's signed step_result, or a refusal record, or None
-    when nothing should be recorded). govd NEVER runs the step — exod does, confined."""
+    when nothing should be recorded). govd NEVER runs the step — exod does, confined.
+
+    govd mints the grant pinning the perk's whole blessed src closure (snippet_shas) and hands exod the
+    materialized workspace; exod ITSELF re-derives the digest of every staged file at time of use and refuses
+    a swap, so govd does not attest to its own copy — the integrity check is exod's, against the signed pin."""
     now = int(time.time()) if now is None else now
     ws, env, run_sh = materialize_workspace(rec, base, registry)
-    snippet_sha = _porter_sha(env["SNIP"], rec, step)
     nonce = secrets.token_urlsafe(18)
     grant = grants.mint_grant(grant_key, run_id=rec["run_id"], plan_sha=plan_sha,
                               snippet_shas=rec.get("snippet_shas") or {}, capabilities=["run"],
                               credentials=rec.get("credential_ids") or [],
                               nbf=now - 5, exp=now + grant_ttl, nonce=nonce)
     req = {"run_id": rec["run_id"], "plan_sha": plan_sha, "step": step,
-           "argv": ["bash", run_sh, "--step", step], "workspace": ws, "env": env,
-           "snippet_sha": snippet_sha, "grant": grant}
+           "argv": ["bash", run_sh, "--step", step], "workspace": ws, "env": env, "grant": grant}
     try:
         envl = request(exod_socket, req)
     except Exception:

@@ -96,6 +96,33 @@ def test_delegated_run_status_is_exod_signed_agent_runs_nothing(delegated):
     sr = [e for e in rec["events"] if e.get("type") == "step_result"]
     assert sr and sr[0]["authority"] == "exod" and sr[0]["exod_keyid"].startswith("ed25519:")
     assert "step-output-stays-server-side" not in json.dumps(rec)   # the step output never crossed to govd
+    assert "credential_ids" in rec                                  # the record carries the server-authorized set
+    assert rec["credential_ids"] == []                              # find_large declares none -> credential-free
+
+
+def test_delegated_step_is_at_most_once(delegated):
+    """A completed delegated step is never re-run: re-sending step_request for a recorded step is refused
+    BEFORE exod is dialed (so a non-idempotent porter cannot be double-executed / double-billed)."""
+    from infra.govern import compiler, govd_client as gc
+    base, _httpd = delegated
+    verdict = gc.fetch(base, {"skill": "fs", "perk": "find_large", "vars": {"SEARCH_DIR": "/tmp"}})
+    assert verdict["decision"] == "allow"
+    psha = compiler.plan_sha(verdict["plan"])
+    ws_host, ws_port = verdict["ws"].split("://", 1)[1].split("/", 1)[0].rsplit(":", 1)
+    sock = gc._ws_connect(ws_host, int(ws_port))
+    try:
+        gc._ws_send(sock, json.dumps({"type": "hello", "run_id": verdict["run_id"],
+                                      "token": verdict["session_token"]}))
+        assert json.loads(gc._ws_recv(sock))["authorized"] is True
+        gc._ws_send(sock, json.dumps({"type": "step_request", "step": "1", "plan_sha": psha}))
+        first = json.loads(gc._ws_recv(sock))
+        assert first["type"] == "executed" and first["status"] == "ok"
+        gc._ws_send(sock, json.dumps({"type": "step_request", "step": "1", "plan_sha": psha}))   # re-run step 1
+        second = json.loads(gc._ws_recv(sock))
+        assert second["type"] == "refuse" and "already executed" in second["reason"]
+    finally:
+        gc._ws_send(sock, b"", 0x8)
+        sock.close()
 
 
 def test_delegated_without_exod_fails_closed(tmp_path):
