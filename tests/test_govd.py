@@ -672,3 +672,45 @@ def test_monitor_stream_caps_concurrent_connections(server):
         assert e.value.code == 503
     finally:
         govd._SSE_ACTIVE[0] = 0                                    # reset the shared counter for other tests
+
+
+# ── P5-T05: W3C traceparent across planes + in-toto provenance ───────────────────────────────────────
+
+def test_trace_and_intoto_endpoints_by_run_id(server):
+    """A run with a stored traceparent is retrievable by run_id: /trace reassembles the claim→grant→step
+    spans under one trace id, /intoto renders the cyberware/run@v1 attestation. Both monitor-token gated."""
+    base, store, _ = server
+    from infra.govern import tracing
+    tp = "00-" + "a" * 32 + "-" + "b" * 16 + "-01"
+    rid = "traceabc12345678"
+    secret_tok = "SEKRET-session-token-value"
+    store.create(rid, {"run_id": rid, "ts": "2026-06-22T00:00:00Z", "skill": "fs", "perk": "read",
+                       "decision": "allow", "principal": "local", "plan_sha": "feedface", "traceparent": tp,
+                       "token": secret_tok,
+                       "events": [{"type": "granted", "step": "1", "span": tracing.child_span(tp)},
+                                  {"type": "step_result", "step": "1", "status": "ok",
+                                   "span": tracing.child_span(tp)}]})
+    trace_body = urllib.request.urlopen(base + "/trace/" + rid + "?token=admin").read().decode()
+    tr = json.loads(trace_body)
+    assert tr["trace_id"] == "a" * 32
+    assert [s["plane"] for s in tr["spans"]] == ["claim", "granted", "step_result"]   # full cross-plane trace
+
+    intoto_body = urllib.request.urlopen(base + "/intoto/" + rid + "?token=admin").read().decode()
+    att = json.loads(intoto_body)
+    assert att["predicateType"] == "https://cyberware.dev/run/v1"      # cyberware/run@v1
+    assert att["predicate"]["trace_id"] == "a" * 32 and att["subject"][0]["digest"]["sha256"] == "feedface"
+    # value-free: the run's session token never crosses to the trace/provenance plane
+    assert secret_tok not in trace_body and secret_tok not in intoto_body
+
+    for ep in ("/trace/", "/intoto/"):
+        with pytest.raises(urllib.error.HTTPError) as e:
+            urllib.request.urlopen(base + ep + rid)                    # no token
+        assert e.value.code == 403
+
+
+def test_govern_response_carries_a_traceparent(server):
+    """Every /govern verdict echoes a W3C traceparent the agent propagates to the step plane."""
+    base, _, _ = server
+    from infra.govern import tracing
+    _code, v = claim(base, "fs", "find_large", var_keys=["SEARCH_DIR"])
+    assert tracing.parse_traceparent(v.get("traceparent")) is not None

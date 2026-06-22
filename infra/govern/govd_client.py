@@ -86,6 +86,8 @@ def fetch(base_url, ledger, approve=()):
             "var_keys": sorted((ledger.get("vars") or {}).keys())}
     if approve:
         body["approve"] = list(approve)
+    if ledger.get("traceparent"):                        # P5-T05: propagate the agent's W3C trace into the claim
+        body["traceparent"] = ledger["traceparent"]
     _, verdict = _post_json(base_url.rstrip("/") + "/govern", body)
     return verdict
 
