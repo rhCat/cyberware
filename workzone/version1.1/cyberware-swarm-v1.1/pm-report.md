@@ -1,15 +1,15 @@
 # cyberware v1.1 — project status (2026-06-22)
 
 Generated through govd (dogfood): `cws-pm/run` (DRY_RUN board) + `cws-observe/status` (chain + milestones),
-chip `132cd6c9` (lean), done-ledger-v2 head seq 61.
+chip `132cd6c9` (lean), done-ledger-v2 head seq 63.
 
 ## Headline — the SV ladder is CLOSED; the agent-mode stage (M7) is now tracked
 **All 7 SV cones closed (M0 + SV-1…SV-6), 0 open rungs.** `done_ledger_chain: ok` (tamper-checked).
-**70 / 91 tasks redeemed (77%).** `validators_missing: []`; `blocked:validator: 0`. The DAG grew **90 → 91**:
+**72 / 91 tasks redeemed (79%).** `validators_missing: []`; `blocked:validator: 0`. The DAG grew **90 → 91**:
 a new **M7 — Agent-mode** milestone + one new task **P2-T12 (govd-as-executor)** now track the kernel-for-agents
 build-out (see [`../AGENT-MODE.md`](../AGENT-MODE.md)). Recent redemptions (non-cone tail, all perk-bound):
 **P6-T06** reward_verify, **P6-T10** markets, **P6-T13** reputation (seq 58-60), **P4-T06** settlement lifecycle
-formally proven — TLC + Apalache, money mutants caught (seq 61).
+formally proven — TLC + Apalache, money mutants caught (seq 61); **P6-T03** escrow expiry/auto-refund + **P6-T07** code↔blueprint bisimulation (seq 62-63).
 
 | cone | rung | redeemed/closure | state |
 |------|------|------------------|-------|

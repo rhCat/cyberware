@@ -1,0 +1,15 @@
+{
+  "name": "Settlement",
+  "doc": "The canonical settlement lifecycle (P4-T06 model-checked, P6-T07 bisimilar to the engine). The implemented lifecycle (infra/settle/engine.py, modelled by workflow.settlement_workflow) must map transition-for-transition onto this blueprint.",
+  "states": ["quoted", "funded", "checked", "settled", "cancelled"],
+  "entry": "quoted",
+  "terminal": ["settled", "cancelled"],
+  "transitions": [
+    {"from": "quoted", "to": "funded", "label": "fund-escrow"},
+    {"from": "funded", "to": "checked", "label": "validate"},
+    {"from": "checked", "to": "settled", "label": "settle-payout"},
+    {"from": "funded", "to": "cancelled", "label": "escrow-expiry-refund"},
+    {"from": "checked", "to": "cancelled", "label": "cancel-refund"},
+    {"from": "cancelled", "to": "cancelled", "label": "terminal-self-loop"}
+  ]
+}

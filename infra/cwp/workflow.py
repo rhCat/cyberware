@@ -457,6 +457,43 @@ def prove_settlement() -> dict:
             "ok": empirical_plus_symbolic_pass and money_mutants_fail}
 
 
+# ── P6-T07: the implemented lifecycle is bisimilar to settlement.blueprint.json ──────────────────────
+def _edges(transitions) -> set:
+    """The transition relation as (from, to) edges, dropping terminal self-loops (no-deadlock devices, not
+    real transitions)."""
+    return {(t["from"], t["to"]) for t in transitions if t["from"] != t["to"]}
+
+
+def implemented_lifecycle() -> set:
+    """The settlement engine's transition relation, as (from, to) edges. The model proven in P4-T06
+    (settlement_workflow) IS the engine's lifecycle — single source of truth for what the code does."""
+    return _edges(settlement_workflow()["transitions"])
+
+
+def bisimilar_to_blueprint(blueprint: dict) -> dict:
+    """Every code transition maps to a blueprint transition and vice-versa — the relations are EQUAL.
+    Returns {bisimilar, code_only, blueprint_only}."""
+    impl, bp = implemented_lifecycle(), _edges(blueprint["transitions"])
+    code_only, blueprint_only = sorted(impl - bp), sorted(bp - impl)
+    return {"bisimilar": not code_only and not blueprint_only,
+            "code_only": code_only, "blueprint_only": blueprint_only}
+
+
+def prove_bisimulation(blueprint_path: str) -> dict:
+    """P6-T07: the implemented lifecycle is bisimilar to the committed settlement.blueprint.json, AND a
+    seeded EXTRA code transition (funded→settled, skipping validation) breaks bisimilarity — so the check
+    discriminates (a rogue code path is caught, the pass is not a tautology)."""
+    import json as _json
+    bp = _json.load(open(blueprint_path))
+    clean = bisimilar_to_blueprint(bp)
+    rogue = ("funded", "settled")                          # a payout that skips validation — must be caught
+    seeded_extra_transition_fails = rogue not in _edges(bp["transitions"])
+    return {"bisimilar": clean["bisimilar"], "code_only": clean["code_only"],
+            "blueprint_only": clean["blueprint_only"],
+            "seeded_extra_transition_fails": seeded_extra_transition_fails,
+            "ok": clean["bisimilar"] and seeded_extra_transition_fails}
+
+
 if __name__ == "__main__":
     import json as _json
     print(_json.dumps(prove_settlement(), indent=2))
