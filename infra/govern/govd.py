@@ -45,6 +45,7 @@ from infra import registry
 from infra.cwp import canonical
 from infra.govern import compiler
 from infra.govern import composer
+from infra.govern import principals  # P1-T08: Bearer-principal auth + token-bucket rate-limit at /govern
 from infra.tool import skill_index   # verify the registry matches its committed per-skill authenticity index
 import difflib             # the inconsistency path is a plain text diff — never execute a submitted plan
 
@@ -86,6 +87,10 @@ def load_config(path=None):
     # the monitor (dashboard) token — gates the dashboard. env > config; the default is filled by
     # ensure_monitor_token() once the FINAL mode is known (after any --mode override).
     cfg["monitor_token"] = os.environ.get("GOVD_MONITOR_TOKEN") or cfg.get("monitor_token") or None
+    # P1-T08: the principals registry (id -> token_sha -> quota). A present registry makes Authorization:
+    # Bearer mandatory at /govern; absent (local dev) -> auth off, every record carries principal "local".
+    pr_path = os.environ.get("GOVD_PRINCIPALS") or cfg.get("principals_path")
+    cfg["principals"] = principals.load_principals(pr_path) if pr_path else (cfg.get("principals") or {})
     return cfg
 
 
@@ -704,6 +709,19 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != "/govern":
             return self._json(404, {"error": "not found", "path": self.path})
         cfg, store = self.server.cfg, self.server.store
+        # P1-T08: principal auth at the syscall boundary (header-only, before reading the body). A configured
+        # principals registry makes Authorization: Bearer mandatory; local dev (no registry) runs as 'local'.
+        reg = cfg.get("principals") or {}
+        pid = "local"
+        if reg:
+            pid = principals.authenticate(principals.bearer_of(self.headers.get("Authorization", "")), reg)
+            if pid is None:
+                return self._json(401, {"error": "missing/invalid Authorization: Bearer token"})
+            spec = reg[pid]
+            bucket = self.server.rate_buckets.setdefault(pid, {})
+            if not principals.rate_ok(bucket, time.time(), float(spec.get("rate", 1.0)),
+                                      float(spec.get("burst", 10))):
+                return self._json(429, {"error": "rate limit exceeded", "principal": pid})
         try:
             n = int(self.headers.get("Content-Length", 0))
             if n > MAX_BODY:
@@ -727,7 +745,7 @@ class Handler(BaseHTTPRequestHandler):
         var_keys = sorted(ledger.get("var_keys") or ledger.get("vars") or [])
         plan = v.get("plan")
         record = {"run_id": run_id, "ts": now(), "skill": ledger.get("skill"), "perk": ledger.get("perk"),
-                  "token": token, "var_keys": var_keys, "decision": v["decision"],
+                  "principal": pid, "token": token, "var_keys": var_keys, "decision": v["decision"],
                   "destructive": v.get("destructive", False), "approved": v.get("approved", []),
                   "plan_sha": v.get("plan_sha"), "snippet_shas": (plan or {}).get("snippet_shas", {}),
                   "seq": v.get("seq", []), "wrapper": (plan or {}).get("wrapper", ""), "tlc": v.get("tlc"),
@@ -739,7 +757,7 @@ class Handler(BaseHTTPRequestHandler):
             store.remember(run_id, record)               # in the monitor (ledger + plan + problems), not on disk
         # every decision (incl. push_back/reject) is logged for the monitor — metadata only, no token
         store.record_decision({"run_id": run_id, "ts": record["ts"], "skill": record["skill"],
-                               "perk": record["perk"], "decision": v["decision"],
+                               "perk": record["perk"], "principal": pid, "decision": v["decision"],
                                "destructive": v.get("destructive", False), "var_keys": var_keys,
                                "plan_sha": (v.get("plan_sha") or "")[:12], "tlc": v.get("tlc"),
                                "problems": [p.get("id") for p in v.get("problems", [])],
@@ -866,6 +884,7 @@ def serve(cfg):
         raise SystemExit(f"govd: no free port among {ports}")
     httpd.daemon_threads = True
     httpd.cfg, httpd.store = cfg, store
+    httpd.rate_buckets = {}                               # P1-T08: per-principal token-bucket state (in-memory)
     dash_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
     print(f"govd · {cfg['mode']} · http://{host}:{port}  ·  ws://{host}:{port}/oversight")
     prov = chip_provenance()

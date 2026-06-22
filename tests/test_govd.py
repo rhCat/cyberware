@@ -33,6 +33,7 @@ def server(tmp_path):
     httpd, _ = govd.bind_server("127.0.0.1", [0])
     httpd.daemon_threads = True
     httpd.cfg, httpd.store = cfg, store
+    httpd.rate_buckets = {}
     # poll the shutdown flag every 20ms (not the 0.5s default) so the per-test teardown returns promptly —
     # otherwise httpd.shutdown() below waits up to half a second × every test in this file.
     threading.Thread(target=httpd.serve_forever, kwargs={"poll_interval": 0.02}, daemon=True).start()
@@ -542,3 +543,58 @@ def test_monitor_snapshot_classifies_each_step_state(tmp_path):
     assert snap["tools"]["a"]["ok"] == 1
     assert snap["tools"]["b"]["error"] == 1
     assert snap["tools"]["c"]["granted"] == 1
+
+
+# ── P1-T08: principal Bearer auth + token-bucket rate-limit at /govern ──
+def _auth_server(tmp_path, reg):
+    cfg = govd.load_config()
+    cfg["mode"] = "local"
+    cfg["local"] = {"host": "127.0.0.1", "ports": [0]}
+    cfg["record_root"] = str(tmp_path / "govd_auth")
+    govd.ensure_monitor_token(cfg)
+    cfg["principals"] = reg
+    store = govd.Store(cfg["record_root"])
+    httpd, _ = govd.bind_server("127.0.0.1", [0])
+    httpd.daemon_threads = True
+    httpd.cfg, httpd.store = cfg, store
+    httpd.rate_buckets = {}
+    threading.Thread(target=httpd.serve_forever, kwargs={"poll_interval": 0.02}, daemon=True).start()
+    base = f"http://127.0.0.1:{httpd.server_address[1]}"
+    for _ in range(100):
+        try:
+            urllib.request.urlopen(base + "/health", timeout=1); break
+        except OSError:
+            time.sleep(0.02)
+    return base, store, httpd
+
+
+def _post(base, body, headers=None):
+    req = urllib.request.Request(base + "/govern", data=json.dumps(body).encode(),
+                                 headers=headers or {}, method="POST")
+    try:
+        r = urllib.request.urlopen(req, timeout=5)
+        return r.status, json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        return e.code, None
+
+
+def test_govern_bearer_auth_principal_and_rate_limit(tmp_path):
+    from infra.govern import principals
+    reg = {"agent-a": {"token_sha": principals.token_sha("secret-A"), "rate": 1.0, "burst": 3}}
+    base, store, httpd = _auth_server(tmp_path, reg)
+    body = {"skill": "cws-conform", "perk": "schemas", "var_keys": []}
+    try:
+        assert _post(base, body)[0] == 401                                   # no token -> 401
+        assert _post(base, body, {"Authorization": "Bearer nope"})[0] == 401  # wrong token -> 401
+        assert _post(base, body, {"Authorization": "token=secret-A"})[0] == 401  # query-style -> 401 (Bearer only)
+        code, v = _post(base, body, {"Authorization": "Bearer secret-A"})     # valid -> allow
+        assert code == 200 and v["decision"] == "allow"
+        # the persisted record carries the principal (every_record_carries_principal)
+        led = json.loads(urllib.request.urlopen(
+            base + "/ledger/" + v["run_id"] + "?token=" + v["session_token"]).read())
+        assert led["principal"] == "agent-a"
+        # burst then 429 (burst=3; one token already spent on the allowed call above)
+        codes = [_post(base, body, {"Authorization": "Bearer secret-A"})[0] for _ in range(4)]
+        assert 429 in codes
+    finally:
+        httpd.shutdown(); httpd.server_close()
