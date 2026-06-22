@@ -34,6 +34,14 @@
       "note": "SV-2 Ledger-v2 chain verifier (verify_chain + link digests) — prose-clean core, both sides pinned"
     },
     {
+      "module": "infra/govern/plan_steps.py",
+      "slice": "tests/test_plan_steps.py",
+      "cap": 20,
+      "floor": 1.0,
+      "target": 0.90,
+      "note": "P1-T06 step-truth from the blessed plan — manifesto sequence AUTHENTICATED against its index.json sha (a post-bless swap cannot decouple the step→tool map from snippet-verify); prose-clean core, both sides pinned"
+    },
+    {
       "module": "infra/govern/snippetverify.py",
       "slice": "tests/test_snippetverify.py",
       "cap": 50,

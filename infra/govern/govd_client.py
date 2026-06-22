@@ -211,8 +211,11 @@ def run_governed(base_url, ledger, approve=(), registry=None):
         sock.close()
         return {"run_id": verdict["run_id"], "decision": "allow", "error": "oversight session not authorized"}
 
-    listing = subprocess.run(["bash", sh, "--list"], capture_output=True, text=True, env=env).stdout
-    steps = [ln.split("\t")[0].strip() for ln in listing.strip().splitlines() if ln.strip()]
+    # P1-T06: the BLESSED PLAN is the sole source of step truth — never the porter's own `--list`. The
+    # wrapper emits step1..stepN for enumerate(sequence, 1), so the step ids ARE the 1-based indices of
+    # plan["sequence"] (which we just hash-verified against govd). Asking the script `--list` would let the
+    # executed text — not the blessed structure — decide what runs; deriving the ids here removes that gap.
+    steps = [str(i) for i in range(1, len(plan["sequence"]) + 1)]
     results = []
     for st in steps:
         _ws_send(sock, json.dumps({"type": "step_request", "step": st, "plan_sha": psha}))
