@@ -272,6 +272,36 @@ def test_run_table_is_bounded():
     assert len(st.runs) == 3 and st.get("r0") is None and st.get("r4") is not None
 
 
+def test_claim_step_is_at_most_once_and_concurrency_safe():
+    """claim_step reserves (run,step) atomically: the FIRST caller wins; a concurrent in-flight claim, OR a
+    step already RAN (recorded ok/error), is refused. This is what makes delegated execution at-most-once
+    even when two WS sessions race the same step."""
+    import tempfile
+    st = govd.Store(tempfile.mkdtemp())
+    st.create("r", {"run_id": "r", "decision": "allow", "events": []})
+    assert st.claim_step("r", "1") is True                          # first caller wins
+    assert st.claim_step("r", "1") is False                         # already in flight -> refused
+    assert st.claim_step("r", "2") is True                          # a different step is independent
+    st.release_step("r", "1")
+    assert st.claim_step("r", "1") is True                          # released (e.g. after a refusal) -> retryable
+    st.release_step("r", "1")
+    st.append("r", {"type": "step_result", "step": "1", "status": "ok"})
+    assert st.claim_step("r", "1") is False                         # a completed step is never re-run
+    assert st.claim_step("missing", "1") is False                   # unknown run -> fail-closed
+
+
+def test_claim_step_done_set_ignores_a_refused_delegation():
+    """A step exod REFUSED is recorded under step_delegation_refused (not step_result), so it stays OUT of the
+    done-set and can be retried — a transient refusal must not permanently wedge the run."""
+    import tempfile
+    st = govd.Store(tempfile.mkdtemp())
+    st.create("r", {"run_id": "r", "decision": "allow", "events": []})
+    st.append("r", {"type": "step_delegation_refused", "step": "1", "status": "refused"})
+    assert st.claim_step("r", "1") is True                          # refused != completed -> retryable
+    st.append("r", {"type": "step_result", "step": "1", "status": "error"})
+    assert st.claim_step("r", "1") is False                         # but a step that RAN (error) is terminal
+
+
 # ── end-to-end: value-free plan, run locally, status-only provenance on the server ──
 
 def test_run_governed_records_status_only(server, tmp_path):

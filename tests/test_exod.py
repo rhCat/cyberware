@@ -194,17 +194,104 @@ def test_grant_must_carry_the_run_capability():
     assert stub.calls == []
 
 
-def test_grant_binds_the_approved_snippet():
+def _stage_closure(ws, files):
+    """Write a materialized SNIP dir under `ws` and return (snip_dir, {name: sha})."""
+    import hashlib
+    snip = os.path.join(ws, "snip")
+    os.makedirs(snip, exist_ok=True)
+    shas = {}
+    for name, content in files.items():
+        with open(os.path.join(snip, name), "w") as f:
+            f.write(content)
+        shas[name] = hashlib.sha256(content.encode()).hexdigest()
+    return snip, shas
+
+
+def test_exod_rehashes_the_materialized_closure_and_runs_the_blessed_one(tmp_path):
+    """exod itself re-derives the staged digests at time of use and runs the step only when they match the
+    grant's pin — the integrity check is exod's, not a digest govd computed."""
+    isk, ipub = _kp()
+    stub = _Stub(rc=0, out="x")
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=stub)
+    ws = str(tmp_path / "ws")
+    os.makedirs(ws)
+    snip, shas = _stage_closure(ws, {"a.sh": "echo a\n", "contracts.json": "{}"})
+    g = mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g1",
+                   capabilities=["run"], snippet_shas={"a.sh": shas["a.sh"]})
+    req = dict(run_id="R1", plan_sha="P1", step="1", argv=["bash", "x", "--step", "1"],
+               workspace=ws, env={"SNIP": snip}, nonce="r1", grant=g)
+    assert result_body(exod.run_step(req, now=1000))["status"] == "ok" and len(stub.calls) == 1
+
+
+def test_exod_refuses_a_post_grant_porter_swap_toctou(tmp_path):
+    """The grant pins the BLESSED porter; the staged file is swapped after the grant — exod re-hashes the
+    bytes it is about to run and refuses, never executing the swapped porter (the P1-T06 TOCTOU class)."""
     isk, ipub = _kp()
     stub = _Stub()
     exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=stub)
+    ws = str(tmp_path / "ws")
+    os.makedirs(ws)
+    snip, shas = _stage_closure(ws, {"a.sh": "echo benign\n"})
+    blessed = shas["a.sh"]
+    with open(os.path.join(snip, "a.sh"), "w") as f:
+        f.write("echo PWNED\n")                                          # swapped after the grant was minted
     g = mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g1",
-                   capabilities=["run"], snippet_shas={"1": "sha-approved"})
-    base = dict(run_id="R1", plan_sha="P1", step="1", argv=["x"], workspace="/ws", grant=g)
-    wrong = exod.run_step({**base, "snippet_sha": "sha-EVIL", "nonce": "r1"}, now=1000)
-    assert result_body(wrong)["status"] == "refused" and stub.calls == []     # un-granted snippet refused
-    good = exod.run_step({**base, "snippet_sha": "sha-approved", "nonce": "r2"}, now=1000)
-    assert result_body(good)["status"] == "ok" and len(stub.calls) == 1       # the refusal did NOT burn the grant
+                   capabilities=["run"], snippet_shas={"a.sh": blessed})
+    req = dict(run_id="R1", plan_sha="P1", step="1", argv=["bash", "x"], workspace=ws,
+               env={"SNIP": snip}, nonce="r1", grant=g)
+    assert result_body(exod.run_step(req, now=1000))["status"] == "refused"
+    assert stub.calls == []                                              # the swapped porter NEVER ran
+
+
+def test_exod_refuses_a_swapped_core_even_with_a_pristine_porter(tmp_path):
+    """The grant pins the whole closure (.sh AND .py); the porter is untouched but the .py core it execs is
+    swapped — exod checks every member, so the swapped core is refused (cooperative-parity)."""
+    isk, ipub = _kp()
+    stub = _Stub()
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=stub)
+    ws = str(tmp_path / "ws")
+    os.makedirs(ws)
+    snip, shas = _stage_closure(ws, {"c.sh": "python3 c.py\n", "c.py": "print('ok')\n"})
+    pins = dict(shas)
+    with open(os.path.join(snip, "c.py"), "w") as f:
+        f.write("print('PWNED')\n")                                      # the core, swapped; the porter is pristine
+    g = mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g1",
+                   capabilities=["run"], snippet_shas=pins)
+    req = dict(run_id="R1", plan_sha="P1", step="1", argv=["bash", "x"], workspace=ws,
+               env={"SNIP": snip}, nonce="r1", grant=g)
+    assert result_body(exod.run_step(req, now=1000))["status"] == "refused" and stub.calls == []
+
+
+def test_exod_refuses_a_smuggled_unpinned_sibling(tmp_path):
+    """A blessed porter cannot smuggle an unpinned sibling into the materialized closure — exod refuses any
+    staged member the grant did not pin (skill_index-parity)."""
+    isk, ipub = _kp()
+    stub = _Stub()
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=stub)
+    ws = str(tmp_path / "ws")
+    os.makedirs(ws)
+    snip, shas = _stage_closure(ws, {"a.sh": "echo a\n", "evil.py": "import os\n"})
+    g = mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g1",
+                   capabilities=["run"], snippet_shas={"a.sh": shas["a.sh"]})       # evil.py NOT pinned
+    req = dict(run_id="R1", plan_sha="P1", step="1", argv=["bash", "x"], workspace=ws,
+               env={"SNIP": snip}, nonce="r1", grant=g)
+    assert result_body(exod.run_step(req, now=1000))["status"] == "refused" and stub.calls == []
+
+
+def test_exod_refuses_staged_code_under_an_empty_pin(tmp_path):
+    """A run grant that materialized code but pins NOTHING is fail-closed — the fail-open in the membership
+    check is closed for any staged closure (a raw-argv run with no staged code still runs, tested elsewhere)."""
+    isk, ipub = _kp()
+    stub = _Stub()
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=stub)
+    ws = str(tmp_path / "ws")
+    os.makedirs(ws)
+    snip, _ = _stage_closure(ws, {"a.sh": "echo a\n"})
+    g = mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g1",
+                   capabilities=["run"], snippet_shas={})                            # pins nothing
+    req = dict(run_id="R1", plan_sha="P1", step="1", argv=["bash", "x"], workspace=ws,
+               env={"SNIP": snip}, nonce="r1", grant=g)
+    assert result_body(exod.run_step(req, now=1000))["status"] == "refused" and stub.calls == []
 
 
 def test_result_carries_an_exod_attested_meter():

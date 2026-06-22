@@ -72,6 +72,14 @@
       "floor": 1.0,
       "target": 0.90,
       "note": "SV-3 exod step-result verifier (forged-status refusal + binding + replay) — prose-clean core"
+    },
+    {
+      "module": "infra/exec/closureverify.py",
+      "slice": "tests/test_closureverify.py",
+      "cap": 50,
+      "floor": 1.0,
+      "target": 0.90,
+      "note": "P2-T12 delegated-execution closure integrity — exod RE-DERIVES every staged digest at time of use vs the grant pin (post-grant porter/core swap + smuggled sibling refused); prose-clean core, both sides pinned"
     }
   ]
 }

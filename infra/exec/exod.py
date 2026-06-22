@@ -24,6 +24,7 @@ import time
 
 from infra.cwp import sign
 from infra.exec import vault as _vaultmod
+from infra.exec.closureverify import closure_decision
 from infra.exec.grantverify import _issuer, grant_body, verify_grant
 from infra.exec.sandbox import core_profile, run_confined
 from infra.exec.exodverify import (  # noqa: F401  (single source of truth for the verify surface)
@@ -70,9 +71,13 @@ class Exod:
         """Verify the grant AGAINST THE REQUEST, run the step confined, and return exod's SIGNED step-result.
         The grant authorizes a specific (run_id, plan_sha), a set of capabilities, and (optionally) the
         approved snippet digests — exod refuses the moment the request strays outside what was actually
-        granted, so one grant can never be laundered into authority over a different run or command. The
-        signed result is bound to the GRANT's single-use nonce (not the caller's), so a replayed grant is
-        detectable at the ledger even across a daemon restart. Every refusal is itself on exod's channel."""
+        granted, so one grant can never be laundered into authority over a different run or command. For a
+        `run`, exod itself RE-DERIVES the digest of every file in the materialized SNIP closure and requires
+        it to match the grant's pin (it trusts no digest the caller computed), so a post-grant porter/core
+        swap is refused at time of use; the entry wrapper (run.sh) rests on govd's plan-hash, not this gate.
+        The signed result is bound to the GRANT's single-use nonce (not the
+        caller's), so a replayed grant is detectable at the ledger even across a daemon restart. Every refusal
+        is itself on exod's channel."""
         run_id, plan_sha, step = req.get("run_id"), req.get("plan_sha"), req.get("step")
         try:
             gbody = grant_body(req["grant"])
@@ -93,10 +98,15 @@ class Exod:
         # 2. the grant must actually carry the capability being exercised
         if required_capability not in (gbody.get("capabilities") or []):
             return refuse("capability:" + required_capability)
-        # 3. if the grant pins approved snippet digests, the step's snippet must be one of them
-        granted = set((gbody.get("snippet_shas") or {}).values())
-        if granted and req.get("snippet_sha") not in granted:
-            return refuse("snippet:not_granted")
+        # 3. INDEPENDENTLY re-derive the digest of the materialized closure the confined step will source and
+        #    require every member to match what govd signed into the grant. exod trusts NO digest the caller
+        #    computed, so a post-grant porter/core swap (the snippet TOCTOU) or a smuggled sibling is refused
+        #    at time of use; a run grant that pins a closure with no staged code is fail-closed.
+        if required_capability == "run":
+            snip_dir = (req.get("env") or {}).get("SNIP") or os.path.join(req.get("workspace") or "", "snip")
+            refuse_closure, why = closure_decision(gbody.get("snippet_shas") or {}, snip_dir)
+            if refuse_closure:
+                return refuse(why)
         # 4. spend the grant ONLY now that the request is fully authorized — a refused request never burns a
         #    still-valid grant. This is the fast in-memory guard; the durable one is the ledger (result nonce).
         if gnonce is None or not self._grant_nonces.spend(_issuer(self._issuer_pub), gnonce):
@@ -106,14 +116,16 @@ class Exod:
         #    --setenv AFTER --clearenv, so the secret reaches the porter yet never the host/agent env. The set
         #    is exactly what govd signed into the grant (credentials=), so it is authorized + run-bound.
         prof = self._profile(req["workspace"])
+        env = {**prof.env, **(req.get("env") or {})}   # govd-supplied NON-secret step env (SNIP, RECORD_STORE)
         creds = gbody.get("credentials") or []
         if creds:
             if self._vault is None:
                 return refuse("vault:unavailable")
             try:
-                prof = dataclasses.replace(prof, env=_vaultmod.inject_step_env(dict(prof.env), self._vault, creds))
+                env = _vaultmod.inject_step_env(env, self._vault, creds)   # + the grant-authorized secrets
             except Exception:
                 return refuse("vault:resolve_failed")
+        prof = dataclasses.replace(prof, env=env)
         # 6. run confined + sign the authoritative outcome, bound to the grant nonce, with an ATTESTED meter
         #    (P2-T07): exod itself measures the step's wall time and signs it, so the meter originates from
         #    exod and the agent cannot fabricate it — the proto-receipt a settlement plane will later trust.
@@ -229,3 +241,47 @@ def record_step_result(ledger_path: str, exod_public_key, envelope, *, expect_ru
     ledger["runs"].append(rec)
     json.dump(ledger, open(ledger_path, "w"), indent=2)
     return True, rec
+
+
+def load_vault(spec):
+    """Build a vault from a spec: `file:/path.json` -> FileVault, `sops:/path.enc#/age.key` -> SopsAgeVault;
+    None/empty -> no vault (exod then REFUSES any credentialed step, fail-closed)."""
+    if not spec:
+        return None
+    kind, _, rest = spec.partition(":")
+    if kind == "file":
+        return _vaultmod.FileVault(rest)
+    if kind == "sops":
+        path, _, age = rest.partition("#")
+        return _vaultmod.SopsAgeVault(path, age or None)
+    raise SystemExit(f"exod: unknown vault spec {spec!r} (use file:/path.json or sops:/path.enc#/age.key)")
+
+
+def main(argv=None):
+    """The exec-image sidecar: load exod's identity key + govd's TRUSTED grant-issuer public key + (optional)
+    a vault, then serve the confined-execution channel on the UDS — a separate process/principal from govd."""
+    import argparse
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+    ap = argparse.ArgumentParser(description="exod — the confined execution limb (a separate signing principal)")
+    ap.add_argument("--socket", default=os.environ.get("EXOD_SOCKET", "/run/cyberware/exod.sock"))
+    ap.add_argument("--key", default=os.environ.get("EXOD_KEY"),
+                    help="exod identity Ed25519 private key (raw 32 bytes)")
+    ap.add_argument("--issuer-pub", default=os.environ.get("EXOD_ISSUER_PUB"),
+                    help="govd's grant-issuer Ed25519 PUBLIC key (raw 32 bytes) — the ONLY key exod trusts")
+    ap.add_argument("--vault", default=os.environ.get("EXOD_VAULT"),
+                    help="vault spec: file:/path.json | sops:/path.enc#/age.key")
+    a = ap.parse_args(argv)
+    if not a.key or not a.issuer_pub:
+        raise SystemExit("exod: --key and --issuer-pub are required (identity key + trusted grant issuer)")
+    sk = Ed25519PrivateKey.from_private_bytes(open(a.key, "rb").read())
+    issuer_pub = Ed25519PublicKey.from_public_bytes(open(a.issuer_pub, "rb").read())
+    if os.path.dirname(a.socket):
+        os.makedirs(os.path.dirname(a.socket), exist_ok=True)
+    exod = Exod(sk, grant_issuer_pub=issuer_pub, vault=load_vault(a.vault))
+    print(f"exod · limb · socket={a.socket} · keyid={_principal(sk.public_key())} · "
+          f"trusts-issuer {_principal(issuer_pub)} · vault={'yes' if a.vault else 'none'}")
+    exod.serve(a.socket)
+
+
+if __name__ == "__main__":
+    main()
