@@ -26,16 +26,19 @@ cws-observe/status through govd (`decision=allow`, step exit 0). Passed the **v1
   harden-pyenv). What gates the tail is absent **subjects/infra** (/dev/kvm, exod meters, market subjects) +
   the unresolved per-task perks above — not missing validators.
 
-### Milestone cones — 6 / 7 CLOSED
+### Milestone cones — 7 / 7 CLOSED (full SV-1…SV-6 ladder)
 | cone | rung | redeemed/closure | gate | state |
 |------|------|------------------|------|-------|
 | M0 | — | 15/15 | P6-T05 | ✓ CLOSED |
 | M1 | SV-1 | 7/7 | P0-T18 | ✓ CLOSED |
 | M2 | SV-2 | 8/8 | P1-T09,P1-T10 | ✓ CLOSED |
-| M3 | SV-3 | **9/10** | P2-T08,P2-T09 | ○ open — the lone open rung |
+| M3 | SV-3 | **10/10** | P2-T08,P2-T09 | ✓ CLOSED |
 | M4 | SV-4 | 9/9 | P3-T09,P3-T15 | ✓ CLOSED |
 | M5 | SV-5 | 8/8 | P4-T09 | ✓ CLOSED |
 | M6 | SV-6 | 21/21 | P6-T21 | ✓ CLOSED |
 
-**M3 / SV-3 (kernel isolation)** is the only open cone — 9/10, blocked on **/dev/kvm** (microVM isolation,
-unavailable on the Mac). Everything else is closed and chain-verified.
+**UPDATE 2026-06-22 — M3 / SV-3 closed (10/10).** P2-T09 (microVM budgets) was the lone open rung. It is now
+redeemed (done-ledger-v2 seq 57) from a REAL Firecracker measurement on a GitHub-hosted KVM runner via
+`.github/workflows/bench-microvm.yml`: **cold boot 696 ms** (≤1500) + **warm snapshot-resume 31 ms** (≤250),
+driven through govd as cws-bench/microvm-overhead (decision=allow, perk-bound). The whole SV-1…SV-6 ladder is
+now closed and chain-verified (66/90 tasks redeemed; the remaining 24 are unrelated infra/subject-gated tail).
