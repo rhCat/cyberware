@@ -7,6 +7,7 @@
 | Version | 1.1 (supersedes 1.0) |
 | Date | 2026-06-12 |
 | New in 1.1 | (1) dispositions of the plan-grill findings M1–M14, each folded, reframed, or ruled out-of-scope **on the record** · (2) **composition of the ancestor**: the Magnum Opus / alembic / putrefactio pipeline enters the register and the chip · (3) doctrine additions: principal-key agnosticism, substrate-not-economy, denominated promises, one-axiom-three-faces, no chrysopoeia by decree |
+| Reframe (2026-06-22) | **agent-mode / kernel-for-agents** — the doctrine that *cognition is information and thinking needs no limb*, so capability lives behind the kernel and the agent only ever issues governed syscalls. The remaining tail is re-read as this build-out (keystone: auth **P1-T08** + double-blind secrets **P2-T05**; integration: **govd-as-executor**). It is a reframe — the 90-task DAG and the M0–M6 cones are unchanged. See [`AGENT-MODE.md`](AGENT-MODE.md). |
 
 ---
 

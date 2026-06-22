@@ -13,6 +13,7 @@ governed channel and recording the passing run-ledger — never by asserting "do
 ```
 workzone/version1.1/
   cyberware-foundation-plan-v1.1.md     the plan
+  AGENT-MODE.md                         the agent-mode reframe — the remaining tail as a kernel-for-agents build-out
   cyberware-swarm-milestones.md         the M0–M6 roadmap (derived from the DAG)
   cyberware-swarm-tool-skills.md        the 10 validator-skill specs
   cyberware-swarm-v1.1/                 the task DAG — 90 task JSONs + _swarm_manifest.json + generate_swarm.py
