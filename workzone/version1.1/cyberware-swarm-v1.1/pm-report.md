@@ -1,11 +1,13 @@
 # cyberware v1.1 — project status (2026-06-22)
 
 Generated through govd (dogfood): `cws-pm/run` (DRY_RUN board) + `cws-observe/status` (chain + milestones),
-chip `848914cd` (lean), done-ledger-v2 head seq 57.
+chip `d0861aec` (lean), done-ledger-v2 head seq 58.
 
 ## Headline — the full SV security ladder is CLOSED
 **All 7 milestone cones closed (M0 + SV-1…SV-6), 0 open rungs.** `done_ledger_chain: ok` (tamper-checked).
-**66 / 90 tasks redeemed (73%).** `validators_missing: []` — every validator skill is built; `blocked:validator: 0`.
+**67 / 90 tasks redeemed (74%).** `validators_missing: []` — every validator skill is built; `blocked:validator: 0`.
+Latest: **P6-T06** (money↔work cross-check — `infra/settle/reward_verify.py` + `cws-settle-sim/reward-verify`,
+perk-bound) redeemed (seq 58), advancing the non-cone P6 tail.
 
 | cone | rung | redeemed/closure | state |
 |------|------|------------------|-------|
@@ -17,7 +19,7 @@ chip `848914cd` (lean), done-ledger-v2 head seq 57.
 | M5 | SV-5 formal proof | 8/8 | ✓ CLOSED |
 | M6 | SV-6 money lifecycle | 21/21 | ✓ CLOSED |
 
-## Phase board (DRY_RUN) — 66 redeemed · 15 ready · 9 dep-blocked · 0 failed
+## Phase board (DRY_RUN) — 67 redeemed · 14 ready · 9 dep-blocked · 0 failed
 | phase | redeemed | ready | dep-blocked | note |
 |-------|----------|-------|-------------|------|
 | P0 governance spine | 18 | — | — | complete |
@@ -26,7 +28,7 @@ chip `848914cd` (lean), done-ledger-v2 head seq 57.
 | P3 supply chain | 14 | 1 | 1 | cone closed; tail |
 | P4 formal proof | 7 | 2 | — | cone closed; 2 tail tasks |
 | P5 ops/observability | 0 | 3 | 2 | **unstarted** — no cone gate; not on the SV ladder |
-| P6 money | 10 | 5 | 6 | cone closed (capstone); tail |
+| P6 money | 11 | 4 | 6 | cone closed (capstone); tail (P6-T06 reward-verify redeemed) |
 
 ## The remaining 24 tasks (15 ready + 9 dep-blocked) — NOT ladder-blocking
 Every security cone is closed; the tail is non-cone work. Two honest caveats on why it isn't auto-driven:
