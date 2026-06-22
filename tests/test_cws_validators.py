@@ -527,3 +527,43 @@ def test_pm_report_discloses_steps_never_reached_on_early_halt():
                          "run_id": "b", "detail": "boom"}]}
     md = _pm_report(report, {}, set(), False)
     assert "3 of 5 steps were never reached" in md
+
+
+# ── cws-observe/redeem — perk-level binding (closes the multi-perk fake-pass) ──────────────────────
+def _govd_allow_ledger(skill, perk):
+    """A clean govd provenance ledger (the events branch redeem accepts): decision allow, one step ok."""
+    return {"run_id": "r1", "skill": skill, "perk": perk, "decision": "allow",
+            "events": [{"type": "step_result", "step": "1", "status": "ok", "exit": 0}]}
+
+
+def test_redeem_refuses_a_sibling_perk_for_a_perk_pinned_task(tmp_path):
+    """A validator that ships >1 perk (cws-bench: microvm-overhead needs /dev/kvm, bwrap-overhead does not)
+    must NOT be redeemable for a perk-pinned task via the WRONG (kvm-free) perk's clean run."""
+    swarm = tmp_path / "swarm"
+    swarm.mkdir()
+    (swarm / "P2-T09.json").write_text(json.dumps({
+        "task_id": "P2-T09", "validated_by": "cws-bench",
+        "validated_perk": "microvm-overhead", "status": "todo"}))
+    sib = tmp_path / "sibling-runledger.json"                    # clean allow — but the wrong perk
+    sib.write_text(json.dumps(_govd_allow_ledger("cws-bench", "bwrap-overhead")))
+    rc, rep = _drive("cws-observe", "redeem", "cws_observe_redeem",
+                     {"SWARM_DIR": str(swarm), "TASK_ID": "P2-T09", "RUN_LEDGER": str(sib),
+                      "DONE_LEDGER": str(tmp_path / "done-ledger.json")}, "redeem.json")
+    assert rc != 0
+    assert rep and rep["verdict"] == "refused" and "validated_perk" in rep["reason"]
+
+
+def test_redeem_accepts_the_pinned_perk(tmp_path):
+    """The correct perk's clean governed run redeems the perk-pinned task."""
+    swarm = tmp_path / "swarm"
+    swarm.mkdir()
+    (swarm / "P2-T09.json").write_text(json.dumps({
+        "task_id": "P2-T09", "validated_by": "cws-bench",
+        "validated_perk": "microvm-overhead", "status": "todo"}))
+    good = tmp_path / "good-runledger.json"
+    good.write_text(json.dumps(_govd_allow_ledger("cws-bench", "microvm-overhead")))
+    rc, rep = _drive("cws-observe", "redeem", "cws_observe_redeem",
+                     {"SWARM_DIR": str(swarm), "TASK_ID": "P2-T09", "RUN_LEDGER": str(good),
+                      "DONE_LEDGER": str(tmp_path / "done-ledger.json")}, "redeem.json")
+    assert rc == 0
+    assert rep and rep["verdict"] == "pass"

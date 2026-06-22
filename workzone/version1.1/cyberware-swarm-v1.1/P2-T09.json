@@ -13,6 +13,7 @@
   ],
   "executor": "external-anchor",
   "validated_by": "cws-bench",
+  "validated_perk": "microvm-overhead",
   "bootstrap_exempt": true,
   "validation_available_after": null,
   "skill": null,

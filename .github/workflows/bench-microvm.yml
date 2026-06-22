@@ -1,0 +1,143 @@
+name: bench-microvm
+# Close P2-T09 (M3/SV-3 microVM budgets): boot a REAL Firecracker microVM on a GitHub-hosted runner that
+# exposes a usable /dev/kvm, drive cws-bench/microvm-overhead THROUGH govd (the porter executes client-side
+# on THIS runner, where /dev/kvm is), and upload the governed run-ledger as the redemption evidence.
+#
+# MUST stay on ubuntu-latest forever — the self-hosted Lightsail runner is itself a VM with NO /dev/kvm, so
+# this is the one workflow that does NOT move to self-hosted. Runs on demand / on its own branch, never on
+# main (a KVM boot costs hosted minutes; we run it deliberately to mint the P2-T09 evidence).
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "bench/microvm", "feat/p2t09-microvm-bench" ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bench-microvm
+  cancel-in-progress: false
+
+jobs:
+  microvm:
+    runs-on: ubuntu-latest          # hosted nested-KVM; NEVER self-hosted (Lightsail VPS has no /dev/kvm)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: checkout the skillChip cartridge (submodule — carries cws-bench/microvm-overhead)
+        env:
+          TOKEN: ${{ secrets.SUBMODULE_PAT || github.token }}
+        run: |
+          AUTH="https://x-access-token:${TOKEN}@github.com/"
+          git -c "url.${AUTH}.insteadOf=git@github.com:" \
+              -c "url.${AUTH}.insteadOf=https://github.com/" \
+              submodule update --init --recursive skillChip   # NOT --depth=1: a shallow tip fetch may not contain the pinned SHA
+          python3 -c "import json;d=json.load(open('skillChip/index.json'));print('chip',d['chip_sha'][:16],d['count'],'skills')"
+
+      - name: assert a USABLE /dev/kvm (fail loud — never skip-to-pass)
+        run: |
+          test -e /dev/kvm || { echo "::error::no /dev/kvm on this runner"; exit 1; }
+          sudo chmod 666 /dev/kvm
+          python3 - <<'PY'
+          import fcntl, os, sys
+          fd = os.open("/dev/kvm", os.O_RDWR)
+          ver = fcntl.ioctl(fd, 0xAE00, 0)            # KVM_GET_API_VERSION
+          os.close(fd)
+          print("KVM_GET_API_VERSION =", ver)
+          sys.exit(0 if ver == 12 else 1)
+          PY
+
+      - name: install firecracker (pinned v1.12.1) + guest-build tools
+        run: |
+          set -euo pipefail
+          curl -fSL -o fc.tgz \
+            https://github.com/firecracker-microvm/firecracker/releases/download/v1.12.1/firecracker-v1.12.1-x86_64.tgz
+          tar xzf fc.tgz
+          sudo install release-v1.12.1-x86_64/firecracker-v1.12.1-x86_64 /usr/local/bin/firecracker
+          firecracker --version
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq busybox-static e2fsprogs
+          test -x /bin/busybox && echo "busybox-static OK"
+
+      - name: python deps (cyberware needs only 'cryptography')
+        run: python3 -m pip install --quiet cryptography
+
+      - name: drive cws-bench/microvm-overhead THROUGH govd; capture the governed run-ledger
+        env:
+          GOVD_MONITOR_TOKEN: admin
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          # 1) start a local govd node over the checked-out skillChip registry
+          python3 -m infra.govern.govd --mode local --port 5773 >out/govd.log 2>&1 &
+          echo $! > out/govd.pid
+          for i in $(seq 1 40); do
+            curl -fsS http://127.0.0.1:5773/health >/dev/null 2>&1 && break
+            sleep 0.5
+          done
+          curl -fsS http://127.0.0.1:5773/health
+
+          # 2) the VALUE-FREE claim: skill + perk + an explicit record_store (where bench.json lands)
+          printf '{"skill":"cws-bench","perk":"microvm-overhead","record_store":"%s/out","vars":{}}\n' "$PWD" \
+            > out/task-ledger.json
+          cat out/task-ledger.json
+
+          # 3) run it through govd — the porter (and the real Firecracker boot) execute client-side here.
+          #    Capture the client exit: 2 == blocked (reject / registry-mismatch / unknown perk / auth) — fail
+          #    loud with the govd log. (Exit 0 still needs the step-4 results[].exit check: a clean ALLOW whose
+          #    bench step exits 1 returns 0 here, so the budget gate lives in step 4/5, not this exit code.)
+          set +e
+          python3 -m infra.govern.govd_client \
+            --url http://127.0.0.1:5773 --ledger out/task-ledger.json --approve all > out/verdict.json
+          CLIENT_RC=$?
+          set -e
+          cat out/verdict.json
+          if [ "$CLIENT_RC" -ne 0 ]; then
+            echo "::error::govd_client exited $CLIENT_RC (blocked: reject / registry mismatch / unknown perk / auth)"
+            echo "----- govd.log -----"; cat out/govd.log
+            exit 1
+          fi
+
+          # 4) verify the governed verdict + pull the provenance ledger (the redemption evidence)
+          python3 - <<'PY'
+          import json, sys, urllib.request
+          v = json.load(open("out/verdict.json"))
+          if v.get("decision") != "allow" or v.get("error"):
+              print("::error::govd did not allow / errored:", v.get("decision"), v.get("error")); sys.exit(1)
+          results = v.get("results") or []
+          if not results or any(r.get("exit") != 0 for r in results):
+              print("::error::a governed step did not exit 0:", results); sys.exit(1)
+          data = urllib.request.urlopen(v["ledger"], timeout=30).read()
+          open("out/bench-runledger.json", "wb").write(data)
+          led = json.loads(data)
+          if led.get("decision") != "allow" or led.get("skill") != "cws-bench":
+              print("::error::provenance ledger not a clean cws-bench allow:", led.get("decision"), led.get("skill")); sys.exit(1)
+          print("governed run-ledger captured:", led.get("run_id"), "skill=cws-bench decision=allow")
+          PY
+
+          # 5) the measurement itself must be WITHIN budget (the porter exits 0 iff within — but assert loudly)
+          python3 - <<'PY'
+          import json, sys
+          b = json.load(open("out/bench.json"))
+          print("bench.json:", json.dumps(b))
+          if b.get("backend") != "microvm" or b.get("within") is not True:
+              print("::error::microVM budget not met / skipped:", b); sys.exit(1)
+          print(f"PASS  cold={b['cold_ms']}ms (<=1500)  warm={b['warm_ms']}ms (<=250)")
+          PY
+
+          kill "$(cat out/govd.pid)" 2>/dev/null || true
+
+      - name: upload the governed run-ledger + bench result (P2-T09 redemption evidence)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2t09-microvm-evidence
+          path: |
+            out/bench-runledger.json
+            out/bench.json
+            out/task-ledger.json
+            out/verdict.json
+            out/govd.log
+          if-no-files-found: warn
