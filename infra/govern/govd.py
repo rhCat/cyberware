@@ -45,6 +45,7 @@ from infra import registry
 from infra.cwp import canonical
 from infra.govern import compiler
 from infra.govern import composer
+from infra.govern import delegate    # P2-T12: server-side execution delegated to exod the limb (containment)
 from infra.govern import feed        # P5-T02: SSE framing + pagination + change-digest (prose-clean core)
 from infra.govern import principals  # P1-T08: Bearer-principal auth + token-bucket rate-limit at /govern
 from infra.govern import tracing     # P5-T05: W3C traceparent across planes + in-toto run provenance
@@ -611,9 +612,17 @@ class Handler(BaseHTTPRequestHandler):
         cfg, store = self.server.cfg, self.server.store
         host, port = self.server.server_address[0], self.server.server_address[1]
         if self.path == "/health":
+            # P2-T12: surface the execution boundary so an operator/agent sees whether steps run client-side
+            # (cooperative) or are CONFINED by exod (delegated) — and, when delegated, whether the limb is
+            # actually attached (a delegated govd with no exod refuses every step, fail-closed).
+            ex_mode = getattr(self.server, "exec_mode", "cooperative")
+            exod_attached = bool(getattr(self.server, "exod_socket", None)
+                                 and getattr(self.server, "exod_grant_key", None)
+                                 and getattr(self.server, "exod_pub", None))
             return self._json(200, {"status": "ok", "service": "cyberware-govd", "mode": cfg["mode"],
                                     "host": host, "port": port, "registry": registry.SKILLCHIP,
                                     "chip_sha": chip_sha(), "chip": chip_provenance(),
+                                    "exec_mode": ex_mode, "exod_attached": exod_attached,
                                     "runs": len(store.runs)})
         path = self.path.split("?", 1)[0]
         if path == "/catalog":
@@ -920,6 +929,28 @@ class Handler(BaseHTTPRequestHandler):
                     step = str(msg.get("step"))                  # the session is bound — operate only on `bound`
                     psha = msg.get("plan_sha")
                     ok, reason = authorize_step(store, bound, step, psha)
+                    rec0 = store.get(bound)
+                    reg0 = self.server.cfg.get("principals") or {}
+                    delegated = ((reg0.get((rec0 or {}).get("principal")) or {}).get("exec_mode")
+                                 or getattr(self.server, "exec_mode", "cooperative")) == "delegated"
+                    if ok and delegated:
+                        # P2-T12: govd NEVER runs the step — it hands a signed grant to exod the limb, which
+                        # runs CONFINED + signs the authoritative status. Fail-closed if exod isn't attached.
+                        sock = getattr(self.server, "exod_socket", None)
+                        gk = getattr(self.server, "exod_grant_key", None)
+                        epub = getattr(self.server, "exod_pub", None)
+                        if not (sock and gk and epub):
+                            ws_send(self.wfile, json.dumps({"type": "refuse", "step": msg.get("step"),
+                                    "reason": "delegated mode but exod is not configured (fail-closed)"}))
+                            continue
+                        d_reply, d_event = delegate.execute_step(
+                            rec0, step, psha, exod_socket=sock, grant_key=gk, exod_pub=epub,
+                            base=getattr(self.server, "exec_workspace", os.path.join(store.root, "_work")))
+                        if d_event:
+                            store.append(bound, {**d_event, "ts": now(),
+                                                 "span": tracing.child_span((rec0 or {}).get("traceparent"))})
+                        ws_send(self.wfile, json.dumps({"type": "executed", "step": msg.get("step"), **d_reply}))
+                        continue
                     reply = {"type": "grant" if ok else "refuse", "step": msg.get("step"), "reason": reason}
                     if ok:                                       # record the grant so a result can bind to it
                         span = tracing.child_span((store.get(bound) or {}).get("traceparent"))   # P5-T05 hop
@@ -939,6 +970,15 @@ class Handler(BaseHTTPRequestHandler):
                     ws_send(self.wfile, json.dumps(reply))
                 elif t == "step_result":
                     step = str(msg.get("step"))                  # STATUS only — never command output/content
+                    rec1 = store.get(bound)
+                    reg1 = self.server.cfg.get("principals") or {}
+                    if (((reg1.get((rec1 or {}).get("principal")) or {}).get("exec_mode")
+                         or getattr(self.server, "exec_mode", "cooperative")) == "delegated"):
+                        # in delegated mode exod's signed result is authoritative + already recorded by govd;
+                        # an agent self-report is rejected (the cognition holds no limb — it cannot report status).
+                        ws_send(self.wfile, json.dumps({"type": "error", "step": step,
+                                "reason": "delegated mode — exod is authoritative; agent self-report rejected"}))
+                        continue
                     ok, why = result_acceptable(store, bound, step, msg.get("plan_sha"))
                     if not ok:                                   # a result that did not follow a grant is rejected
                         ws_send(self.wfile, json.dumps({"type": "error", "step": step, "reason": why}))
@@ -984,6 +1024,22 @@ def require_closed_auth(cfg):
             "'local'). Set GOVD_PRINCIPALS to a registry, or export CYBERWARE_ALLOW_OPEN=1 to override.")
 
 
+def _load_exec_mode(cfg, httpd):
+    """Configure the execution boundary. 'cooperative' (default): the agent runs each step client-side
+    (run_governed) — govd governs the CLAIM + records status. 'delegated': govd hands a signed grant to exod
+    the limb, which runs the step CONFINED and signs the authoritative status (containment). Delegated
+    REQUIRES exod config (socket + grant key + exod pub) — absent, it fail-closed-refuses every step."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+    httpd.exec_mode = cfg.get("exec_mode", "cooperative")
+    httpd.exec_workspace = cfg.get("exec_workspace") or os.path.join(cfg["record_root"], "_work")
+    ex = cfg.get("exod") or {}
+    httpd.exod_socket = ex.get("socket")
+    httpd.exod_grant_key = (Ed25519PrivateKey.from_private_bytes(open(ex["grant_key"], "rb").read())
+                            if ex.get("grant_key") else None)
+    httpd.exod_pub = (Ed25519PublicKey.from_public_bytes(open(ex["pub"], "rb").read())
+                      if ex.get("pub") else None)
+
+
 def serve(cfg):
     Handler.timeout = cfg.get("socket_timeout", SOCKET_TIMEOUT)
     ensure_monitor_token(cfg)                            # final mode is known here (after --mode)
@@ -999,6 +1055,7 @@ def serve(cfg):
     httpd.daemon_threads = True
     httpd.cfg, httpd.store = cfg, store
     httpd.rate_buckets = {}                               # P1-T08: per-principal token-bucket state (in-memory)
+    _load_exec_mode(cfg, httpd)                           # P2-T12: cooperative (client-side) | delegated (exod limb)
     dash_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
     print(f"govd · {cfg['mode']} · http://{host}:{port}  ·  ws://{host}:{port}/oversight")
     prov = chip_provenance()
