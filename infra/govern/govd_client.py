@@ -11,6 +11,11 @@ Two calls, the whole governed loop:
 Stdlib only (urllib + a tiny RFC 6455 client), so an agent can drive govd with no dependencies.
 
   python3 infra/govd_client.py --url http://127.0.0.1:5773 --ledger task-ledger.json [--approve <id>]
+
+A HARDENED/remote govd (one with a principals registry) REQUIRES the agent's principal Bearer token at
+/govern (401 without). Supply it with --token-file <f> (or GOVD_TOKEN_FILE / GOVD_TOKEN) — the raw token is
+read from the file/env, never argv. An open/local govd (no registry) needs none. This is the agent side of
+P1-T08: the token + the endpoint are all the agent holds; every action is a governed syscall over this.
 """
 from __future__ import annotations
 import argparse, base64, collections, hashlib, json, os, socket, subprocess, sys, urllib.error, urllib.parse, urllib.request
