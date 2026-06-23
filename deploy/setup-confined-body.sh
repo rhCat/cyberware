@@ -30,19 +30,26 @@ CW_SRC="${CW_SRC:-/mnt/cywaregallery/cyberware}"    # the NAS-mounted canonical 
 GOVD_PORT="${GOVD_PORT:-5773}"
 SOCK_DIR="/run/cyberware"
 EXOD_SOCK="$SOCK_DIR/exod.sock"
-PY="$(command -v python3)"
-
 log(){ echo "[confined-body] $*"; }
 [ "$(id -u)" = 0 ] || { echo "run with sudo (provisioning needs root; the runtime then drops to '$CW_USER'/nobody)"; exit 1; }
+umask 077                                            # every minted secret/key/token is 0600 from birth — not umask-run-order dependent
 [ -f "$CW_SRC/infra/govern/govd.py" ] || { echo "gallery not mounted at CW_SRC=$CW_SRC (mount the NAS gallery read-only first; needs infra/ + skillChip/)"; exit 1; }
 [ -d "$CW_SRC/skillChip" ] || { echo "skillChip missing under $CW_SRC — the mounted gallery's submodule isn't populated (the chip is the load set)"; exit 1; }
 command -v tailscale >/dev/null || log "WARN: tailscale not found — join the tailnet first (govd binds the overlay IP)"
+# refuse to collide with the OTHER deploy model: setup-lightsail-node.sh installs a Docker-mode cyberware-govd.service
+# at the SAME unit name + port $GOVD_PORT. Running both on one host silently clobbers the unit / contends for the port.
+if systemctl cat cyberware-govd.service 2>/dev/null | grep -q 'docker run'; then
+  echo "a Docker-mode cyberware-govd (from setup-lightsail-node.sh) is already installed here — the two deploy models share the unit name + port $GOVD_PORT. Pick ONE model (or change GOVD_PORT / the unit name)."; exit 1
+fi
+# PY is resolved AFTER the apt block (a minimal image may lack python3 until then) — see below.
 
 # 1. deps: bubblewrap = the confinement boundary; cryptography = grant/exod signing; age/jq/curl = plumbing
 export DEBIAN_FRONTEND=noninteractive
 log "apt: bubblewrap, uidmap, python3-cryptography, age, jq, curl"
-apt-get update -qq
-apt-get install -y --no-install-recommends bubblewrap uidmap python3 python3-venv python3-cryptography age jq curl ca-certificates >/dev/null
+apt-get update -qq || { echo "apt-get update failed — provisioning aborted (no half-set-up node)"; exit 1; }
+apt-get install -y --no-install-recommends bubblewrap uidmap python3 python3-venv python3-cryptography age jq curl ca-certificates >/dev/null \
+  || { echo "apt-get install failed (bubblewrap/cryptography/age/...) — provisioning aborted"; exit 1; }
+PY="$(command -v python3)"; [ -n "$PY" ] || { echo "python3 not found after install"; exit 1; }   # resolve AFTER install, then assert
 
 # 2. service identity (non-login) + dirs
 id "$CW_USER" >/dev/null 2>&1 || useradd -r -s /usr/sbin/nologin -d "$CW_DATA" "$CW_USER"
@@ -107,6 +114,7 @@ Wants=network-online.target
 [Service]
 User=$CW_USER
 WorkingDirectory=$CW_SRC
+Environment=PYTHONDONTWRITEBYTECODE=1
 RuntimeDirectory=cyberware
 RuntimeDirectoryMode=0750
 ExecStart=$PY -m infra.exec.exod --socket $EXOD_SOCK --key $CW_KEYS/exod.key --issuer-pub $CW_KEYS/grant.pub
@@ -125,6 +133,9 @@ Requires=cyberware-exod.service
 [Service]
 User=$CW_USER
 WorkingDirectory=$CW_SRC
+RuntimeDirectory=cyberware
+RuntimeDirectoryMode=0750
+Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=GOVD_CONFIG=$CW_ETC/govd.json
 Environment=GOVD_RECORD_ROOT=$CW_DATA/govd
 Environment=GOVD_PRINCIPALS=$CW_ETC/principals.json
@@ -136,7 +147,8 @@ WantedBy=multi-user.target
 UNIT
 
 systemctl daemon-reload
-systemctl enable --now cyberware-exod cyberware-govd >/dev/null 2>&1 || true
+systemctl enable cyberware-exod cyberware-govd >/dev/null 2>&1 || true
+systemctl restart cyberware-exod cyberware-govd            # restart (not just --now start) so a RE-RUN's rewritten govd.json/units take effect
 sleep 3
 log "exod socket: $([ -S "$EXOD_SOCK" ] && echo present || echo MISSING)"
 if curl -fsS -m 5 "http://$BIND_HOST:$GOVD_PORT/health" >/dev/null 2>&1; then
