@@ -53,8 +53,12 @@ do_base(){
   # bubblewrap = the kernel sandbox boundary the exec/limb runs steps inside (nobody, empty caps);
   # age+sops = the secret store; jq/curl = plumbing; python3 = the agent (cortex) runtime + the chip.
   apt-get install -y --no-install-recommends bubblewrap uidmap age jq curl ca-certificates python3 python3-venv >/dev/null
-  command -v sops >/dev/null || { log "installing sops"; curl -fsSL -o /usr/local/bin/sops \
-      https://github.com/getsops/sops/releases/latest/download/sops-v3.9.0.linux.amd64 && chmod +x /usr/local/bin/sops; }
+  # sops: pin the release path AND the matching filename (a floating latest/ + a version-pinned filename 404s).
+  command -v sops >/dev/null || { log "installing sops"; SOPS_V=v3.9.0; \
+      case "$(uname -m)" in aarch64|arm64) SOPS_A=arm64 ;; *) SOPS_A=amd64 ;; esac; \
+      curl -fsSL -o /usr/local/bin/sops \
+      "https://github.com/getsops/sops/releases/download/${SOPS_V}/sops-${SOPS_V}.linux.${SOPS_A}" \
+      && chmod +x /usr/local/bin/sops || log "WARN: sops install failed — secrets need it (SopsAgeVault); see step 2"; }
   id "$CW_USER" >/dev/null 2>&1 || useradd -r -m -d "$CW_HOME" -s /usr/sbin/nologin "$CW_USER"
   install -d -m 0750 -o "$CW_USER" -g "$CW_USER" "$CW_ETC" "$CW_ETC/secrets"
   # secret store key (age). The PRIVATE key never leaves the node; you encrypt secrets TO its public key.
@@ -93,6 +97,7 @@ ExecStart=/usr/bin/docker run --rm --name cyberware-govd \\
   -v ${CW_ETC}/principals.json:/run/principals.json:ro \\
   -v ${CW_ETC}/monitor.token:/run/monitor.token:ro \\
   -e GOVD_PRINCIPALS=/run/principals.json \\
+  -e GOVD_RECORD_ROOT=/data/govd \\
   -e PYTHONDONTWRITEBYTECODE=1 \\
   --read-only --tmpfs /tmp \\
   ${GOVD_IMAGE} \\
@@ -182,11 +187,17 @@ cat <<DONE
 ==================== setup complete — YOUR remaining steps (not automatable here) ====================
 1. AWS firewall: in the Lightsail console (or aws lightsail put-instance-public-ports), restrict SSH (22)
    to YOUR PC's IP only. Do NOT expose govd's port publicly — front it with a TLS edge if remote.
-2. Secrets (never plaintext — encrypt to this node's age recipient $(cat $CW_ETC/age.pub 2>/dev/null)):
-     echo -n 'sk_test_...'  | age -r "\$(cat $CW_ETC/age.pub)" -o $CW_ETC/secrets/stripe_test_key.age   # P6-T14
-     echo -n '<LLM_API_KEY>'| age -r "\$(cat $CW_ETC/age.pub)" -o $CW_ETC/secrets/llm_api_key.age        # P6-T09
-     echo -n '<PGPASSWORD>' | age -r "\$(cat $CW_ETC/age.pub)" -o $CW_ETC/secrets/pgpassword.age          # P5-T01
-   The kernel resolves these via SopsAgeVault / a *_FILE pointer; the agent only ever names a credential.
+2. Secrets — ONE sops/age file keyed by credential name (the kernel's SopsAgeVault runs
+   'sops -d --extract' per name; raw per-secret age files have NO backend). Encrypt to this node's
+   recipient $(cat $CW_ETC/age.pub 2>/dev/null); only add the credentials a task actually needs:
+     cat > /tmp/cw.yaml <<'YAML'
+     pgpassword: <PGPASSWORD>          # P5-T01
+     llm_api_key: <LLM_API_KEY>        # P6-T09
+     stripe_test_key: sk_test_...      # P6-T14
+     YAML
+     sops --encrypt --age "\$(cat $CW_ETC/age.pub)" /tmp/cw.yaml > $CW_ETC/secrets/secrets.sops.yaml && shred -u /tmp/cw.yaml
+   Vault spec (exod --vault / EXOD_VAULT, delegated mode): sops:$CW_ETC/secrets/secrets.sops.yaml#$CW_ETC/age.key
+   The agent only ever NAMES a credential; the limb resolves the bytes step-side.
 3. Agent (cortex): give the VPS agent ONLY (a) the govd endpoint, (b) the principal token in
    $CW_ETC/agent-1.token.GIVE-TO-AGENT-THEN-DELETE, (c) the chip. It claims to govd; actions are governed.
    Then delete that token file. The agent never gets SSH or a credentialed shell — that IS the architecture.
