@@ -9,18 +9,24 @@
 # confined step drops further to uid 65534 (nobody). Privileged host management is OUT of scope (operator /
 # local agent, off-band). Dual-control: govd's grant-issuer key != exod's identity key (the script mints both).
 #
-# Usage (on the body, as a sudo-capable user; the cyberware repo must already be cloned --recursive):
-#   sudo CW_SRC=/opt/cyberware bash deploy/setup-confined-body.sh
+# Source model: the body does NOT clone. It MOUNTS the canonical gallery (the same NAS the Mac updater keeps
+# verified+current — fetch→ff→skillChip→authenticity-gate→revert-on-drift). CW_SRC points at that mount.
+# Mount it READ-ONLY on the body: the body only ever reads/runs the source; only the Mac updater writes it.
+# That is the "hook, not a per-node repo copy" shape — one verified source, every body reads the same commit.
 #
-# Prereqs your hand, not mine: AWS/host firewall (overlay-only); tailscale already joined; the repo cloned
-# with its skillChip submodule. Idempotent: safe to re-run (keys/tokens are minted once, never overwritten).
+# Usage (on the body, as a sudo-capable user; the gallery already mounted at CW_SRC):
+#   sudo CW_SRC=/mnt/cywaregallery/cyberware bash deploy/setup-confined-body.sh
+#
+# Prereqs your hand, not mine: AWS/host firewall (overlay-only); tailscale already joined; the NAS gallery
+# mounted (read-only) at CW_SRC with its skillChip submodule populated. Idempotent: safe to re-run (keys/
+# tokens are minted once, never overwritten).
 set -uo pipefail
 
 CW_USER="cyberware"
 CW_ETC="/etc/cyberware"
 CW_KEYS="$CW_ETC/keys"
 CW_DATA="/var/lib/cyberware"
-CW_SRC="${CW_SRC:-/opt/cyberware}"                  # the cyberware repo (infra/ + skillChip/) — cloned by you
+CW_SRC="${CW_SRC:-/mnt/cywaregallery/cyberware}"    # the NAS-mounted canonical gallery (infra/ + skillChip/), read-only
 GOVD_PORT="${GOVD_PORT:-5773}"
 SOCK_DIR="/run/cyberware"
 EXOD_SOCK="$SOCK_DIR/exod.sock"
@@ -28,8 +34,8 @@ PY="$(command -v python3)"
 
 log(){ echo "[confined-body] $*"; }
 [ "$(id -u)" = 0 ] || { echo "run with sudo (provisioning needs root; the runtime then drops to '$CW_USER'/nobody)"; exit 1; }
-[ -f "$CW_SRC/infra/govern/govd.py" ] || { echo "cyberware repo not at CW_SRC=$CW_SRC (clone it --recursive first; needs infra/ + skillChip/)"; exit 1; }
-[ -d "$CW_SRC/skillChip" ] || { echo "skillChip submodule missing under $CW_SRC — clone --recursive (the chip is the load set)"; exit 1; }
+[ -f "$CW_SRC/infra/govern/govd.py" ] || { echo "gallery not mounted at CW_SRC=$CW_SRC (mount the NAS gallery read-only first; needs infra/ + skillChip/)"; exit 1; }
+[ -d "$CW_SRC/skillChip" ] || { echo "skillChip missing under $CW_SRC — the mounted gallery's submodule isn't populated (the chip is the load set)"; exit 1; }
 command -v tailscale >/dev/null || log "WARN: tailscale not found — join the tailnet first (govd binds the overlay IP)"
 
 # 1. deps: bubblewrap = the confinement boundary; cryptography = grant/exod signing; age/jq/curl = plumbing
