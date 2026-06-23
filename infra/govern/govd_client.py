@@ -21,18 +21,31 @@ from infra.govern import runlog
 from infra.tool import skill_index   # the value-free catalog builder — shared with govd, so the two can't drift
 
 
+def _auth_headers():
+    """The agent's principal Bearer token for /govern — from GOVD_TOKEN, or GOVD_TOKEN_FILE (a secret-via-file
+    pointer so the raw token never lands in argv / an env dump). A hardened (principal-gated) govd REQUIRES this
+    (401 without it); an open/local govd ignores it. Returns {} when unset — local-dev behaviour is unchanged."""
+    tok = os.environ.get("GOVD_TOKEN")
+    if not tok:
+        f = os.environ.get("GOVD_TOKEN_FILE")
+        if f and os.path.isfile(f):
+            tok = open(f).read().strip()
+    return {"Authorization": "Bearer " + tok} if tok else {}
+
+
 def _post_json(url, obj):
     data = json.dumps(obj).encode()
-    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+    req = urllib.request.Request(url, data=data,
+                                 headers={"Content-Type": "application/json", **_auth_headers()}, method="POST")
     try:
         with urllib.request.urlopen(req) as r:
             return r.getcode(), json.loads(r.read())
-    except urllib.error.HTTPError as e:               # 409 push_back / 403 reject still carry a JSON verdict
+    except urllib.error.HTTPError as e:               # 401 unauth / 409 push_back / 403 reject still carry a JSON verdict
         return e.code, json.loads(e.read())
 
 
 def _get_json(url):
-    with urllib.request.urlopen(url) as r:
+    with urllib.request.urlopen(urllib.request.Request(url, headers=_auth_headers())) as r:
         return json.loads(r.read())
 
 
@@ -291,7 +304,12 @@ def main():
     ap.add_argument("--discover", action="store_true",
                     help="step 2: list what govd governs + tag each local skill verified/drift/unverified (no claim)")
     ap.add_argument("--fetch-only", action="store_true", help="just get the verdict/plan, do not execute")
+    ap.add_argument("--token-file", help="file holding the principal Bearer token (a hardened/remote govd requires it; "
+                                         "equivalent to GOVD_TOKEN_FILE — the raw token never lands in argv)")
     a = ap.parse_args()
+    if a.token_file:
+        os.environ["GOVD_TOKEN_FILE"] = a.token_file        # _auth_headers reads it; raw value stays in the file
+    a.url = a.url.rstrip("/")
     if a.discover:
         out = discover(a.url, registry=a.registry)
         print(json.dumps(out, indent=2))
