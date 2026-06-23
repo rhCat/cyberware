@@ -81,7 +81,9 @@ SKILL.md ─► LLM fills the form → task-ledger.json
 ```
 
 **2 · govd — the service plane** (`infra/govern/govd.py`, a control/audit plane). **No data crosses the
-boundary.** The agent sends a **claim** (skill, perk, var **KEYS** — never values, files, or secrets);
+boundary.** The agent authenticates with its **principal Bearer token** (a hardened/remote govd carrying a
+principals registry requires it — `401` without; the client reads it from a `*_FILE`/env pointer like a
+secret, never argv) and sends a **claim** (skill, perk, var **KEYS** — never values, files, or secrets);
 govd checks it against its **own** trusted registry, runs compose + TLC, and blesses a **value-free,
 code-free PLAN** (tool sequence + each snippet's sha256 + a `${VAR}` wrapper), pinning the plan's sha256.
 The agent binds its vars **locally**, runs the porters+cores **from its own registry**, and reports
