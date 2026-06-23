@@ -1108,9 +1108,13 @@ def serve(cfg):
            if (prov or {}).get("mode") == "cloud" else "local (baked)")
     print(f"  skillChip={registry.SKILLCHIP}   chip_sha={(chip_sha() or '?')[:16]}   source={src}")
     print(f"  record_root={store.root}")
-    print(f"  dashboard:  http://{dash_host}:{port}/?token={cfg['monitor_token']}"
-          + ("   (default local token 'admin' — set GOVD_MONITOR_TOKEN to change)"
-             if cfg["monitor_token"] == "admin" else ""))
+    _mt = cfg["monitor_token"]
+    if _mt == "admin":                                   # the well-known default is not a secret — keep the click-through
+        print(f"  dashboard:  http://{dash_host}:{port}/?token=admin   (default local token — set GOVD_MONITOR_TOKEN to change)")
+    elif os.environ.get("GOVD_ECHO_TOKEN") == "1":       # explicit opt-in for a trusted local terminal
+        print(f"  dashboard:  http://{dash_host}:{port}/?token={_mt}")
+    else:                                                # a real monitor token is an admin credential — never to stdout (journald/Docker-log capture)
+        print(f"  dashboard:  http://{dash_host}:{port}/?token=<GOVD_MONITOR_TOKEN>   (redacted from logs; GOVD_ECHO_TOKEN=1 to print)")
     print("  control/audit plane — govd governs the claim + records status; it never sees data, never runs.")
     try:
         httpd.serve_forever()
