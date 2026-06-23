@@ -97,6 +97,7 @@ ExecStart=/usr/bin/docker run --rm --name cyberware-govd \\
   -v ${CW_ETC}/principals.json:/run/principals.json:ro \\
   -v ${CW_ETC}/monitor.token:/run/monitor.token:ro \\
   -e GOVD_PRINCIPALS=/run/principals.json \\
+  -e GOVD_RECORD_ROOT=/data/govd \\
   -e PYTHONDONTWRITEBYTECODE=1 \\
   --read-only --tmpfs /tmp \\
   ${GOVD_IMAGE} \\
