@@ -1,0 +1,67 @@
+# cyberware BODY — govd (delegated) + exod (the confined limb) in ONE non-root image. Pull this on any Linux
+# node to make it a full body: it governs AND executes governed acts, so the brain can reach + manage it.
+# Sibling of ./Dockerfile (govd-only); this adds bwrap + exod + the body entrypoint.
+#
+# Confinement runtime — pick one at `docker run`:
+#   * gVisor (recommended): docker run --runtime=runsc ...   — the Sentry IS the isolation, so NO --privileged
+#       and NO dependency on the host's unprivileged-userns sysctl (sidesteps the Ubuntu hardening that breaks
+#       bwrap). Set -e EXOD_SANDBOX_BACKEND=runsc to ALSO use gVisor as exod's in-container backend, or leave
+#       bwrap (the gVisor runtime already isolates the whole container).
+#   * runc + bwrap:        docker run --privileged ...       — bwrap needs unprivileged user namespaces, which
+#       the container runtime masks; the body container must hold the caps to drop each step to nobody.
+FROM python:3.11-slim
+
+# Java + tla2tools.jar — govd's compose model-checks the blueprint for deadlock via the real TLC (same as the
+# govd image). git stays for CLOUD_MODE chip clone-at-boot. bubblewrap/uidmap = exod's confinement boundary.
+ARG TLA_VERSION=v1.8.0
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends default-jre-headless ca-certificates curl git bubblewrap uidmap \
+ && curl -fsSL -o /opt/tla2tools.jar \
+      "https://github.com/tlaplus/tlaplus/releases/download/${TLA_VERSION}/tla2tools.jar" \
+ && apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+ENV TLA2TOOLS_JAR=/opt/tla2tools.jar
+
+# cryptography: govd + exod import Ed25519 at startup (grants, exod identity). manylinux wheel — no compiler.
+RUN pip install --no-cache-dir cryptography==49.0.0
+
+WORKDIR /app
+
+# the engine + the baked cartridge + the body boot
+COPY infra/ ./infra/
+COPY skillChip/ ./skillChip/
+COPY deploy/body-entrypoint.sh /usr/local/bin/body-entrypoint.sh
+
+# build-time gates: the baked chip must be authentic, AND the FULL body import chain (govd + delegate + exod +
+# the bwrap sandbox driver) must load in-image — fail the BUILD, never ship a body that crash-loops on a node.
+RUN python3 -m infra.tool.skill_index --check --all \
+ && python3 -c "import infra.govern.govd, infra.govern.delegate, infra.exec.exod, infra.exec.sandbox; print('body import chain OK')" \
+ && chmod +x /usr/local/bin/body-entrypoint.sh
+
+# non-root principal — govd AND exod run under a scoped service identity, NEVER root (exec-never-root: the
+# executor refuses uid 0; exod drops each STEP to nobody on top). chown BEFORE VOLUME so a fresh named volume
+# inherits cyberware ownership.
+RUN groupadd -g 1000 cyberware \
+ && useradd -u 1000 -g cyberware -d /app -s /usr/sbin/nologin cyberware \
+ && mkdir -p /data/body \
+ && chown -R cyberware:cyberware /app /data/body
+
+ENV GOVD_RECORD_ROOT=/data/body \
+    EXOD_SOCKET=/data/body/exod.sock \
+    EXOD_SANDBOX_BACKEND=bwrap \
+    PYTHONUNBUFFERED=1
+
+# the body's state — keys, monitor token, the agent principal, the provenance ledger. Mount to persist:
+#   docker run -v cyberware-body:/data/body ...
+VOLUME ["/data/body"]
+EXPOSE 5773
+
+# drop to the non-root principal — govd + exod inherit this uid; exod drops each step to nobody on top
+USER cyberware
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s \
+  CMD python3 -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5773/health').getcode()==200 else 1)"
+
+# Boot = acquire + VALIDATE the chip (chipfetch refuses on drift), then exec the body entrypoint (mints
+# keys/token/principal, starts exod, then govd-delegated). Both inherit CYBERWARE_SKILLCHIP from chipfetch.
+#   LOCAL (default): the baked chip.   CLOUD: docker run -e CLOUD_MODE=1 [-e CLOUD_SOURCE_TAG=main] ...
+CMD ["python3", "-m", "infra.govern.chipfetch", "--exec", "/usr/local/bin/body-entrypoint.sh"]
