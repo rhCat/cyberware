@@ -4,7 +4,7 @@ Tool skills (operational pathways) — not design/taste skills. They live on the
 swappable skill cartridge, a separate repo vendored as the `skillChip/` submodule). Each runs through the
 governed pipeline (`validate → compose → compile → oversight → executor`), ships a `blueprint.{drawio,svg}`,
 pins every file in an `index.json` (authenticity), and carries a per-perk `test/case.json` that proves it
-through the real channel. **40 skills** — discover them at `GET /catalog` or `./govd-client --discover`.
+through the real channel. **41 skills** — discover them at `GET /catalog` or `./govd-client --discover`.
 The table below is the **general tool** catalog; the **v1.1 validator family** (which grades the build
 against the plan) is listed separately under [Validators](#validators).
 
@@ -23,6 +23,7 @@ against the plan) is listed separately under [Validators](#validators).
 | **cws-provision** | `up` | bash | bring a node up as a **cyberware fleet member** in one governed run — base deps, Docker, Tailscale (private-overlay join), and the **always-on syscontrol** (enable + `Restart=always` so services survive a reboot). Governed-clean (apt, never `curl\|sh` / `sudo`); operator-run as root; `DRY_RUN=1` plans only. Destructive (host-modifying). |
 | **cws-neoclaw** | `discover` · `run` · `status` | python3 · http | the agent's governed handle to **operate a (detached) govd node**: `discover` reads what a node governs (`/health`+`/catalog`), `status` is a liveness probe, `run` forwards a governed sub-claim to a node (it blesses + oversees, executes faithfully non-root, returns the verdict + ledger). Agent KNOWs; every ACT stays a govd syscall on the far side. |
 | **net** | `healthcheck` · `dns` | curl · python3 | HTTP probe (status + latency); DNS resolve (python core via porter). Read-only. |
+| **sys** | `stat` | python3 | governed host metrics — CPU %, load average, memory, uptime, cores (value-free node pulse for the fleet monitor). Real `/proc/stat` on Linux; honest load-per-core estimate on macOS. Read-only. |
 | **data** | `csv2json` · `jq` | python3 · jq | CSV → JSON array (python core); jq query over a JSON file. |
 | **search** | `grep` · `loc` | ripgrep/grep · find | pattern search (rg, fallback grep); line counts by extension. Read-only. |
 | **release** | `tag` | git | annotated git tag at HEAD; no-op if it exists. No force, no push (push stays gated). |
