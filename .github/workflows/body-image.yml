@@ -1,0 +1,86 @@
+name: body-image
+# Build the cyberware BODY image (Dockerfile.body — govd delegated + exod, ONE non-root image) and publish it
+# SIGNED to ghcr, so a node becomes a full body with one `docker pull` + `docker run`. Run it under gVisor
+# (`--runtime=runsc`) for sysctl-independent, non-privileged confinement. Signed keyless with cosign via GitHub
+# OIDC (no stored key). Deliberate publishes only: on a vN.N.N tag or on demand. Mirrors server-image.yml.
+on:
+  push:
+    tags: [ "v*" ]
+  workflow_dispatch:
+    inputs:
+      skillchip_ref:
+        description: "skillChip ref to bake into the image (tag/branch/sha). Default: the lean 'core' channel tag."
+        default: core
+        required: false
+
+permissions:
+  contents: read
+  packages: write          # publish the image to ghcr under this repo's owner
+  id-token: write          # cosign keyless signing (OIDC -> Fulcio/Rekor); no secret stored
+
+concurrency:
+  group: body-image
+  cancel-in-progress: false
+
+jobs:
+  build-push-sign:
+    runs-on: [self-hosted]          # dev: private repo → self-hosted (free Actions minutes). Revert to ubuntu-latest when cyberware goes public.
+    steps:
+      - name: reclaim workspace ownership before checkout (self-hosted runner)
+        run: sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE" 2>/dev/null || true
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: pull the skillChip CORE tag (the lean cartridge the image bakes in)
+        env:
+          TOKEN: ${{ secrets.SUBMODULE_PAT || github.token }}   # PAT for the private chip; falls back for a public one
+          SKILLCHIP_REF: ${{ github.event.inputs.skillchip_ref || 'core' }}
+        run: |
+          rm -rf skillChip
+          git clone --depth 1 --branch "${SKILLCHIP_REF}" \
+            "https://x-access-token:${TOKEN}@github.com/rhCat/skillChip.git" skillChip
+          rm -rf skillChip/.git                                 # don't bake the clone's git metadata into the image
+          python3 -c "import json;d=json.load(open('skillChip/index.json'));print('baked skillChip@${SKILLCHIP_REF}:',d['count'],'skills · chip_sha',d['chip_sha'][:16])"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: log in to ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/cyberware-body   # metadata-action lowercases the owner
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+            type=sha,format=long
+
+      - name: build + push (amd64) — the Dockerfile.body gates (skill_index --check + body import chain) fail the build on drift
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.body
+          platforms: linux/amd64          # amd64-only (dev): the runner + target nodes are x86; no arm64/QEMU. Restore arm64 when publishing broadly.
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
+
+      - name: install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: keyless-sign the pushed image (OIDC — verifiable, no stored key)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          owner="${{ github.repository_owner }}"
+          cosign sign --yes "ghcr.io/${owner,,}/cyberware-body@${DIGEST}"

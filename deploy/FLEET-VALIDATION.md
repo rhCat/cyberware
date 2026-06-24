@@ -101,3 +101,37 @@ Per the task's allowed "**one green backend + a documented stub**":
   ```
   `rt-gvisor-tier`'s `redteam.json` records `bwrap_live` / `runsc_live` honestly, so a host without a backend
   is visible as a skip — never a fabricated pass.
+
+## One image = a full body (govd + exod), non-root, runsc-ready
+
+`Dockerfile.body` is a single **non-root** image that runs **govd (delegated) + exod (the confined limb)** —
+so any Linux node becomes a full body with one `docker pull`, governing AND executing governed acts. It's the
+sibling of `./Dockerfile` (govd-only) plus bwrap + exod + `deploy/body-entrypoint.sh`. Built + signed by
+`.github/workflows/body-image.yml` (on a `vN.N.N` tag) → `ghcr.io/rhCat/cyberware-body`.
+
+**Run it under gVisor (recommended)** — the Sentry is the isolation, so NO `--privileged` and NO dependency on
+the host's unprivileged-userns sysctl (this sidesteps the Ubuntu hardening that breaks bwrap):
+```
+docker run -d --name cyberware-body --runtime=runsc \
+  -p <tailnet-ip>:5773:5773 -v cyberware-body:/data/body \
+  -e CLOUD_MODE=1 \                       # chip-at-boot: clone + validate the live chip (drift-refused)
+  ghcr.io/rhCat/cyberware-body:latest
+```
+**Or under runc with bwrap** (bwrap needs the userns caps the runtime masks): add `--privileged` (or the
+least-privilege `--cap-add SYS_ADMIN --cap-add SYS_CHROOT --security-opt seccomp=unconfined`). Either way the
+step itself always runs as `nobody`.
+
+> **Bind the overlay IP, never the host's `0.0.0.0`.** govd inside the container binds `0.0.0.0`, so the `-p`
+> mapping is what scopes it — always `-p <tailnet-ip>:5773:5773`. A bare `-p 5773:5773` publishes the
+> governance plane on EVERY host interface (LAN/public). Auth is on (the plane refuses without a token), but
+> the overlay-only binding is the first fence — keep it.
+
+The entrypoint mints, ONCE, into the `/data/body` volume: the grant + exod keypairs (dual-control), a monitor
+token, and an `agent-1` principal. Wire them:
+```
+docker exec cyberware-body cat /data/body/etc/agent-1.token.GIVE-TO-AGENT   # hand to the brain
+docker exec cyberware-body cat /data/body/etc/monitor.token                  # -> ~/.cyberware/monitors/<name>.token
+deploy/fleet-setup.sh register <name> body http://<tailnet-ip>:5773          # add the row to ~/.cyberware/fleet.json
+```
+**Update:** `docker pull ghcr.io/rhCat/cyberware-body:latest && docker restart cyberware-body` refreshes the
+infra; the chip is re-fetched + re-validated at boot (CLOUD_MODE), so chip updates stay nimble — no rebuild.
