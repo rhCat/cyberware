@@ -288,7 +288,7 @@ class Store:
     record_root; the agent never writes here. In-memory runs are capped (oldest evicted, disk retained)
     so the server stays bounded under high concurrency."""
 
-    def __init__(self, root, max_runs=MAX_RUNS):
+    def __init__(self, root, max_runs=MAX_RUNS, cfg=None):
         self.root = os.path.abspath(os.path.expanduser(root))
         os.makedirs(self.root, exist_ok=True)
         self.lock = threading.Lock()
@@ -298,6 +298,12 @@ class Store:
         self.decisions = collections.deque(maxlen=500)       # every /govern verdict (metadata, for the monitor)
         self.decisions_log = os.path.join(self.root, "decisions.jsonl")  # durable, append-only: ALL verdicts
         self._hydrate()                                      # load persisted ledgers (mounted record_root)
+        # P5-T01: the chained-JSONL ARTIFACT OF RECORD + a DERIVED StoreBackend index live behind StoreMirror
+        # (infra/store/mirror.py), OUT of this enforcement-surface file. The decision path only hands the mirror
+        # value-free snapshots; a single async worker writes chain-first then index, off the request thread and
+        # exception-isolated. The in-memory runs + ledger.json remain the authoritative hot-path state.
+        from infra.store.mirror import StoreMirror
+        self.mirror = StoreMirror(self.root, cfg)
 
     def _path(self, run_id): return os.path.join(self.root, run_id, "ledger.json")
 
@@ -383,6 +389,10 @@ class Store:
                 self.runs.pop(next(iter(self.runs)), None)
             snapshot = json.dumps(record, indent=2)
         self._persist(run_id, snapshot)                      # disk write outside the lock — less contention
+        try:                                                 # P5-T01: async value-free mirror; never fails create
+            self.mirror.record_run(run_id, record)
+        except Exception as e:
+            sys.stderr.write(f"[govd] mirror (create {run_id}) skipped: {e}\n")
 
     def remember(self, run_id, record):
         """Keep a NON-allow verdict (push_back / reject) in memory only — navigable + inspectable in the
@@ -404,7 +414,12 @@ class Store:
                 return None
             rec["events"].append(event)
             snapshot = json.dumps(rec, indent=2)
+            plan_sha = rec.get("plan_sha", "")
         self._persist(run_id, snapshot)
+        try:
+            self.mirror.record_event(run_id, plan_sha, event)
+        except Exception as e:
+            sys.stderr.write(f"[govd] mirror (event {run_id}) skipped: {e}\n")
         return rec
 
     def ran_ok(self, run_id):
@@ -457,6 +472,10 @@ class Store:
                     f.write(json.dumps(summary) + "\n")      # only ALLOW runs get a full per-run ledger dir
             except OSError:
                 pass
+        try:                                                 # P5-T01: async chain+index mirror, off the decision path
+            self.mirror.decision(summary)
+        except Exception as e:
+            sys.stderr.write(f"[govd] mirror (decision) skipped: {e}\n")
 
     def run_detail(self, run_id):
         """The full value-free record for one run (events, steps, plan hash, tlc) — for the review panel.
@@ -1089,7 +1108,7 @@ def serve(cfg):
     Handler.timeout = cfg.get("socket_timeout", SOCKET_TIMEOUT)
     ensure_monitor_token(cfg)                            # final mode is known here (after --mode)
     require_closed_auth(cfg)                              # refuse a network-exposed plane with auth off
-    store = Store(cfg["record_root"])
+    store = Store(cfg["record_root"], cfg=cfg)
     if cfg["mode"] == "remote":
         host, ports = cfg["remote"]["host"], [cfg["remote"]["port"]]
     else:
@@ -1108,6 +1127,24 @@ def serve(cfg):
            if (prov or {}).get("mode") == "cloud" else "local (baked)")
     print(f"  skillChip={registry.SKILLCHIP}   chip_sha={(chip_sha() or '?')[:16]}   source={src}")
     print(f"  record_root={store.root}")
+    # P5-T01: the continuous reconciler — its OWN backend connection (never shares the writers' cx), READ-ONLY,
+    # alarms on chain/index divergence. Daemon thread: dies with the process; never touches Store decision state.
+    if store.mirror.enabled():
+        try:
+            from infra.store import backend as _sb
+            from infra.store import reconcile as _rec
+
+            def _alarm(cycle, res):
+                if not res["ok"]:
+                    sys.stderr.write("[govd][reconcile] cycle %d: %d run(s) diverged: %s\n" % (
+                        cycle, len(res["alarms"]),
+                        json.dumps([{a["run_id"]: [d["class"] for d in a["divergences"]]} for a in res["alarms"]])))
+            _recon_be = _sb.make_backend(store.root, cfg)
+            threading.Thread(target=_rec.continuous_reconcile, args=(_recon_be, store.root),
+                             kwargs={"interval": float(cfg.get("reconcile_interval", 5.0)), "sink": _alarm},
+                             daemon=True).start()
+        except Exception as e:
+            sys.stderr.write(f"[govd] reconciler not started: {e}\n")
     _mt = cfg["monitor_token"]
     if _mt == "admin":                                   # the well-known default is not a secret — keep the click-through
         print(f"  dashboard:  http://{dash_host}:{port}/?token=admin   (default local token — set GOVD_MONITOR_TOKEN to change)")
