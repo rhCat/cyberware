@@ -19,13 +19,54 @@ import os
 from infra.exec.sandbox import SandboxProfile, _CORE_RO
 
 
+# P2-T04: capability TIERS. The community tier (the gVisor/runsc community backend's grant) is the floor:
+# read-only system, optional network, and — crucially — it CANNOT request secrets. Only a trusted-tier grant
+# may name credentials (resolved step-side by the vault, P2-T05). Enforced at BOTH the schema (a community
+# manifest dict carrying credentials is malformed) and the runtime (materialize_checked refuses it).
+COMMUNITY = "community"
+TRUSTED = "trusted"
+_TIERS = (COMMUNITY, TRUSTED)
+
+
 @dataclasses.dataclass(frozen=True)
 class CapabilityManifest:
-    """The declared capabilities of a sandbox: the readable system tree, the writable workspace, the
-    network. The defaults ARE the spine core grant (read-only system, no network)."""
+    """The declared capabilities of a sandbox: the readable system tree, the writable workspace, the network,
+    the tier, and the credentials it requests. The defaults ARE the spine core grant at the COMMUNITY tier
+    (read-only system, no network, no secrets)."""
     workspace: str
     ro_binds: tuple = _CORE_RO
     network: bool = False
+    tier: str = COMMUNITY
+    credentials: tuple = ()
+
+
+def community_no_secrets(manifest: CapabilityManifest):
+    """Returns (ok, reason). The community tier is the no-secrets floor: a COMMUNITY manifest that requests any
+    credential is REFUSED (only a trusted-tier grant may name secrets). An unknown tier is refused too."""
+    if manifest.tier not in _TIERS:
+        return False, f"unknown_tier:{manifest.tier}"
+    if manifest.tier == COMMUNITY and tuple(manifest.credentials):
+        return False, "community_tier_cannot_request_secrets"
+    return True, "ok"
+
+
+def validate_manifest_schema(d: dict):
+    """Schema gate for a manifest dict (the wire form). Returns (ok, reason). A community-tier manifest dict
+    carrying a non-empty `credentials` list is malformed — the no-secrets floor is a SCHEMA property, refused
+    before anything is materialized, not only at runtime."""
+    if not isinstance(d, dict):
+        return False, "manifest_not_object"
+    if "workspace" not in d:
+        return False, "missing_workspace"
+    tier = d.get("tier", COMMUNITY)
+    if tier not in _TIERS:
+        return False, f"unknown_tier:{tier}"
+    creds = d.get("credentials", []) or []
+    if not isinstance(creds, (list, tuple)):
+        return False, "credentials_not_a_list"
+    if tier == COMMUNITY and creds:
+        return False, "community_tier_cannot_request_secrets"
+    return True, "ok"
 
 
 def materialize(manifest: CapabilityManifest) -> SandboxProfile:
@@ -75,8 +116,12 @@ def verify_materialized(profile: SandboxProfile, manifest: CapabilityManifest):
 
 
 def materialize_checked(manifest: CapabilityManifest) -> SandboxProfile:
-    """Materialize a manifest and self-verify the result matches it exactly. Raises if the materialization
-    diverges from the declared grant — a sandbox is never run unless it provably equals its manifest."""
+    """Materialize a manifest and self-verify the result matches it exactly. Raises if the tier forbids the
+    request (a community manifest requesting secrets) OR if the materialization diverges from the declared
+    grant — a sandbox is never run unless its tier permits it AND it provably equals its manifest."""
+    ok, reason = community_no_secrets(manifest)              # P2-T04: the no-secrets floor, at runtime
+    if not ok:
+        raise ValueError(f"capability manifest refused by tier policy: {reason}")
     profile = materialize(manifest)
     ok, reason = verify_materialized(profile, manifest)
     if not ok:

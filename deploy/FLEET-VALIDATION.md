@@ -57,3 +57,28 @@ NAS SMB mount (import/exec I/O), but comfortably inside the budget. Run it on a 
 `infra/tool/fleetdash.py` wraps every node's `/monitor` into one who-fired-what-**where** dashboard (per-node
 health + a merged decision feed, `exec=exod` on the confined bodies). `python3 -m infra.tool.fleetdash
 --config deploy/fleet.example.json --serve 8787`; tokens come from per-node `token_file`s, never argv.
+
+## SandboxProfile community tier — gVisor (P2-T04)
+
+The execution boundary has a **second backend behind the same value-free `SandboxProfile` driver**
+(`infra/exec/sandbox.py`): bwrap (the default/spine) and **gVisor (`runsc`)** for the community tier. The
+gVisor renderer (`oci_config`) maps the SAME profile to an OCI runtime spec; `sandbox.confinement(profile,
+backend)` proves the two are **seam-equivalent** — identical capability binds, network isolation, nobody
+uid/gid, all caps dropped, no-new-privileges, masked `/proc`, readonly rootfs — so the community backend can
+never *weaken* the boundary. The community tier is also the **no-secrets floor**: a community capability
+manifest that requests a credential is refused at both the schema and the runtime (`capmanifest`).
+
+Per the task's allowed "**one green backend + a documented stub**":
+- **bwrap is the green backend** — the full kernel red-team corpus (`cws-redteam`) is green under it (SV-3/M3,
+  already closed). Run it on any Linux+bwrap node: `python3 -m infra.tool.skilltest --skill cws-redteam`.
+- **gVisor is the seam + a host-gated stub.** The rendering + the no-secrets tier are proven on **any** host
+  (pure functions — `cws-redteam/rt-gvisor-tier`, redeemed for P2-T04). The **live attack corpus under
+  `runsc`** is gated on a gVisor host (`sandbox.runsc_available()`), exactly as bwrap is gated on
+  `is_available()`. To run it where `runsc` is installed:
+  ```
+  # on a gVisor node (runsc on PATH):
+  python3 -c "from infra.exec import sandbox, redteam; print(sandbox.runsc_available())"   # -> True
+  # the sandbox-family attacks exec through the runsc backend; rt-gvisor-tier reports runsc_live=true
+  ```
+  `rt-gvisor-tier`'s `redteam.json` records `bwrap_live` / `runsc_live` honestly, so a host without a backend
+  is visible as a skip — never a fabricated pass.

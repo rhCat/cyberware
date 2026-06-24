@@ -119,6 +119,12 @@ class Exod:
         env = {**prof.env, **(req.get("env") or {})}   # govd-supplied NON-secret step env (SNIP, RECORD_STORE)
         creds = gbody.get("credentials") or []
         if creds:
+            # P2-T04 no-secrets floor, enforced where secrets RESOLVE: the COMMUNITY tier (the default) may
+            # never resolve a credential — only an explicit trusted-tier grant may. A community grant carrying
+            # credentials is refused HERE, before any secret is touched — the floor is a runtime invariant of
+            # the limb, not merely a manifest-build check.
+            if gbody.get("tier", "community") != "trusted":
+                return refuse("tier:community_no_secrets")
             if self._vault is None:
                 return refuse("vault:unavailable")
             try:

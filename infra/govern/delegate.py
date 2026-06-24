@@ -55,9 +55,14 @@ def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base,
     now = int(time.time()) if now is None else now
     ws, env, run_sh = materialize_workspace(rec, base, registry)
     nonce = secrets.token_urlsafe(18)
+    # P2-T04 tier: a grant that carries credentials is minted at the TRUSTED tier (govd authorized those
+    # credentials from the plan); a credential-free grant stays at the COMMUNITY floor. exod refuses to resolve
+    # a secret for any non-trusted grant, so a credentialed grant that is NOT trusted-tier (a malformed/foreign
+    # grant) is rejected at the secret-resolution boundary.
+    creds = rec.get("credential_ids") or []
     grant = grants.mint_grant(grant_key, run_id=rec["run_id"], plan_sha=plan_sha,
                               snippet_shas=rec.get("snippet_shas") or {}, capabilities=["run"],
-                              credentials=rec.get("credential_ids") or [],
+                              credentials=creds, tier=("trusted" if creds else "community"),
                               nbf=now - 5, exp=now + grant_ttl, nonce=nonce)
     req = {"run_id": rec["run_id"], "plan_sha": plan_sha, "step": step,
            "argv": ["bash", run_sh, "--step", step], "workspace": ws, "env": env, "grant": grant}

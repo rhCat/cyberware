@@ -388,8 +388,8 @@ def test_exod_injects_grant_authorized_credentials_into_the_confined_step():
     vault = _vaultmod.EnvStubVault({"api-key": secret, "other": "nope"})
     stub = _Stub(rc=0, out="x")
     exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=stub, vault=vault)
-    g = mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g1",
-                   capabilities=["run"], credentials=["api-key"])           # only api-key is granted
+    g = mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g1", tier="trusted",
+                   capabilities=["run"], credentials=["api-key"])           # only api-key is granted (trusted tier)
     env = exod.run_step(dict(run_id="R1", plan_sha="P1", step="1", argv=["x"], workspace="/ws", grant=g),
                         now=1000)
     assert result_body(env)["status"] == "ok"
@@ -403,11 +403,32 @@ def test_exod_refuses_when_credentials_granted_but_no_vault():
     """Fail closed: a grant that authorizes credentials but no vault is attached -> refuse, never run."""
     isk, ipub = _kp()
     exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=_Stub())   # no vault
-    g = mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g1",
+    g = mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g1", tier="trusted",
                    capabilities=["run"], credentials=["api-key"])
     env = exod.run_step(dict(run_id="R1", plan_sha="P1", step="1", argv=["x"], workspace="/ws", grant=g),
                         now=1000)
     assert result_body(env)["status"] == "refused"
+
+
+def test_exod_refuses_secrets_for_a_community_tier_grant():
+    """P2-T04 no-secrets floor where secrets RESOLVE: a COMMUNITY-tier grant (the default) carrying credentials
+    is refused by exod before any secret is touched — only a trusted-tier grant may resolve credentials."""
+    isk, ipub = _kp()
+    secret = "SEKRET-" + "z" * 16
+    vault = _vaultmod.EnvStubVault({"api-key": secret})
+    stub = _Stub(rc=0, out="x")
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=stub, vault=vault)
+    # community tier is the DEFAULT (no tier= passed) — requesting a credential must be refused
+    g = mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g1",
+                   capabilities=["run"], credentials=["api-key"])
+    env = exod.run_step(dict(run_id="R1", plan_sha="P1", step="1", argv=["x"], workspace="/ws", grant=g),
+                        now=1000)
+    import hashlib as _h
+    body = result_body(env)
+    # refused for the RIGHT reason: the tag is hashed into output_sha (value-free — the body never leaks text)
+    assert body["status"] == "refused"
+    assert body["output_sha"] == _h.sha256(b"tier:community_no_secrets").hexdigest()
+    assert not stub.calls                                                     # the step never ran; no secret touched
 
 
 def test_exod_no_credentials_runs_without_vault():
