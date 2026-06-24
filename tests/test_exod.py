@@ -410,6 +410,29 @@ def test_exod_refuses_when_credentials_granted_but_no_vault():
     assert result_body(env)["status"] == "refused"
 
 
+def test_exod_refuses_when_selected_backend_is_unavailable():
+    """P2-T04 backend selection is FAIL-CLOSED: if the chosen confinement backend cannot enforce on this host
+    (e.g. exod configured for runsc/gVisor but runsc is absent), exod REFUSES the step (signed), never runs it
+    unconfined, and never crashes the limb."""
+    import hashlib as _h
+
+    import pytest
+
+    from infra.exec.sandbox import run_confined, runsc_available
+    if runsc_available():
+        pytest.skip("runsc present — this exercises the unavailable-backend refusal")
+    isk, ipub = _kp()
+    # the runner is run_confined pinned to the runsc backend — unavailable on this host
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub,
+                runner=lambda prof, argv: run_confined(prof, argv, backend="runsc"))
+    g = mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g1", capabilities=["run"])
+    env = exod.run_step(dict(run_id="R1", plan_sha="P1", step="1", argv=["true"], workspace="/ws", grant=g),
+                        now=1000)
+    body = result_body(env)
+    assert body["status"] == "refused"
+    assert body["output_sha"] == _h.sha256(b"sandbox:unavailable").hexdigest()   # the right refusal reason
+
+
 def test_exod_refuses_secrets_for_a_community_tier_grant():
     """P2-T04 no-secrets floor where secrets RESOLVE: a COMMUNITY-tier grant (the default) carrying credentials
     is refused by exod before any secret is touched — only a trusted-tier grant may resolve credentials."""
