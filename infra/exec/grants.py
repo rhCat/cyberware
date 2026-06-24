@@ -21,12 +21,16 @@ from infra.exec.grantverify import (  # noqa: F401  (single source of truth for 
 
 
 def mint_grant(private_key, *, run_id, plan_sha, nbf, exp, nonce,
-               snippet_shas=None, capabilities=None, credentials=None):
+               snippet_shas=None, capabilities=None, credentials=None, tier="community"):
     """Issue a signed grant (a DSSE envelope). The body is the value-free capability claim; the signature
-    binds it so any holder can verify it offline. The nonce MUST be a non-empty string (the replay key)."""
+    binds it so any holder can verify it offline. The nonce MUST be a non-empty string (the replay key).
+
+    `tier` is the capability tier (P2-T04): the default COMMUNITY tier is the no-secrets floor — a community
+    grant may NOT carry credentials (exod refuses to resolve secrets for it). Only an explicit `tier="trusted"`
+    grant may name credentials. Secure by default: a grant minted without a tier cannot smuggle secrets."""
     if not (isinstance(nonce, str) and nonce):
         raise ValueError("grant nonce must be a non-empty string")
     body = {"run_id": run_id, "plan_sha": plan_sha, "snippet_shas": snippet_shas or {},
-            "capabilities": capabilities or [], "credentials": credentials or [],
+            "capabilities": capabilities or [], "credentials": credentials or [], "tier": tier,
             "nbf": int(nbf), "exp": int(exp), "nonce": nonce}
     return sign.sign(body, private_key, payload_type=GRANT_TYPE)

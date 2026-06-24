@@ -110,11 +110,254 @@ def core_profile(workspace: str, *, network: bool = False) -> SandboxProfile:
     return SandboxProfile(workspace=workspace, network=network)
 
 
+# ── P2-T04: the community tier — a SECOND backend behind the SAME value-free SandboxProfile ──────────────
+# gVisor (runsc) renders the same confinement as an OCI runtime spec (readonly rootfs, all caps dropped,
+# no-new-privileges, the network namespace unshared unless granted, the masked /proc paths, ro system binds +
+# the one rw workspace). The SandboxProfile is the single source of truth; each backend realizes it. `runsc`
+# needs Linux + the runsc binary, so the live corpus under gVisor is gated exactly like bwrap is — the
+# rendering is a PURE function provable everywhere; only the exec is host-gated.
+
+RUNSC = "runsc"
+_MASKED_PROC = ("/proc/sysrq-trigger", "/proc/kcore", "/proc/kallsyms", "/proc/keys",
+                "/proc/timer_list", "/proc/sched_debug")
+
+
+def runsc_available() -> bool:
+    """True only where gVisor can actually confine: a Linux host with the runsc binary present."""
+    return os.uname().sysname == "Linux" and shutil.which(RUNSC) is not None
+
+
+def oci_config(profile: SandboxProfile, argv: Sequence[str]) -> dict:
+    """Render this profile + argv into an OCI runtime spec (the gVisor/runc representation of the SAME
+    confinement). Pure: it builds the dict, runs nothing. The security invariants mirror bwrap_argv exactly —
+    readonly rootfs, every capability dropped, no-new-privileges, the network namespace unshared unless
+    granted, the masked /proc paths, the ro system binds + the one rw workspace, the step dropped to nobody."""
+    ns = [{"type": "pid"}, {"type": "ipc"}, {"type": "uts"}, {"type": "mount"}, {"type": "user"},
+          {"type": "cgroup"}]
+    if not profile.network:
+        ns.append({"type": "network"})                       # unshare net: no egress (mirrors --unshare-net)
+    mounts = []
+    for t in profile.tmpfs:
+        mounts.append({"destination": t, "type": "tmpfs", "source": "tmpfs",
+                       "options": ["nosuid", "nodev", "noexec"]})
+    if profile.proc:
+        mounts.append({"destination": "/proc", "type": "proc", "source": "proc"})
+    for p in profile.ro_binds:
+        if os.path.exists(p):
+            mounts.append({"destination": p, "type": "bind", "source": p, "options": ["ro", "rbind", "nosuid"]})
+    mounts.append({"destination": profile.workspace, "type": "bind", "source": profile.workspace,
+                   "options": ["rw", "rbind", "nosuid"]})      # the one writable path
+    masked = [f for f in _MASKED_PROC if os.path.exists(f)]
+    return {
+        "ociVersion": "1.0.2",
+        "hostname": profile.hostname,
+        "root": {"path": "rootfs", "readonly": True},          # readonly rootfs (the ro system tree)
+        "process": {
+            "terminal": False,
+            "user": {"uid": profile.uid, "gid": profile.gid}, # the step runs as nobody, never root
+            "args": list(argv),
+            "env": [f"{k}={v}" for k, v in profile.env.items()],
+            "cwd": profile.workspace,
+            "noNewPrivileges": True,
+            "capabilities": {"bounding": [], "effective": [], "permitted": [], "inheritable": [],
+                             "ambient": []},                   # drop ALL capabilities
+        },
+        "mounts": mounts,
+        "linux": {
+            "namespaces": ns,
+            "maskedPaths": masked,
+            "readonlyPaths": ["/proc/sys"],                    # writes -> EROFS (mirrors --ro-bind /proc/sys)
+            "uidMappings": [{"containerID": profile.uid, "hostID": os.getuid() if hasattr(os, "getuid") else 0,
+                             "size": 1}],
+            "gidMappings": [{"containerID": profile.gid, "hostID": os.getgid() if hasattr(os, "getgid") else 0,
+                             "size": 1}],
+        },
+    }
+
+
+def capability_mounts(profile: SandboxProfile, backend: str = "bwrap") -> set:
+    """The (path, mode) CAPABILITY binds a backend's rendering actually materializes — source==destination,
+    excluding the fixed /proc-hardening masks. Lets the same EXACT-match check (capmanifest) verify either
+    backend grants precisely the manifest, no more, no fewer — proving the seam doesn't widen reach."""
+    if backend == "runsc":
+        out = set()
+        for m in oci_config(profile, ["true"])["mounts"]:
+            src, dst, opts = m.get("source"), m.get("destination"), m.get("options", [])
+            if m.get("type") == "bind" and src == dst and not dst.startswith("/proc"):
+                out.add((dst, "ro" if "ro" in opts else "rw"))
+        return out
+    # bwrap: parse the rendered argv (same logic as capmanifest.materialized_mounts, kept here for both backends)
+    argv, out, i = profile.bwrap_argv(["true"]), set(), 0
+    while i < len(argv) - 2:
+        if argv[i] in ("--ro-bind", "--ro-bind-try", "--bind"):
+            src, dst = argv[i + 1], argv[i + 2]
+            if src == dst and not dst.startswith("/proc") and src != "/dev/null":
+                out.add((dst, "rw" if argv[i] == "--bind" else "ro"))
+            i += 3
+        else:
+            i += 1
+    return out
+
+
+def _namespaces(profile: SandboxProfile, backend: str) -> frozenset:
+    """The normalized set of isolation namespaces a backend's rendering establishes — every one bwrap unshares
+    plus the implicit mount namespace, and `network` iff the network is NOT granted. Extracted from the
+    rendered output so a backend that DROPS a namespace (e.g. pid → host processes visible) fails parity."""
+    if backend == "runsc":
+        return frozenset(n["type"] for n in oci_config(profile, ["true"])["linux"]["namespaces"])
+    argv = profile.bwrap_argv(["true"])
+    ns = {"mount"}                                            # bwrap always creates a mount namespace to bind
+    for flag, name in (("--unshare-user", "user"), ("--unshare-pid", "pid"), ("--unshare-ipc", "ipc"),
+                       ("--unshare-uts", "uts"), ("--unshare-cgroup-try", "cgroup"), ("--unshare-net", "network")):
+        if flag in argv:
+            ns.add(name)
+    return frozenset(ns)
+
+
+def _masked_proc(profile: SandboxProfile, backend: str) -> frozenset:
+    """The set of dangerous /proc surfaces a backend neutralizes: the live-kernel files shadowed + /proc/sys
+    made read-only. Extracted from the rendering so a backend that leaves a file writable fails parity."""
+    if backend == "runsc":
+        spec = oci_config(profile, ["true"])
+        masked = {f for f in spec["linux"]["maskedPaths"] if f in _MASKED_PROC}
+        if "/proc/sys" in spec["linux"]["readonlyPaths"]:
+            masked.add("/proc/sys")
+        return frozenset(masked)
+    argv = profile.bwrap_argv(["true"])
+    masked = set()
+    for i in range(len(argv) - 2):
+        if argv[i] == "--ro-bind" and argv[i + 1] == "/dev/null" and argv[i + 2] in _MASKED_PROC:
+            masked.add(argv[i + 2])
+    if "/proc/sys" in argv:                                   # --ro-bind-try /proc/sys /proc/sys
+        masked.add("/proc/sys")
+    return frozenset(masked)
+
+
+def confinement(profile: SandboxProfile, backend: str = "bwrap") -> dict:
+    """The backend-independent SECURITY confinement a backend's rendering enforces — extracted from the ACTUAL
+    rendered output (argv / OCI spec), NOT re-derived from the profile. Two backends are seam-equivalent iff
+    their confinement() dicts are EQUAL. The dict is TOTAL over the boundary's properties — the capability
+    binds, the FULL namespace set (pid/ipc/uts/cgroup/user/mount + network), nobody uid/gid, dropped caps,
+    no-new-privileges, the readonly rootfs, AND the masked /proc surfaces — so a backend that drops ANY of them
+    fails parity. This is how P2-T04 proves gVisor never WEAKENS the bwrap boundary (a coarser check would be
+    vacuous: a dropped pid namespace or an un-masked /proc file would slip through)."""
+    mounts = capability_mounts(profile, backend)
+    nss = _namespaces(profile, backend)
+    common = {"mounts": mounts,
+              "namespaces": nss,
+              "net_isolated": "network" in nss,
+              "readonly_root": {p for p, m in mounts if m == "rw"} == {profile.workspace},  # only workspace rw
+              "masked_proc": _masked_proc(profile, backend)}
+    if backend == "runsc":
+        spec = oci_config(profile, ["true"])
+        return {**common,
+                "uid": spec["process"]["user"]["uid"], "gid": spec["process"]["user"]["gid"],
+                "no_new_privs": spec["process"]["noNewPrivileges"],
+                "caps_dropped": spec["process"]["capabilities"]["bounding"] == []}
+    argv = profile.bwrap_argv(["true"])
+    return {**common,
+            "uid": int(argv[argv.index("--uid") + 1]), "gid": int(argv[argv.index("--gid") + 1]),
+            "no_new_privs": "--unshare-user" in argv,          # a fresh userns + nobody == no privilege escalation
+            "caps_dropped": "--unshare-user" in argv}          # host caps do not reach into the new userns
+
+
 def run_confined(profile: SandboxProfile, argv: Sequence[str], *, timeout: int = 600,
-                 stdin: str | None = None) -> subprocess.CompletedProcess:
-    """Run `argv` inside the profile's bwrap sandbox and return the CompletedProcess. REFUSES (raises
-    RuntimeError) when the kernel boundary is unavailable — it never silently runs the step unconfined."""
+                 stdin: str | None = None, backend: str = "bwrap") -> subprocess.CompletedProcess:
+    """Run `argv` inside the profile's sandbox via `backend` ("bwrap" default | "runsc" gVisor) and return the
+    CompletedProcess. REFUSES (raises RuntimeError) when the chosen backend cannot enforce the boundary on this
+    host — it never silently runs the step unconfined."""
+    if backend == "runsc":
+        if not runsc_available():
+            raise RuntimeError("gVisor sandbox unavailable (need Linux + runsc) — refusing to run unconfined")
+        return _run_runsc(profile, argv, timeout=timeout, stdin=stdin)
     if not is_available():
         raise RuntimeError("kernel sandbox unavailable (need Linux + bwrap) — refusing to run unconfined")
     return subprocess.run(profile.bwrap_argv(argv), capture_output=True, text=True,
                           timeout=timeout, input=stdin)
+
+
+def community_tier_selftest() -> dict:
+    """Hermetic, no-network, no host backend needed (PURE rendering). The P2-T04 seam proof:
+      (1) seam_parity — gVisor (runsc) renders the SAME confinement as bwrap for the core, a network-granted,
+          and a custom-bind profile: identical capability binds, net isolation, nobody uid/gid, dropped caps,
+          no-new-privileges, masked /proc, readonly rootfs. The community backend never WEAKENS the boundary.
+      (2) gvisor_no_weaken — the OCI spec's hard invariants hold on their own: readonly rootfs, ALL caps
+          dropped, no-new-privileges, the network namespace unshared when network is not granted, no raw block
+          device, the masked /proc paths.
+      (3) network_grant_tracks — a network-granted profile drops net isolation in BOTH backends together (the
+          grant is honoured identically), never in one but not the other.
+      (4) no_secrets_tier — the community tier is the no-secrets floor: a community manifest requesting a
+          credential is refused at BOTH the schema and the runtime (materialize_checked), while a trusted-tier
+          grant may name secrets. (The LIVE corpus under each backend is gated on the host: bwrap=is_available,
+          runsc=runsc_available — exercised on a Linux node, a documented stub elsewhere.)"""
+    from infra.exec import capmanifest as cm
+
+    profiles = [core_profile("/ws"), core_profile("/ws", network=True),
+                SandboxProfile(workspace="/ws", ro_binds=("/usr", "/etc"))]
+    seam_parity = all(confinement(p, "bwrap") == confinement(p, "runsc") for p in profiles)
+
+    cp = core_profile("/ws")
+    spec = oci_config(cp, ["true"])
+    # a HOST device exposed to the step (the exact dir /dev OR any /dev/* except /dev/null) would be a weakening
+    host_dev = any(m.get("type") == "bind"
+                   and (m.get("destination") == "/dev"
+                        or (m.get("destination", "").startswith("/dev/") and m.get("destination") != "/dev/null"))
+                   for m in spec["mounts"])
+    # every bind carries nosuid (a setuid binary can't escalate); tmpfs is nosuid+nodev+noexec
+    binds_nosuid = all("nosuid" in m.get("options", []) for m in spec["mounts"] if m.get("type") == "bind")
+    tmpfs_hardened = all({"nosuid", "nodev", "noexec"} <= set(m.get("options", []))
+                         for m in spec["mounts"] if m.get("type") == "tmpfs")
+    # --clearenv equivalent: the step env is EXACTLY the profile's (no injected LD_PRELOAD/LD_LIBRARY_PATH/etc.)
+    spec_env = dict(kv.split("=", 1) for kv in spec["process"]["env"])
+    env_is_clean = spec_env == dict(cp.env)
+    full_ns = _namespaces(cp, "runsc") >= {"pid", "ipc", "uts", "cgroup", "user", "mount", "network"}
+    full_masked = _masked_proc(cp, "runsc") >= ({f for f in _MASKED_PROC if os.path.exists(f)} | {"/proc/sys"})
+    gvisor_no_weaken = bool(
+        spec["root"]["readonly"]
+        and spec["process"]["capabilities"]["bounding"] == []
+        and spec["process"]["noNewPrivileges"] is True
+        and spec["process"]["user"]["uid"] == 65534 and spec["process"]["user"]["gid"] == 65534
+        and full_ns and full_masked and binds_nosuid and tmpfs_hardened and env_is_clean
+        and not host_dev)
+
+    netp = core_profile("/ws", network=True)
+    network_grant_tracks = (confinement(netp, "bwrap")["net_isolated"] is False
+                            and confinement(netp, "runsc")["net_isolated"] is False)
+
+    ws = "/ws"
+    community_clean = cm.community_no_secrets(cm.CapabilityManifest(workspace=ws))[0] is True
+    community_secret_refused = cm.community_no_secrets(
+        cm.CapabilityManifest(workspace=ws, credentials=("api_key",)))[0] is False
+    schema_refuses = cm.validate_manifest_schema(
+        {"workspace": ws, "tier": "community", "credentials": ["api_key"]})[0] is False
+    trusted_may = cm.community_no_secrets(
+        cm.CapabilityManifest(workspace=ws, tier="trusted", credentials=("api_key",)))[0] is True
+    runtime_refuses = False
+    try:
+        cm.materialize_checked(cm.CapabilityManifest(workspace=ws, credentials=("api_key",)))
+    except ValueError:
+        runtime_refuses = True
+    no_secrets_tier = bool(community_clean and community_secret_refused and schema_refuses
+                           and trusted_may and runtime_refuses)
+
+    ok = bool(seam_parity and gvisor_no_weaken and network_grant_tracks and no_secrets_tier)
+    return {"seam_parity": seam_parity, "gvisor_no_weaken": gvisor_no_weaken,
+            "network_grant_tracks": network_grant_tracks, "no_secrets_tier": no_secrets_tier,
+            "bwrap_live": is_available(), "runsc_live": runsc_available(), "ok": ok}
+
+
+def _run_runsc(profile: SandboxProfile, argv: Sequence[str], *, timeout: int,
+               stdin: str | None) -> subprocess.CompletedProcess:
+    """Write the OCI bundle (config.json + a rootfs view) and run it under `runsc run`. Linux+runsc only
+    (gated by run_confined). The bundle's rootfs is the host's readonly system tree exposed via the spec
+    mounts; runsc applies the same confinement the OCI spec declares."""
+    import json
+    import tempfile
+    bundle = tempfile.mkdtemp(prefix="runsc-bundle-")
+    os.makedirs(os.path.join(bundle, "rootfs"), exist_ok=True)
+    with open(os.path.join(bundle, "config.json"), "w") as f:
+        json.dump(oci_config(profile, argv), f)
+    cid = "cw-" + os.path.basename(bundle)
+    return subprocess.run([RUNSC, "--network=none" if not profile.network else "--network=sandbox",
+                           "run", "--bundle", bundle, cid],
+                          capture_output=True, text=True, timeout=timeout, input=stdin)
