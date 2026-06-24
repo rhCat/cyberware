@@ -190,7 +190,7 @@ The infra is covered by a real suite under [`tests/`](tests/) — the governance
 - **integration** — the executor channel: tamper snapshot + drift refusal, **in-channel oversight**
   refuse/waive, the upstream gate, step validation, provenance; and the full
   validate→compose→compile→oversee→execute pipeline.
-- **per-perk contract** — every one of the 152 perks (across 39 skills) compiles to a clean, consistent,
+- **per-perk contract** — every one of the 153 perks (across 40 skills) compiles to a clean, consistent,
   oversight-clear script.
 - **in-skill self-tests** — each skill carries its OWN proof: `perks/<perk>/test/case.json`, run
   end-to-end **through the governed executor** on shipped fixtures (`infra.tool.skilltest`, discovered by
@@ -224,6 +224,6 @@ python3 -m http.server -d "$D" 8765           # → http://localhost:8765
 - [architecture](docs/architecture.md) — the skill-as-package, the two execution planes, governance, authenticity, self-proof
 - [governance-service](docs/governance-service.md) — **govd**: the control/audit plane, discovery (`/catalog`), the WebSocket, the dashboard
 - [authoring](docs/authoring.md) — scaffold + the perk / manifesto / contract / snippet / self-test pattern
-- [skills](docs/skills.md) — the catalog (39 skills)
+- [skills](docs/skills.md) — the catalog (40 skills)
 - [SKILL.md](SKILL.md) — the agent contract: discover → claim → run the blessed plan → review the verdict
 - [spec](docs/SPEC.md) — the original specification
