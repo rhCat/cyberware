@@ -1,0 +1,9 @@
+{
+  "_comment": "fleetdash config — one row per govd node. Tokens come from token_file (a path) or env GOVD_MONITOR_TOKEN_<NAME>; never inline. Collect each node's monitor token (body: ~/cyberware/etc/monitor.token; containerized edge: /etc/cyberware/monitor.token) into the files below.",
+  "nodes": [
+    {"name": "body-1",        "role": "body",   "url": "http://100.64.0.21:5773", "token_file": "~/.cyberware/monitors/body-1.token"},
+    {"name": "body-2",          "role": "body",   "url": "http://100.64.0.22:5773",  "token_file": "~/.cyberware/monitors/body-2.token"},
+    {"name": "runner-1", "role": "anchor", "url": "http://100.64.0.24:5773",  "token_file": "~/.cyberware/monitors/runner-1.token"},
+    {"name": "edge-1",         "role": "anchor", "url": "http://100.64.0.23:5773",  "token_file": "~/.cyberware/monitors/edge-1.token"}
+  ]
+}
