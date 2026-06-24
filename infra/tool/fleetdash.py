@@ -13,10 +13,10 @@ fleetdash (never land in a browser URL). Read-only; no govd change; stdlib only.
   python3 -m infra.tool.fleetdash --config fleet.json --serve 8787   # serve the live, click-through dashboard
 
 Tokens never sit in argv: each node's monitor token comes from `token_file` (a path) or env
-GOVD_MONITOR_TOKEN_<NODENAME>. fleet.json:
+GOVD_MONITOR_TOKEN_<NODENAME>. fleet.json (tailnet/overlay IPs — never public; fill from YOUR fleet):
   {"nodes": [
-     {"name": "body-1",        "role": "body",   "url": "http://100.64.0.21:5773", "token_file": "~/.cyberware/monitors/body-1.token"},
-     {"name": "runner-1", "role": "anchor", "url": "http://100.64.0.24:5773",  "token_file": "~/.cyberware/monitors/runner.token"}
+     {"name": "body-1",   "role": "body",   "url": "http://100.64.0.20:5773", "token_file": "~/.cyberware/monitors/body-1.token"},
+     {"name": "anchor-1", "role": "anchor", "url": "http://100.64.0.10:5773", "token_file": "~/.cyberware/monitors/anchor-1.token"}
   ]}
 """
 from __future__ import annotations
