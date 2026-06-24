@@ -4,7 +4,7 @@ Tool skills (operational pathways) — not design/taste skills. They live on the
 swappable skill cartridge, a separate repo vendored as the `skillChip/` submodule). Each runs through the
 governed pipeline (`validate → compose → compile → oversight → executor`), ships a `blueprint.{drawio,svg}`,
 pins every file in an `index.json` (authenticity), and carries a per-perk `test/case.json` that proves it
-through the real channel. **39 skills** — discover them at `GET /catalog` or `./govd-client --discover`.
+through the real channel. **40 skills** — discover them at `GET /catalog` or `./govd-client --discover`.
 The table below is the **general tool** catalog; the **v1.1 validator family** (which grades the build
 against the plan) is listed separately under [Validators](#validators).
 
@@ -37,6 +37,7 @@ against the plan) is listed separately under [Validators](#validators).
 | **cws-release** | `sign` · `publish` · `receipts` · `transparency` · `revoke` · `keyrotate` · `timeanchor` · `engine` · `citrinitas` · … | python3 | publish & transparency toolchain — cosign the chip manifest (tri-layer refusal), Rekor transparency proofs, signed revocation feed, key-rotation, TSA time-anchor, engine attestation, the Citrinitas gate (13 perks). |
 | **cws-create** | `evaluate` · `scaffold` | python3 · scaffold.py | **the on-ramp** — classify a candidate skill (execution / design / transformable / unclear) and, if it fits, scaffold it into cyberware format. |
 | **cws-addperk** | `evaluate` · `apply` | python3 · git · gh | add a perk to an existing skill, governed — evaluate (exists / generalizable / scope), then branch → formulate + validate → open a PR (merge through the agent). |
+| **llm-extract** | `payment-gate` | python3 | the first `llm/*` **intelligence** skill (P6-T09) — declares I/O + model class + an output **contract**; pay is gated on the SHAPE of the output, not the effort: a schema-fail pays the publisher **zero** and refunds the initiator, yet the provider passthrough + govd fee still land. *The meter measures effort; the contract decides whether effort was work.* |
 
 ## Validators
 
