@@ -37,3 +37,23 @@ GOVD_TOKEN_FILE=<path-to-agent-token> \
 # then read the body's ledger:  GET /ledger/<run_id>?token=<session_token>
 ```
 Discovery is ungated (`--discover` needs no token); only `/govern` requires the principal token.
+
+## Confined-execution overhead (2026-06-24)
+
+`cws-bench/bwrap-overhead` on `dgx-spark` — N=30 benign steps through exod into the bwrap SandboxProfile,
+timed from exod's **attested `meter.wall_ms`** (not the agent's stopwatch). Budget: p95 ≤ 100 ms.
+
+```
+{ "backend": "bwrap", "n": 30, "p50": 15.068, "p95": 17.62, "max": 71.472, "budget_ms": 100, "within": true }
+```
+
+The confinement boundary on the deployed body costs ~15 ms median / ~18 ms p95 per step — **within budget**
+(the lone 71 ms max is still under). Higher than the ~4 ms bare-metal reference because the source is on the
+NAS SMB mount (import/exec I/O), but comfortably inside the budget. Run it on a body:
+`cd <gallery>/cyberware && python3 -m infra.tool.skilltest --skill cws-bench --perk bwrap-overhead`.
+
+## Fleet monitor
+
+`infra/tool/fleetdash.py` wraps every node's `/monitor` into one who-fired-what-**where** dashboard (per-node
+health + a merged decision feed, `exec=exod` on the confined bodies). `python3 -m infra.tool.fleetdash
+--config deploy/fleet.example.json --serve 8787`; tokens come from per-node `token_file`s, never argv.
