@@ -1,9 +1,7 @@
 {
-  "_comment": "fleetdash config — one row per govd node. Tokens come from token_file (a path) or env GOVD_MONITOR_TOKEN_<NAME>; never inline. Collect each node's monitor token (body: ~/cyberware/etc/monitor.token; containerized edge: /etc/cyberware/monitor.token) into the files below.",
+  "_comment": "fleetdash config TEMPLATE — copy to ~/.cyberware/fleet.json and fill with YOUR nodes (that copy is YOURS and is never committed). One row per govd node. `url` = the node's TAILNET (overlay) address + the govd port (default 5773); govd binds the overlay IP, never a public interface. `role`: 'body' (delegated, exod-confined execution) | 'anchor' (cooperative, client-side execution). Monitor tokens come from `token_file` (a path to that node's minted monitor token) or env GOVD_MONITOR_TOKEN_<NAME> — NEVER inline. Stand each node up with deploy/fleet-setup.sh; it derives the host's overlay IP and prints the row to paste into your fleet.json. Do NOT put real node IPs/names in this template — those live only in your local ~/.cyberware/fleet.json.",
   "nodes": [
-    {"name": "dgx-spark",        "role": "body",   "url": "http://100.125.82.27:5773", "token_file": "~/.cyberware/monitors/dgx-spark.token"},
-    {"name": "acerbox",          "role": "body",   "url": "http://100.66.128.67:5773",  "token_file": "~/.cyberware/monitors/acerbox.token"},
-    {"name": "cyberware-runner", "role": "anchor", "url": "http://100.87.213.98:5773",  "token_file": "~/.cyberware/monitors/cyberware-runner.token"},
-    {"name": "homeedge",         "role": "anchor", "url": "http://100.73.226.43:5773",  "token_file": "~/.cyberware/monitors/homeedge.token"}
+    {"name": "anchor-1", "role": "anchor", "url": "http://100.64.0.10:5773", "token_file": "~/.cyberware/monitors/anchor-1.token"},
+    {"name": "body-1",   "role": "body",   "url": "http://100.64.0.20:5773", "token_file": "~/.cyberware/monitors/body-1.token"}
   ]
 }
