@@ -44,16 +44,19 @@ umask 077
 mkdir -p "$ETC" "$DATA" "$UNITS"
 
 # 1. source — a local clone (the edge can't mount the NAS). Cloned once; re-runs fast-forward it.
-#    Prefer gh's token auth (no SSH key needed); the submodule's SSH URL is rewritten to HTTPS (local to this
-#    clone) so gh's credential helper covers it too. Falls back to git+SSH if gh isn't present/logged-in.
+#    Auth via gh's token (no SSH key) when gh is logged in; route github SSH URLs — incl. the private skillChip
+#    submodule, whose .gitmodules URL is SSH — through HTTPS so gh's credential helper covers them. The rewrite
+#    MUST be GLOBAL: a local (per-repo) insteadOf does NOT reach the submodule clone SUBPROCESS. git+SSH fallback.
+GH_OK=0
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  GH_OK=1
+  git config --global url."https://github.com/".insteadOf "git@github.com:" 2>/dev/null || true  # submodule + subprocess SSH->HTTPS
+fi
 if [ ! -d "$CW_SRC/.git" ]; then
-  if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-    log "cloning via gh (token auth) -> $CW_SRC"
-    gh repo clone "$REPO_SLUG" "$CW_SRC" -- --no-recurse-submodules \
-      || { echo "gh repo clone failed — gh logged in? token has access to $REPO_SLUG?"; exit 1; }
-    git -C "$CW_SRC" config url."https://github.com/".insteadOf "git@github.com:"   # submodule SSH->HTTPS, via gh auth
-    git -C "$CW_SRC" submodule update --init --recursive \
-      || { echo "skillChip submodule fetch FAILED — does your gh token have access to rhCat/skillChip?"; exit 1; }
+  if [ "$GH_OK" = 1 ]; then
+    log "cloning via gh (token auth, submodule over HTTPS) -> $CW_SRC"
+    gh repo clone "$REPO_SLUG" "$CW_SRC" -- --recursive \
+      || { echo "gh repo clone failed — gh logged in? token has access to $REPO_SLUG + rhCat/skillChip?"; exit 1; }
   else
     log "cloning via git+SSH -> $CW_SRC (gh not found/not logged in; needs SSH read on cyberware.git + skillChip.git)"
     git clone --recursive "$REPO" "$CW_SRC" || { echo "clone failed — SSH read access to the repo + skillChip submodule?"; exit 1; }
