@@ -52,11 +52,30 @@ The confinement boundary on the deployed body costs ~15 ms median / ~18 ms p95 p
 NAS SMB mount (import/exec I/O), but comfortably inside the budget. Run it on a body:
 `cd <gallery>/cyberware && python3 -m infra.tool.skilltest --skill cws-bench --perk bwrap-overhead`.
 
+## Standing up a fleet
+
+`deploy/fleet-setup.sh` is the generic entry point — no node identity is baked in (names + overlay IPs are
+derived from the host + tailscale at run time). On each host:
+
+```
+deploy/fleet-setup.sh body          # confined body  — govd (delegated) + exod   (Linux, rootless)
+deploy/fleet-setup.sh anchor        # cooperative anchor — govd blesses + records (Linux, rootless)
+deploy/fleet-setup.sh mac-anchor    # cooperative anchor on macOS (launchd)
+deploy/fleet-setup.sh nas-updater   # NAS source-updater (systemd timer)
+deploy/fleet-setup.sh register      # append THIS host's row to ~/.cyberware/fleet.json (derives name + IP)
+deploy/fleet-setup.sh dash          # launch the fleet monitor over ~/.cyberware/fleet.json
+```
+
+It dispatches to the per-role `setup-*.sh`. Your real fleet lives in **`~/.cyberware/fleet.json`** (yours,
+never committed); `deploy/fleet.example.json` is only a TEMPLATE (placeholder names + `100.64.0.x` overlay
+IPs) — never put real node IPs/names in the repo.
+
 ## Fleet monitor
 
 `infra/tool/fleetdash.py` wraps every node's `/monitor` into one who-fired-what-**where** dashboard (per-node
-health + a merged decision feed, `exec=exod` on the confined bodies). `python3 -m infra.tool.fleetdash
---config deploy/fleet.example.json --serve 8787`; tokens come from per-node `token_file`s, never argv.
+health + a merged decision feed, `exec=exod` on the confined bodies). `deploy/fleet-setup.sh dash` (or
+`python3 -m infra.tool.fleetdash --config ~/.cyberware/fleet.json --serve 8787`); tokens come from per-node
+`token_file`s, never argv.
 
 ## SandboxProfile community tier — gVisor (P2-T04)
 
