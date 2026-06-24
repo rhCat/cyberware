@@ -20,6 +20,7 @@ set -uo pipefail
 CW_SRC="${CW_SRC:-/mnt/cywaregallery/cyberware}"      # the gallery YOU mounted (read)
 CW_BASE="${CW_BASE:-$HOME/cyberware}"                 # ALL runtime state lives here, under ~ (never /)
 GOVD_PORT="${GOVD_PORT:-5773}"
+BACKEND="${EXOD_SANDBOX_BACKEND:-bwrap}"              # P2-T04: confinement backend — bwrap (default) | runsc (gVisor)
 XRD="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"          # tmpfs runtime dir (RAM) — the socket lives here, not on /
 EXOD_SOCK="$XRD/cyberware/exod.sock"
 ETC="$CW_BASE/etc"; KEYS="$ETC/keys"; DATA="$CW_BASE/data/govd"
@@ -31,19 +32,39 @@ log(){ echo "[confined-body-user] $*"; }
 [ -n "$PY" ] || { echo "python3 not found"; exit 1; }
 [ -f "$CW_SRC/infra/govern/govd.py" ] || { echo "gallery not at CW_SRC=$CW_SRC — mount it (and it must be readable by you)"; exit 1; }
 [ -r "$CW_SRC/infra/exec/exod.py" ] || { echo "cannot READ $CW_SRC (mount perms) — you must be able to read the gallery you mounted"; exit 1; }
-command -v bwrap >/dev/null || { echo "bubblewrap (bwrap) missing — one-time root step: sudo apt install -y bubblewrap uidmap"; exit 1; }
+if [ "$BACKEND" = "runsc" ]; then
+  command -v runsc >/dev/null || { echo "gVisor (runsc) missing for EXOD_SANDBOX_BACKEND=runsc — install runsc (https://gvisor.dev/docs/user_guide/install/), then re-run"; exit 1; }
+else
+  command -v bwrap >/dev/null || { echo "bubblewrap (bwrap) missing — one-time root step: sudo apt install -y bubblewrap uidmap"; exit 1; }
+fi
 "$PY" -c "import cryptography" 2>/dev/null || { echo "python 'cryptography' missing — rootless: pip install --user cryptography  (or one-time root: sudo apt install -y python3-cryptography)"; exit 1; }
 
-# rootless confinement must ACTUALLY work on this kernel (unprivileged user namespaces). Fail early, loudly.
-if ! bwrap --unshare-user --uid 65534 --gid 65534 --ro-bind / / true 2>/tmp/cw_bwrap.$$; then
-  echo "rootless bwrap smoke FAILED — unprivileged user namespaces appear DISABLED on this kernel:"; sed 's/^/    /' /tmp/cw_bwrap.$$
+# the chosen confinement backend must ACTUALLY work on this kernel. Fail early, loudly — never deploy a limb
+# that can't confine (exod fail-closes per step, but the operator should know NOW, not via errored steps).
+if [ "$BACKEND" = "runsc" ]; then
+  if ! runsc --rootless do true >/tmp/cw_runsc.$$ 2>&1; then
+    echo "runsc smoke FAILED — gVisor cannot confine on this host:"; sed 's/^/    /' /tmp/cw_runsc.$$
+    rm -f /tmp/cw_runsc.$$
+    echo "  rootless runsc still needs unprivileged user namespaces for setup; the Sentry is the isolation, but"
+    echo "  the rootless bootstrap is not. one-time root fix (same as bwrap): sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0"
+    echo "  (persist in /etc/sysctl.d/). Or run runsc with a privileged platform. Without it exod refuses, never runs unconfined."
+    exit 1
+  fi
+  rm -f /tmp/cw_runsc.$$
+  log "runsc OK — gVisor confinement is enforceable on this host"
+else
+  # rootless confinement must ACTUALLY work on this kernel (unprivileged user namespaces). Fail early, loudly.
+  if ! bwrap --unshare-user --uid 65534 --gid 65534 --ro-bind / / true 2>/tmp/cw_bwrap.$$; then
+    echo "rootless bwrap smoke FAILED — unprivileged user namespaces appear DISABLED on this kernel:"; sed 's/^/    /' /tmp/cw_bwrap.$$
+    rm -f /tmp/cw_bwrap.$$
+    echo "  one-time root fix: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0   (Ubuntu 24.04+)"
+    echo "  or: sudo sysctl -w kernel.unprivileged_userns_clone=1 ; sudo sysctl -w user.max_user_namespaces=10000"
+    echo "  (persist via a file in /etc/sysctl.d/). Without it, exod cannot confine and refuses to run unconfined."
+    exit 1
+  fi
   rm -f /tmp/cw_bwrap.$$
-  echo "  one-time root fix: sudo sysctl -w kernel.unprivileged_userns_clone=1 ; sudo sysctl -w user.max_user_namespaces=10000"
-  echo "  (persist via a file in /etc/sysctl.d/). Without it, exod cannot confine and refuses to run unconfined."
-  exit 1
+  log "rootless bwrap OK — unprivileged userns works; confinement is enforceable"
 fi
-rm -f /tmp/cw_bwrap.$$
-log "rootless bwrap OK — unprivileged userns works; confinement is enforceable"
 
 umask 077
 mkdir -p "$ETC" "$KEYS" "$DATA" "$UNITS" "$XRD/cyberware"
@@ -99,7 +120,7 @@ WorkingDirectory=$CW_SRC
 Environment=PYTHONDONTWRITEBYTECODE=1
 RuntimeDirectory=cyberware
 RuntimeDirectoryMode=0750
-ExecStart=$PY -m infra.exec.exod --socket $EXOD_SOCK --key $KEYS/exod.key --issuer-pub $KEYS/grant.pub
+ExecStart=$PY -m infra.exec.exod --socket $EXOD_SOCK --key $KEYS/exod.key --issuer-pub $KEYS/grant.pub --backend $BACKEND
 Restart=always
 RestartSec=5
 [Install]

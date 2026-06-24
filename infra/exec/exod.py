@@ -20,13 +20,14 @@ import hashlib
 import json
 import os
 import socket
+import sys
 import time
 
 from infra.cwp import sign
 from infra.exec import vault as _vaultmod
 from infra.exec.closureverify import closure_decision
 from infra.exec.grantverify import _issuer, grant_body, verify_grant
-from infra.exec.sandbox import core_profile, run_confined
+from infra.exec.sandbox import core_profile, is_available, run_confined, runsc_available
 from infra.exec.exodverify import (  # noqa: F401  (single source of truth for the verify surface)
     STEP_RESULT_TYPE, NonceCache, _principal, result_body, verify_step_result,
 )
@@ -136,7 +137,15 @@ class Exod:
         #    (P2-T07): exod itself measures the step's wall time and signs it, so the meter originates from
         #    exod and the agent cannot fabricate it — the proto-receipt a settlement plane will later trust.
         t0 = time.perf_counter()
-        p = self._runner(prof, req["argv"])
+        try:
+            p = self._runner(prof, req["argv"])
+        except Exception as e:
+            # the confinement backend could not run the step (e.g. the selected runsc/bwrap is absent —
+            # run_confined REFUSES rather than running unconfined). Turn ANY runner exception into a signed
+            # REFUSED result: fail-closed, never run unconfined, never crash the limb. The signed reason stays
+            # value-free ('sandbox:unavailable'); the real cause is logged to the limb's stderr for the operator.
+            sys.stderr.write(f"[exod] step refused — sandbox backend could not run it: {type(e).__name__}: {e}\n")
+            return refuse("sandbox:unavailable")
         meter = {"wall_ms": round((time.perf_counter() - t0) * 1000, 3), "by": "exod"}
         status = "ok" if p.returncode == 0 else "error"
         return self._sign_result(run_id=run_id, plan_sha=plan_sha, step=step, exit_code=p.returncode,
@@ -276,6 +285,9 @@ def main(argv=None):
                     help="govd's grant-issuer Ed25519 PUBLIC key (raw 32 bytes) — the ONLY key exod trusts")
     ap.add_argument("--vault", default=os.environ.get("EXOD_VAULT"),
                     help="vault spec: file:/path.json | sops:/path.enc#/age.key")
+    ap.add_argument("--backend", default=os.environ.get("EXOD_SANDBOX_BACKEND", "bwrap"),
+                    choices=("bwrap", "runsc"),
+                    help="confinement backend: bwrap (default) | runsc (gVisor community tier, P2-T04)")
     a = ap.parse_args(argv)
     if not a.key or not a.issuer_pub:
         raise SystemExit("exod: --key and --issuer-pub are required (identity key + trusted grant issuer)")
@@ -283,8 +295,15 @@ def main(argv=None):
     issuer_pub = Ed25519PublicKey.from_public_bytes(open(a.issuer_pub, "rb").read())
     if os.path.dirname(a.socket):
         os.makedirs(os.path.dirname(a.socket), exist_ok=True)
-    exod = Exod(sk, grant_issuer_pub=issuer_pub, vault=load_vault(a.vault))
-    print(f"exod · limb · socket={a.socket} · keyid={_principal(sk.public_key())} · "
+    # P2-T04: select the confinement backend. The runner closure threads it into run_confined; run_step is
+    # unchanged. A backend that cannot enforce on THIS host makes every step REFUSE (fail-closed, never run
+    # unconfined) — warn loudly at startup so the operator sees it rather than only seeing errored steps.
+    if not (runsc_available() if a.backend == "runsc" else is_available()):
+        sys.stderr.write(f"[exod] WARNING: sandbox backend '{a.backend}' is NOT enforceable on this host — "
+                         f"every step will be REFUSED (fail-closed), never run unconfined.\n")
+    exod = Exod(sk, grant_issuer_pub=issuer_pub, vault=load_vault(a.vault),
+                runner=lambda prof, step_argv: run_confined(prof, step_argv, backend=a.backend))
+    print(f"exod · limb · socket={a.socket} · backend={a.backend} · keyid={_principal(sk.public_key())} · "
           f"trusts-issuer {_principal(issuer_pub)} · vault={'yes' if a.vault else 'none'}")
     exod.serve(a.socket)
 
