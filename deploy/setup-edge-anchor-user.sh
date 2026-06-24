@@ -4,19 +4,20 @@
 # units, NO sudo for the runtime. govd governs + records (COOPERATIVE — no exod, it never executes), runs as
 # YOU via `systemctl --user`, bound ONLY to the tailscale overlay IP (never the public cloud interface).
 #
-# Source: the edge can't mount the NAS gallery, so it keeps a LOCAL clone under ~ (you have SSH read access
-# to the repo — the same access the runner uses). cryptography goes in a venv under ~ (Ubuntu 24.04's PEP-668
+# Source: the edge can't mount the NAS gallery, so it keeps a LOCAL clone under ~ (cloned via `gh` token auth
+# when gh is logged in, else git+SSH; the submodule is auth'd the same way). cryptography goes in a venv under ~ (Ubuntu 24.04's PEP-668
 # blocks `pip --user`); it's needed because govd imports it transitively on startup (delegate -> exodverify).
 # Running as you, reading ~-owned files, means the uid/permission friction of the containerized model is gone.
 #
-# Usage (as your normal user; you have SSH read access to the repo):
+# Usage (as your normal user; gh logged in — `gh auth status` — or an SSH key for the repo + skillChip):
 #   bash deploy/setup-edge-anchor-user.sh
 # Idempotent: safe to re-run (clone is fast-forwarded; keys/tokens minted once).
 set -uo pipefail
 
 CW_BASE="${CW_BASE:-$HOME/cyberware}"                 # all state under ~ (never /)
 CW_SRC="${CW_SRC:-$CW_BASE/src}"                       # local clone of the source (no NAS to mount)
-REPO="${REPO:-git@github.com:rhCat/cyberware.git}"
+REPO="${REPO:-git@github.com:rhCat/cyberware.git}"   # SSH fallback if gh isn't available
+REPO_SLUG="${REPO_SLUG:-rhCat/cyberware}"            # for `gh repo clone` (token auth — no SSH key needed)
 GOVD_PORT="${GOVD_PORT:-5773}"
 ETC="$CW_BASE/etc"; DATA="$CW_BASE/data/govd"; VENV="$CW_BASE/venv"
 UNITS="$HOME/.config/systemd/user"
@@ -43,9 +44,20 @@ umask 077
 mkdir -p "$ETC" "$DATA" "$UNITS"
 
 # 1. source — a local clone (the edge can't mount the NAS). Cloned once; re-runs fast-forward it.
+#    Prefer gh's token auth (no SSH key needed); the submodule's SSH URL is rewritten to HTTPS (local to this
+#    clone) so gh's credential helper covers it too. Falls back to git+SSH if gh isn't present/logged-in.
 if [ ! -d "$CW_SRC/.git" ]; then
-  log "cloning source -> $CW_SRC (needs your SSH read access to BOTH cyberware.git AND the skillChip.git submodule)"
-  git clone --recursive "$REPO" "$CW_SRC" || { echo "clone failed — do you have SSH read access to the repo + skillChip submodule?"; exit 1; }
+  if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    log "cloning via gh (token auth) -> $CW_SRC"
+    gh repo clone "$REPO_SLUG" "$CW_SRC" -- --no-recurse-submodules \
+      || { echo "gh repo clone failed — gh logged in? token has access to $REPO_SLUG?"; exit 1; }
+    git -C "$CW_SRC" config url."https://github.com/".insteadOf "git@github.com:"   # submodule SSH->HTTPS, via gh auth
+    git -C "$CW_SRC" submodule update --init --recursive \
+      || { echo "skillChip submodule fetch FAILED — does your gh token have access to rhCat/skillChip?"; exit 1; }
+  else
+    log "cloning via git+SSH -> $CW_SRC (gh not found/not logged in; needs SSH read on cyberware.git + skillChip.git)"
+    git clone --recursive "$REPO" "$CW_SRC" || { echo "clone failed — SSH read access to the repo + skillChip submodule?"; exit 1; }
+  fi
 else
   log "updating existing clone at $CW_SRC"
   git -C "$CW_SRC" fetch -q origin main \
@@ -53,7 +65,7 @@ else
     || log "WARN: ff-only update failed (network down or non-ff upstream) — keeping current source"
   # do NOT swallow a submodule auth failure: a chip-less govd would start green and govern an empty registry
   git -C "$CW_SRC" submodule update --init --recursive >/dev/null 2>&1 \
-    || { echo "skillChip submodule update FAILED — you need SSH read access to git@github.com:rhCat/skillChip.git too"; exit 1; }
+    || { echo "skillChip submodule update FAILED — check repo access (gh token, or SSH key for rhCat/skillChip)"; exit 1; }
 fi
 [ -f "$CW_SRC/infra/govern/govd.py" ] || { echo "source incomplete at $CW_SRC (infra/ missing)"; exit 1; }
 # the chip is what govd governs — refuse a chip-less anchor (would pass /health but /catalog would be empty)
