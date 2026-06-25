@@ -168,6 +168,7 @@ def catalog(skills_dir=None):
         pj = os.path.join(_sd(s, skills_dir), "perks.json")
         perks = [{"id": p.get("id"), "summary": p.get("summary", ""),
                   "destructive": bool(p.get("destructive", False)),
+                  "tier": p.get("tier"),                 # P3-T11: the declared sandbox tier (selects the backend)
                   "vars": _perk_vars(skills_dir, s, p.get("id", ""))}
                  for p in (json.load(open(pj)) or {}).get("perks", [])] if os.path.isfile(pj) else []
         skills.append({"skill": s, "verified": bool(ok), "skill_sha": skill_sha(s, skills_dir),

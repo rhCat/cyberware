@@ -11,6 +11,7 @@ self-report. A forged/unverifiable result is recorded as evidence; an unreachabl
 (fail-closed). The real bwrap confinement runs on the exec image; the channel logic is platform-agnostic.
 """
 from __future__ import annotations
+import json
 import os
 import secrets
 import shutil
@@ -19,7 +20,32 @@ import time
 from infra import registry as _reg
 from infra.exec import exod
 from infra.exec import grants
+from infra.exec import sandbox as _sandbox
 from infra.exec.exodverify import _principal, result_body, verify_step_result
+
+
+def perk_sandbox_tier(skill, perk, registry=None):
+    """The perk's DECLARED catalog sandbox tier (core/verified/community), read from the registry's perks.json,
+    or None when undeclared (P3-T11). It selects the confinement BACKEND at the limb: a perk that declares
+    `community` is gVisor-confined; an undeclared perk takes the operator floor (no regression). An
+    UNRECOGNIZED declared tier is treated as `community` (fail-safe — the strongest box for a tier we cannot
+    vouch for). Names/hashes only ever cross the wire; this reads govd's OWN trusted registry."""
+    if not skill or not perk:
+        return None
+    pj = os.path.join(_reg.skill_dir(skill, registry), "perks.json")
+    if not os.path.isfile(pj):
+        return None
+    try:
+        perks = (json.load(open(pj)) or {}).get("perks", [])
+    except Exception:
+        return None
+    for p in perks:
+        if p.get("id") == perk:
+            t = p.get("tier")
+            if t is None:
+                return None
+            return t if t in _sandbox.SANDBOX_TIERS else "community"
+    return None
 
 
 def materialize_workspace(rec, base, registry=None):
@@ -60,9 +86,13 @@ def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base,
     # a secret for any non-trusted grant, so a credentialed grant that is NOT trusted-tier (a malformed/foreign
     # grant) is rejected at the secret-resolution boundary.
     creds = rec.get("credential_ids") or []
+    # P3-T11: the perk's declared catalog tier flows into the grant's sandbox_tier — exod uses it to select the
+    # confinement backend (community → gVisor/runsc; trusted family → bwrap; undeclared → the operator floor).
+    # Orthogonal to the SECRET tier above: a credentialed grant is still minted trusted regardless of backend.
     grant = grants.mint_grant(grant_key, run_id=rec["run_id"], plan_sha=plan_sha,
                               snippet_shas=rec.get("snippet_shas") or {}, capabilities=["run"],
                               credentials=creds, tier=("trusted" if creds else "community"),
+                              sandbox_tier=perk_sandbox_tier(rec.get("skill"), rec.get("perk"), registry),
                               nbf=now - 5, exp=now + grant_ttl, nonce=nonce)
     req = {"run_id": rec["run_id"], "plan_sha": plan_sha, "step": step,
            "argv": ["bash", run_sh, "--step", step], "workspace": ws, "env": env, "grant": grant}
