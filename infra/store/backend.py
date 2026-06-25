@@ -44,6 +44,14 @@ class StoreBackend:
     def head(self, run_id): raise NotImplementedError                      # {seq, link_digest} | None
     def run_ids(self) -> list: raise NotImplementedError
     def reset(self): raise NotImplementedError                            # drop + recreate (reindex)
+    # P5-T04: the single-writer LEASE (advisory lock) over the SHARED store — the active-passive primitive.
+    # try_acquire/renew/release/holder are MUTUALLY EXCLUSIVE: at most one holder per lease_id at any instant,
+    # enforced by the store's own atomic transaction (sqlite BEGIN IMMEDIATE / Postgres conditional upsert),
+    # so two govd instances can never both be the writer (no split-brain).
+    def try_acquire_lease(self, lease_id, holder_id, ttl, now=None) -> dict: raise NotImplementedError
+    def renew_lease(self, lease_id, holder_id, ttl, now=None) -> dict: raise NotImplementedError
+    def release_lease(self, lease_id, holder_id) -> dict: raise NotImplementedError
+    def lease_holder(self, lease_id, now=None): raise NotImplementedError  # current non-expired holder | None
 
 
 class SqliteWalBackend(StoreBackend):
@@ -63,6 +71,10 @@ class SqliteWalBackend(StoreBackend):
         self.cx = sqlite3.connect(self.db_path, isolation_level=None, check_same_thread=False)
         self.cx.execute("PRAGMA journal_mode=WAL")
         self.cx.execute("PRAGMA synchronous=NORMAL")
+        # P5-T04: under HA two instances share this db (lease + index). busy_timeout makes a racing
+        # BEGIN IMMEDIATE WAIT for the RESERVED lock instead of raising "database is locked" — so concurrent
+        # lease acquirers serialize cleanly (exactly one winner) rather than erroring.
+        self.cx.execute("PRAGMA busy_timeout=5000")
         self.cx.execute("""CREATE TABLE IF NOT EXISTS idx_record(
             run_id TEXT, seq INTEGER, prev TEXT, link_digest TEXT, kind TEXT, ts TEXT,
             plan_sha TEXT, fields TEXT, PRIMARY KEY(run_id, seq))""")
@@ -110,6 +122,74 @@ class SqliteWalBackend(StoreBackend):
     def reset(self):
         for t in ("idx_record", "idx_decision", "idx_origin"):
             self.cx.execute(f"DELETE FROM {t}")
+
+    # ── P5-T04: the single-writer lease (advisory lock) — atomic via BEGIN IMMEDIATE ──────────────────────
+    def _ensure_leases(self):
+        self.cx.execute("""CREATE TABLE IF NOT EXISTS leases(
+            lease_id TEXT PRIMARY KEY, holder_id TEXT, expires_at REAL, acquired_at REAL)""")
+
+    def try_acquire_lease(self, lease_id, holder_id, ttl, now=None) -> dict:
+        import time as _t
+        now = _t.time() if now is None else now
+        self.cx.execute("BEGIN IMMEDIATE")                              # serialize racing acquirers (RESERVED lock)
+        try:
+            self._ensure_leases()
+            row = self.cx.execute("SELECT holder_id, expires_at FROM leases WHERE lease_id=?",
+                                  (lease_id,)).fetchone()
+            if row is not None and row[0] != holder_id and row[1] is not None and row[1] > now:
+                self.cx.execute("COMMIT")                               # held by a LIVE other holder — refuse
+                return {"acquired": False, "holder": row[0], "expires_at": row[1]}
+            exp = now + ttl
+            self.cx.execute("INSERT INTO leases(lease_id, holder_id, expires_at, acquired_at) VALUES(?,?,?,?) "
+                            "ON CONFLICT(lease_id) DO UPDATE SET holder_id=excluded.holder_id, "
+                            "expires_at=excluded.expires_at, acquired_at=excluded.acquired_at",
+                            (lease_id, holder_id, exp, now))
+            self.cx.execute("COMMIT")
+            return {"acquired": True, "holder": holder_id, "expires_at": exp}
+        except Exception:
+            self.cx.execute("ROLLBACK")
+            raise
+
+    def renew_lease(self, lease_id, holder_id, ttl, now=None) -> dict:
+        import time as _t
+        now = _t.time() if now is None else now
+        self.cx.execute("BEGIN IMMEDIATE")
+        try:
+            self._ensure_leases()
+            row = self.cx.execute("SELECT holder_id FROM leases WHERE lease_id=?", (lease_id,)).fetchone()
+            if row is None or row[0] != holder_id:                      # someone else holds it — renewal fails
+                self.cx.execute("COMMIT")
+                return {"renewed": False, "holder": row[0] if row else None}
+            exp = now + ttl
+            self.cx.execute("UPDATE leases SET expires_at=? WHERE lease_id=?", (exp, lease_id))
+            self.cx.execute("COMMIT")
+            return {"renewed": True, "holder": holder_id, "expires_at": exp}
+        except Exception:
+            self.cx.execute("ROLLBACK")
+            raise
+
+    def release_lease(self, lease_id, holder_id) -> dict:
+        self.cx.execute("BEGIN IMMEDIATE")
+        try:
+            self._ensure_leases()
+            row = self.cx.execute("SELECT holder_id FROM leases WHERE lease_id=?", (lease_id,)).fetchone()
+            released = row is not None and row[0] == holder_id          # only the holder may release
+            if released:
+                self.cx.execute("DELETE FROM leases WHERE lease_id=?", (lease_id,))
+            self.cx.execute("COMMIT")
+            return {"released": released}
+        except Exception:
+            self.cx.execute("ROLLBACK")
+            raise
+
+    def lease_holder(self, lease_id, now=None):
+        import time as _t
+        now = _t.time() if now is None else now
+        self._ensure_leases()
+        row = self.cx.execute("SELECT holder_id, expires_at FROM leases WHERE lease_id=?", (lease_id,)).fetchone()
+        if row is None or row[1] is None or row[1] <= now:             # unclaimed or expired → no live holder
+            return None
+        return row[0]
 
 
 class PsycopgBackend(StoreBackend):
@@ -221,6 +301,70 @@ class PsycopgBackend(StoreBackend):
         with self.cx.cursor() as c:
             for t in ("idx_record", "idx_decision", "idx_origin"):
                 c.execute(f"DELETE FROM {t}")
+
+    # ── P5-T04: the single-writer lease — ONE atomic conditional upsert (no race window) ──────────────────
+    def _ensure_leases(self):
+        with self.cx.cursor() as c:
+            c.execute("""CREATE TABLE IF NOT EXISTS leases(
+                lease_id TEXT PRIMARY KEY, holder_id TEXT, expires_at DOUBLE PRECISION, acquired_at DOUBLE PRECISION)""")
+
+    def try_acquire_lease(self, lease_id, holder_id, ttl, now=None) -> dict:
+        if not self.configured():
+            return self._unconf(lease_id=lease_id)
+        import time as _t
+        now = _t.time() if now is None else now
+        exp = now + ttl
+        self._ensure_leases()
+        with self.cx.cursor() as c:
+            # atomic: insert, or update ONLY if the existing lease is expired or already ours. RETURNING tells us
+            # if WE now hold it; an empty result means a live OTHER holder blocked the update.
+            c.execute("INSERT INTO leases(lease_id, holder_id, expires_at, acquired_at) VALUES(%s,%s,%s,%s) "
+                      "ON CONFLICT(lease_id) DO UPDATE SET holder_id=EXCLUDED.holder_id, "
+                      "expires_at=EXCLUDED.expires_at, acquired_at=EXCLUDED.acquired_at "
+                      "WHERE leases.expires_at <= %s OR leases.holder_id = EXCLUDED.holder_id "
+                      "RETURNING holder_id, expires_at", (lease_id, holder_id, exp, now, now))
+            r = c.fetchone()
+            if r and r[0] == holder_id:
+                return {"acquired": True, "holder": holder_id, "expires_at": exp}
+            c.execute("SELECT holder_id, expires_at FROM leases WHERE lease_id=%s", (lease_id,))
+            cur = c.fetchone()
+        return {"acquired": False, "holder": cur[0] if cur else None, "expires_at": cur[1] if cur else None}
+
+    def renew_lease(self, lease_id, holder_id, ttl, now=None) -> dict:
+        if not self.configured():
+            return self._unconf(lease_id=lease_id)
+        import time as _t
+        now = _t.time() if now is None else now
+        exp = now + ttl
+        self._ensure_leases()
+        with self.cx.cursor() as c:
+            c.execute("UPDATE leases SET expires_at=%s WHERE lease_id=%s AND holder_id=%s "
+                      "RETURNING holder_id", (exp, lease_id, holder_id))
+            r = c.fetchone()
+        return {"renewed": bool(r), "holder": holder_id if r else None, "expires_at": exp if r else None}
+
+    def release_lease(self, lease_id, holder_id) -> dict:
+        if not self.configured():
+            return self._unconf(lease_id=lease_id)
+        self._ensure_leases()
+        with self.cx.cursor() as c:
+            c.execute("DELETE FROM leases WHERE lease_id=%s AND holder_id=%s RETURNING lease_id",
+                      (lease_id, holder_id))
+            r = c.fetchone()
+        return {"released": bool(r)}
+
+    def lease_holder(self, lease_id, now=None):
+        if not self.configured():
+            return None
+        import time as _t
+        now = _t.time() if now is None else now
+        self._ensure_leases()
+        with self.cx.cursor() as c:
+            c.execute("SELECT holder_id, expires_at FROM leases WHERE lease_id=%s", (lease_id,))
+            r = c.fetchone()
+        if r is None or r[1] is None or r[1] <= now:
+            return None
+        return r[0]
 
 
 def make_backend(root, config: dict = None) -> StoreBackend:

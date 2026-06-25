@@ -47,6 +47,7 @@ from infra.govern import compiler
 from infra.govern import composer
 from infra.govern import delegate    # P2-T12: server-side execution delegated to exod the limb (containment)
 from infra.govern import feed        # P5-T02: SSE framing + pagination + change-digest (prose-clean core)
+from infra.govern import lease as _lease  # P5-T04: active-passive single-writer advisory-lock lease (off by default)
 from infra.govern import principals  # P1-T08: Bearer-principal auth + token-bucket rate-limit at /govern
 from infra.govern import tracing     # P5-T05: W3C traceparent across planes + in-toto run provenance
 from infra.tool import skill_index   # verify the registry matches its committed per-skill authenticity index
@@ -1120,6 +1121,7 @@ def serve(cfg):
     httpd.cfg, httpd.store = cfg, store
     httpd.rate_buckets = {}                               # P1-T08: per-principal token-bucket state (in-memory)
     _load_exec_mode(cfg, httpd)                           # P2-T12: cooperative (client-side) | delegated (exod limb)
+    httpd.lease = _lease.maybe_enable_ha(cfg, store)      # P5-T04: active-passive single-writer lease (off unless configured)
     dash_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
     print(f"govd · {cfg['mode']} · http://{host}:{port}  ·  ws://{host}:{port}/oversight")
     prov = chip_provenance()

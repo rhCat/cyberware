@@ -478,7 +478,7 @@
   {
     "task_id": "P5-T04",
     "skill": "cws-chaos",
-    "perk": null,
+    "perk": "failover",
     "vars": {},
     "redeem": true
   },
