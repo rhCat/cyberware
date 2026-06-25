@@ -33,5 +33,6 @@
   },
   "status": "todo",
   "assignee": null,
-  "validator_cross_phase": true
+  "validator_cross_phase": true,
+  "validated_perk": "failover"
 }
