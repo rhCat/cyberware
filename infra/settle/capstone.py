@@ -19,7 +19,7 @@ from infra.settle import engine, fmv, quote as quote_mod, reward_ledger
 from infra.settle.money import Money
 
 _DONE_LEDGER = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-                            "workzone", "version1.1", "cyberware-swarm-v1.1", "done-ledger-v2.json")
+                            "docs", "done-ledger-v2.json")
 PLAN_RECEIPT_PREDICATE = "https://cyberware.dev/predicates/plan-completion/v1"
 
 
