@@ -15,6 +15,8 @@ The session token can never reach the chain/index: both projections are ALLOWLIS
 by default), and the chain (artifact of record) is written before the derived index.
 """
 from __future__ import annotations
+import json
+import os
 import queue
 import sys
 import threading
@@ -43,6 +45,9 @@ class StoreMirror:
         self.chain = self.backend = self._cols = None
         self._q = queue.Queue(maxsize=maxsize)
         self._worker = None
+        self.root = root
+        self._lease_guard = None        # P5-T04: () -> bool — do I hold the single-writer lease? None ⇒ single-node
+        self.blocked = 0                # split-brain attempts this instance refused to write (for the drill/tests)
         try:
             from infra.store import backend as _sb
             from infra.store import chainstore as _cs
@@ -57,6 +62,25 @@ class StoreMirror:
 
     def enabled(self):
         return self.chain is not None
+
+    def set_lease_guard(self, guard):
+        """P5-T04: install the single-writer gate. `guard` is a no-arg callable returning True iff THIS instance
+        currently holds the write lease. With a guard installed, the drain worker writes to the SHARED artifact
+        of record ONLY while we hold the lease; a write attempted without the lease is DROPPED and recorded as a
+        split-brain attempt (so a partitioned ex-active can never append behind the new active's back)."""
+        self._lease_guard = guard
+
+    def _record_blocked(self, job):
+        """A shared write refused because this instance does not hold the lease — record the attempt as evidence
+        (value-free: op/run/kind/ts only) to a local jsonl, never to the shared chain we are barred from."""
+        self.blocked += 1
+        try:
+            ev = {"ts": round(time.time(), 3), "op": job.get("op"), "run_id": job.get("run_id"),
+                  "kind": job.get("kind"), "reason": "no_lease_split_brain_blocked"}
+            with open(os.path.join(self.root, "split-brain-attempts.jsonl"), "a") as f:
+                f.write(json.dumps(ev, sort_keys=True) + "\n")
+        except Exception as e:
+            sys.stderr.write(f"[govd] split-brain attempt (unrecordable): {e}\n")
 
     def record_run(self, run_id, record):
         """Enqueue a run's CREATE record (its plan_sha is also the out-of-band expected origin)."""
@@ -89,6 +113,12 @@ class StoreMirror:
         while True:
             job = self._q.get()
             try:
+                # P5-T04 single-writer gate: only the lease HOLDER may touch the shared artifact of record. A
+                # write enqueued without the lease (a partitioned ex-active, a rogue second writer) is refused
+                # and recorded — never appended — so the shared chain has exactly one writer at a time.
+                if self._lease_guard is not None and not self._lease_guard():
+                    self._record_blocked(job)
+                    continue
                 if job.get("op") == "decision":
                     self.chain.append_decision(job["summary"])
                     if self.backend is not None:
