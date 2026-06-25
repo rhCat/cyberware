@@ -138,9 +138,13 @@ class StoreMirror:
                 self._q.task_done()
 
     def flush(self, timeout=10.0):
-        """Block until the queue drains (graceful shutdown / tests). Best-effort under the timeout."""
+        """Block until every enqueued job is fully WRITTEN, not merely dequeued. `unfinished_tasks` counts jobs
+        the worker has `get()`-ed but not yet `task_done()`-ed, so it stays > 0 while a write is still in flight
+        — `empty()` alone goes True the instant the last job is dequeued, before its chain+index write lands.
+        Waiting on `unfinished_tasks` is what makes a post-flush read / reconcile race-free under load (a writer
+        mid-INSERT must not overlap a reader opening the same sqlite). Best-effort under the timeout."""
         if self.chain is None:
             return
         deadline = time.time() + timeout
-        while not self._q.empty() and time.time() < deadline:
-            time.sleep(0.01)
+        while self._q.unfinished_tasks and time.time() < deadline:
+            time.sleep(0.005)
