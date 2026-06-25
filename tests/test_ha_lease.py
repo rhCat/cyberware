@@ -31,19 +31,26 @@ def test_lease_is_mutually_exclusive_no_split_brain():
 
 
 def test_concurrent_acquire_has_exactly_one_winner():
-    """Mutual exclusion under REAL contention (not just sequential injected-clock calls): many threads fire
-    try_acquire at once on the SAME db; BEGIN IMMEDIATE + busy_timeout serialize them so EXACTLY ONE wins."""
+    """Mutual exclusion under REAL contention: N independent instances — each its OWN backend connection to the
+    SAME shared db file (the real two-govd topology, NOT one shared connection) — fire try_acquire at once.
+    BEGIN IMMEDIATE + busy_timeout serialize the racers so EXACTLY ONE wins; no split-brain."""
     import threading
 
-    be = _be()
-    mgrs = [L.LeaseManager(be, holder_id=f"h{i}", ttl=100.0) for i in range(16)]
-    barrier = threading.Barrier(len(mgrs))
+    db = os.path.join(tempfile.mkdtemp(prefix="ha-race-"), "index.sqlite")
+    B.SqliteWalBackend(db).open()                             # create the db + leases table once
+    n = 12
+    backends = [B.SqliteWalBackend(db).open() for _ in range(n)]   # SEPARATE connections == separate instances
+    mgrs = [L.LeaseManager(be, holder_id=f"h{i}", ttl=100.0) for i, be in enumerate(backends)]
+    barrier = threading.Barrier(n)
     lock = threading.Lock()
     results = []
 
     def racer(m):
         barrier.wait()                                        # line every thread up to fire simultaneously
-        got = m.try_acquire(now=1000.0)
+        try:
+            got = m.try_acquire(now=1000.0)
+        except Exception as e:                                # a real bug would surface as an error, not silently
+            got = ("err", type(e).__name__)
         with lock:
             results.append((m.holder_id, got))
 
@@ -52,9 +59,9 @@ def test_concurrent_acquire_has_exactly_one_winner():
         t.start()
     for t in threads:
         t.join()
-    winners = [h for h, got in results if got]
+    winners = [h for h, got in results if got is True]
     assert len(winners) == 1, results                         # exactly one acquirer won the race — no split-brain
-    assert be.lease_holder(L.ACTIVE_LEASE, now=1000.0) == winners[0]
+    assert backends[0].lease_holder(L.ACTIVE_LEASE, now=1000.0) == winners[0]
 
 
 def test_lease_expiry_handoff_and_renew_denied_after_takeover():

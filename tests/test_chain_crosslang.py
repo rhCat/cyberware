@@ -19,7 +19,7 @@ from infra.cwp import ledger as L
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GO_DIR = os.path.join(ROOT, "verifiers", "go")
-DONE_V2 = os.path.join(ROOT, "workzone", "version1.1", "cyberware-swarm-v1.1", "done-ledger-v2.json")
+DONE_V2 = os.path.join(ROOT, "docs", "done-ledger-v2.json")
 
 pytestmark = pytest.mark.skipif(shutil.which("go") is None, reason="requires the go toolchain")
 
