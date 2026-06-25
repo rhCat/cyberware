@@ -5,12 +5,15 @@ Two calls, the whole governed loop:
   * `fetch(base_url, ledger)` — POST the task-ledger, get back the verdict (+ the compiled script on
     `allow`). A `push_back`/`reject` returns the oversight detail and NO script.
   * `run_governed(base_url, ledger)` — fetch, then run the server-issued script step by step while a
-    WebSocket to govd authorizes and records each step live. The provenance lands in the SERVER's
-    ledger; query it with GET /ledger/<run_id>.
+    WebSocket to govd authorizes and records each step live (COOPERATIVE — the agent runs the steps).
+  * `run_delegated(base_url, ledger)` — the govd+exod path: the agent POSTs the claim and drives the WS,
+    but the NODE's exod runs each step confined and signs it; the agent runs nothing. For a delegated body.
+    The provenance lands in the SERVER's ledger; query it with GET /ledger/<run_id>.
 
 Stdlib only (urllib + a tiny RFC 6455 client), so an agent can drive govd with no dependencies.
 
-  python3 infra/govd_client.py --url http://127.0.0.1:5773 --ledger task-ledger.json [--approve <id>]
+  # --url looks for $GOVD_URL, else the local node; --delegated runs server-side via the node's exod
+  python3 infra/govd_client.py [--url $GOVD_URL] --ledger task-ledger.json [--approve <id>] [--delegated]
 
 A HARDENED/remote govd (one with a principals registry) REQUIRES the agent's principal Bearer token at
 /govern (401 without). Supply it with --token-file <f> (or GOVD_TOKEN_FILE / GOVD_TOKEN) — the raw token is
@@ -301,9 +304,13 @@ def run_delegated(base_url, ledger, approve=()):
 
 def main():
     ap = argparse.ArgumentParser(description="drive govd: discover the catalog, then fetch + run a governed script")
-    ap.add_argument("--url", default="http://127.0.0.1:5773")
+    ap.add_argument("--url", default=os.environ.get("GOVD_URL", "http://127.0.0.1:5773"),
+                    help="the govd node base url — looks for $GOVD_URL, else the local node (http://127.0.0.1:5773)")
     ap.add_argument("--ledger", help="the task-ledger (required unless --discover)")
     ap.add_argument("--approve", action="append", default=[])
+    ap.add_argument("--delegated", action="store_true",
+                    help="server-side execution (govd→exod): the NODE's exod runs each step confined + signs it; "
+                         "the agent runs nothing. Use for a delegated-mode body; cooperative (caller-side) is the default")
     ap.add_argument("--registry", default=None,
                     help="where the skill code lives (default: this cyberware install); verified vs the blessed hashes")
     ap.add_argument("--discover", action="store_true",
@@ -322,8 +329,12 @@ def main():
     if not a.ledger:
         ap.error("--ledger is required (unless --discover)")
     ledger = json.load(open(a.ledger))
-    out = (fetch(a.url, ledger, a.approve) if a.fetch_only
-           else run_governed(a.url, ledger, a.approve, registry=a.registry))
+    if a.fetch_only:
+        out = fetch(a.url, ledger, a.approve)
+    elif a.delegated:
+        out = run_delegated(a.url, ledger, a.approve)          # govd→exod: the node executes confined + signs
+    else:
+        out = run_governed(a.url, ledger, a.approve, registry=a.registry)
     print(json.dumps(out, indent=2))
     # a blocked run (registry mismatch / authenticity drift / unauthorized oversight) returns decision="allow"
     # WITH an `error` and no results — it must NOT report success to a caller keying on the exit code.
