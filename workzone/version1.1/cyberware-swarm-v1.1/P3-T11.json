@@ -30,5 +30,6 @@
     "community_no_secrets_schema_and_runtime": true
   },
   "status": "todo",
-  "assignee": null
+  "assignee": null,
+  "validated_perk": "tierwire"
 }

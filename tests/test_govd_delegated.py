@@ -23,7 +23,7 @@ from infra.govern import govd, govd_client
 
 
 class _Stub:
-    def __call__(self, profile, argv):
+    def __call__(self, profile, argv, backend=None):
         return subprocess.CompletedProcess(argv, 0, "step-output-stays-server-side", "")
 
 

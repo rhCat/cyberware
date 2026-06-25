@@ -276,6 +276,64 @@ def run_confined(profile: SandboxProfile, argv: Sequence[str], *, timeout: int =
                           timeout=timeout, input=stdin)
 
 
+# ── P3-T11: the grant's sandbox TIER selects the P2 confinement backend ───────────────────────────────────
+SANDBOX_TIERS = ("core", "verified", "community")          # the catalog tiers a perk may DECLARE
+_TIER_BACKEND = {"core": "bwrap", "verified": "bwrap", "trusted": "bwrap", "community": "runsc"}
+_BACKEND_STRENGTH = {"bwrap": 1, "runsc": 2}               # runsc (the gVisor Sentry) is the STRONGER isolation
+
+
+def backend_for_tier(tier) -> str:
+    """The confinement backend a grant's sandbox tier REQUIRES (P3-T11): the trusted family (core/verified, plus
+    the secret-bearing `trusted`) runs in bwrap; an untrusted `community` perk DEMANDS the gVisor (runsc) box.
+    An UNDECLARED tier (None) maps to bwrap — the floor-neutral element, so the operator's --backend floor
+    governs and nothing regresses. An unknown/garbage declared tier maps to runsc (FAIL-SAFE: the strongest box
+    for a provenance we cannot vouch for)."""
+    if tier is None:
+        return "bwrap"
+    return _TIER_BACKEND.get(tier, "runsc")
+
+
+def strongest(a: str, b: str) -> str:
+    """The stronger of two backends (runsc > bwrap). Backend selection is MONOTONE: a tier may only RATCHET the
+    operator's floor UP (community forces runsc even under a bwrap floor), never weaken it (a core grant on a
+    runsc-floored host still gets runsc). So an untrusted perk is never silently downgraded to a weaker box."""
+    return a if _BACKEND_STRENGTH.get(a, 0) >= _BACKEND_STRENGTH.get(b, 0) else b
+
+
+def backend_enforceable(backend: str) -> bool:
+    """Whether `backend` can actually confine on THIS host (runsc needs Linux + gVisor; bwrap needs Linux +
+    bwrap). A selected backend that is not enforceable makes the step REFUSE (fail-closed) — the runner raises
+    rather than running unconfined."""
+    return runsc_available() if backend == "runsc" else is_available()
+
+
+def tier_backend_selftest() -> dict:
+    """P3-T11 — the grant's sandbox tier selects the confinement backend, as a MONOTONE floor over the operator's
+    --backend. Hermetic, no host backend needed (pure selection logic; the end-to-end exod threading is proven
+    in tests/test_exod.py + the cws-release perk):
+      (1) tier_maps — community → runsc; core/verified/trusted → bwrap; an UNDECLARED tier (None) → bwrap; an
+          unknown/garbage tier → runsc (fail-safe, strongest).
+      (2) monotone_floor — strongest() only ratchets UP: a bwrap floor + community → runsc; a runsc floor + core
+          → runsc (a trusted perk on a hardened host is NOT downgraded); a bwrap floor + core/None → bwrap.
+      (3) enforceable_gate — backend_enforceable mirrors the live host backends (bwrap=is_available,
+          runsc=runsc_available); a non-enforceable selected backend is the fail-closed refusal point."""
+    tier_maps = (backend_for_tier("community") == "runsc"
+                 and backend_for_tier("core") == "bwrap"
+                 and backend_for_tier("verified") == "bwrap"
+                 and backend_for_tier("trusted") == "bwrap"
+                 and backend_for_tier(None) == "bwrap"
+                 and backend_for_tier("nonsense-tier") == "runsc")
+    monotone_floor = (strongest("bwrap", backend_for_tier("community")) == "runsc"   # community ratchets up
+                      and strongest("runsc", backend_for_tier("core")) == "runsc"    # core NOT downgraded
+                      and strongest("bwrap", backend_for_tier("core")) == "bwrap"
+                      and strongest("bwrap", backend_for_tier(None)) == "bwrap")
+    enforceable_gate = (backend_enforceable("bwrap") == is_available()
+                        and backend_enforceable("runsc") == runsc_available())
+    ok = bool(tier_maps and monotone_floor and enforceable_gate)
+    return {"tier_maps": tier_maps, "monotone_floor": monotone_floor, "enforceable_gate": enforceable_gate,
+            "bwrap_live": is_available(), "runsc_live": runsc_available(), "ok": ok}
+
+
 def community_tier_selftest() -> dict:
     """Hermetic, no-network, no host backend needed (PURE rendering). The P2-T04 seam proof:
       (1) seam_parity — gVisor (runsc) renders the SAME confinement as bwrap for the core, a network-granted,
