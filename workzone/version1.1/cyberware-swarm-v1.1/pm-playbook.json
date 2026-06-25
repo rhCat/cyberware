@@ -352,7 +352,7 @@
   {
     "task_id": "P3-T11",
     "skill": "cws-release",
-    "perk": null,
+    "perk": "tierwire",
     "vars": {},
     "redeem": true
   },

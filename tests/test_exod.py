@@ -39,8 +39,8 @@ class _Stub:
     def __init__(self, rc=0, out="hi"):
         self.rc, self.out, self.calls = rc, out, []
 
-    def __call__(self, profile, argv):
-        self.calls.append((profile, argv))
+    def __call__(self, profile, argv, backend=None):
+        self.calls.append((profile, argv, backend))
         return subprocess.CompletedProcess(argv, self.rc, self.out, "")
 
 
@@ -393,7 +393,7 @@ def test_exod_injects_grant_authorized_credentials_into_the_confined_step():
     env = exod.run_step(dict(run_id="R1", plan_sha="P1", step="1", argv=["x"], workspace="/ws", grant=g),
                         now=1000)
     assert result_body(env)["status"] == "ok"
-    prof, _argv = stub.calls[-1]
+    prof, _argv, _backend = stub.calls[-1]
     assert prof.env.get("CWS_SECRET_API_KEY") == secret                      # the granted secret reached the step
     assert _vaultmod.secret_bytes_in(prof.env, secret) == 1                  # exactly once, in the step env only
     assert "CWS_SECRET_OTHER" not in prof.env                                # the ungranted credential is NOT injected
@@ -418,13 +418,12 @@ def test_exod_refuses_when_selected_backend_is_unavailable():
 
     import pytest
 
-    from infra.exec.sandbox import run_confined, runsc_available
+    from infra.exec.sandbox import runsc_available
     if runsc_available():
         pytest.skip("runsc present — this exercises the unavailable-backend refusal")
     isk, ipub = _kp()
-    # the runner is run_confined pinned to the runsc backend — unavailable on this host
-    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub,
-                runner=lambda prof, argv: run_confined(prof, argv, backend="runsc"))
+    # the operator FLOOR is runsc — the real runner can't enforce gVisor on this host, so the step is refused
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, backend_floor="runsc")
     g = mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g1", capabilities=["run"])
     env = exod.run_step(dict(run_id="R1", plan_sha="P1", step="1", argv=["true"], workspace="/ws", grant=g),
                         now=1000)
@@ -460,3 +459,41 @@ def test_exod_no_credentials_runs_without_vault():
     exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=_Stub(rc=0, out="x"))
     env = exod.run_step(_req(isk), now=1000)                                  # _req mints a no-credentials grant
     assert result_body(env)["status"] == "ok"
+
+
+def test_grant_sandbox_tier_selects_the_backend():
+    """P3-T11 — tier_enforced_at_grant: the grant's `sandbox_tier` deterministically selects the confinement
+    backend exod hands the runner. A community grant DEMANDS gVisor (runsc); core/undeclared takes the operator
+    floor (bwrap); and the floor is MONOTONE — a runsc floor is never downgraded by a core grant."""
+    isk, ipub = _kp()
+    seen = []
+
+    def rec(profile, argv, backend=None):
+        seen.append(backend)
+        return subprocess.CompletedProcess(argv, 0, "ok", "")
+
+    def mk(stier, n):
+        return mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g-" + n,
+                          capabilities=["run"], sandbox_tier=stier)
+
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=rec, backend_floor="bwrap")
+    for stier, want, n in (("community", "runsc", "c"), ("core", "bwrap", "k"), (None, "bwrap", "u")):
+        seen.clear()
+        env = exod.run_step(dict(run_id="R1", plan_sha="P1", step="1", argv=["true"], workspace="/ws",
+                                 grant=mk(stier, n)), now=1000)
+        assert result_body(env)["status"] == "ok"
+        assert seen == [want], (stier, seen)                       # the tier picked the backend, at the grant
+
+    # the operator floor only ratchets UP: a runsc-floored limb never downgrades a core grant to bwrap
+    hardened = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=rec, backend_floor="runsc")
+    seen.clear()
+    hardened.run_step(dict(run_id="R1", plan_sha="P1", step="1", argv=["true"], workspace="/ws",
+                           grant=mk("core", "h")), now=1000)
+    assert seen == ["runsc"]                                        # monotone floor — never weakened
+
+
+def test_sandbox_tier_selftest_passes():
+    """The pure tier→backend selection logic (P3-T11): community→runsc, trusted family→bwrap, monotone floor."""
+    from infra.exec.sandbox import tier_backend_selftest
+    r = tier_backend_selftest()
+    assert r["ok"], r

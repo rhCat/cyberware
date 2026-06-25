@@ -21,16 +21,23 @@ from infra.exec.grantverify import (  # noqa: F401  (single source of truth for 
 
 
 def mint_grant(private_key, *, run_id, plan_sha, nbf, exp, nonce,
-               snippet_shas=None, capabilities=None, credentials=None, tier="community"):
+               snippet_shas=None, capabilities=None, credentials=None, tier="community", sandbox_tier=None):
     """Issue a signed grant (a DSSE envelope). The body is the value-free capability claim; the signature
     binds it so any holder can verify it offline. The nonce MUST be a non-empty string (the replay key).
 
-    `tier` is the capability tier (P2-T04): the default COMMUNITY tier is the no-secrets floor — a community
-    grant may NOT carry credentials (exod refuses to resolve secrets for it). Only an explicit `tier="trusted"`
-    grant may name credentials. Secure by default: a grant minted without a tier cannot smuggle secrets."""
+    `tier` is the SECRET tier (P2-T04): the default COMMUNITY tier is the no-secrets floor — a community grant
+    may NOT carry credentials (exod refuses to resolve secrets for it). Only an explicit `tier="trusted"` grant
+    may name credentials. Secure by default: a grant minted without a tier cannot smuggle secrets.
+
+    `sandbox_tier` is the orthogonal P3-T11 CATALOG tier (core/verified/community) that selects the confinement
+    BACKEND at the limb: a `community` perk demands the gVisor (runsc) box, the trusted family runs in bwrap, and
+    an undeclared (None) grant takes the operator's --backend floor (so legacy grants never regress). It is
+    emitted only when set, keeping older grant bodies byte-identical."""
     if not (isinstance(nonce, str) and nonce):
         raise ValueError("grant nonce must be a non-empty string")
     body = {"run_id": run_id, "plan_sha": plan_sha, "snippet_shas": snippet_shas or {},
             "capabilities": capabilities or [], "credentials": credentials or [], "tier": tier,
             "nbf": int(nbf), "exp": int(exp), "nonce": nonce}
+    if sandbox_tier is not None:
+        body["sandbox_tier"] = sandbox_tier
     return sign.sign(body, private_key, payload_type=GRANT_TYPE)

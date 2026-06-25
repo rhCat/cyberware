@@ -27,7 +27,9 @@ from infra.cwp import sign
 from infra.exec import vault as _vaultmod
 from infra.exec.closureverify import closure_decision
 from infra.exec.grantverify import _issuer, grant_body, verify_grant
-from infra.exec.sandbox import core_profile, is_available, run_confined, runsc_available
+from infra.exec.sandbox import (
+    backend_for_tier, core_profile, is_available, run_confined, runsc_available, strongest,
+)
 from infra.exec.exodverify import (  # noqa: F401  (single source of truth for the verify surface)
     STEP_RESULT_TYPE, NonceCache, _principal, result_body, verify_step_result,
 )
@@ -47,7 +49,7 @@ class Exod:
     logic is testable off-Linux); the default is the real bwrap sandbox."""
 
     def __init__(self, signing_key, *, grant_issuer_pub, runner=run_confined, profile_factory=core_profile,
-                 vault=None):
+                 vault=None, backend_floor="bwrap"):
         if _principal(grant_issuer_pub) == _principal(signing_key.public_key()):
             raise ValueError("exod identity key must differ from the grant-issuer key (no self-issued grants)")
         self._sk = signing_key
@@ -55,6 +57,7 @@ class Exod:
         self._runner = runner
         self._profile = profile_factory
         self._vault = vault                 # the limb resolves grant-authorized secrets server-side (P2-T12)
+        self._backend_floor = backend_floor # P3-T11: the operator's --backend; a grant tier may only RATCHET it up
         self._grant_nonces = NonceCache()   # fast per-instance guard; the durable one is the ledger (below)
 
     @property
@@ -133,12 +136,19 @@ class Exod:
             except Exception:
                 return refuse("vault:resolve_failed")
         prof = dataclasses.replace(prof, env=env)
-        # 6. run confined + sign the authoritative outcome, bound to the grant nonce, with an ATTESTED meter
+        # 6. P3-T11: the grant's sandbox TIER selects the confinement backend, as a MONOTONE floor over the
+        #    operator's --backend. A community-tier grant (untrusted marketplace code) DEMANDS the gVisor (runsc)
+        #    box; the trusted family (core/verified) runs in bwrap; an undeclared grant takes the operator floor.
+        #    The tier can only STRENGTHEN the floor, never weaken it. The runner fails closed when the selected
+        #    backend cannot enforce on this host (the RuntimeError is caught below → a signed refusal), so an
+        #    untrusted perk is never silently downgraded to a weaker sandbox.
+        backend = strongest(self._backend_floor, backend_for_tier(gbody.get("sandbox_tier")))
+        # 7. run confined + sign the authoritative outcome, bound to the grant nonce, with an ATTESTED meter
         #    (P2-T07): exod itself measures the step's wall time and signs it, so the meter originates from
         #    exod and the agent cannot fabricate it — the proto-receipt a settlement plane will later trust.
         t0 = time.perf_counter()
         try:
-            p = self._runner(prof, req["argv"])
+            p = self._runner(prof, req["argv"], backend=backend)
         except Exception as e:
             # the confinement backend could not run the step (e.g. the selected runsc/bwrap is absent —
             # run_confined REFUSES rather than running unconfined). Turn ANY runner exception into a signed
@@ -295,14 +305,14 @@ def main(argv=None):
     issuer_pub = Ed25519PublicKey.from_public_bytes(open(a.issuer_pub, "rb").read())
     if os.path.dirname(a.socket):
         os.makedirs(os.path.dirname(a.socket), exist_ok=True)
-    # P2-T04: select the confinement backend. The runner closure threads it into run_confined; run_step is
-    # unchanged. A backend that cannot enforce on THIS host makes every step REFUSE (fail-closed, never run
-    # unconfined) — warn loudly at startup so the operator sees it rather than only seeing errored steps.
+    # P2-T04/P3-T11: --backend is the operator's confinement FLOOR. The default runner (run_confined) accepts the
+    # per-step backend exod selects from the grant's sandbox tier (a community grant ratchets the floor up to
+    # runsc); the floor itself is the minimum every step gets. A floor that cannot enforce on THIS host makes
+    # those steps REFUSE (fail-closed, never run unconfined) — warn loudly at startup so the operator sees it.
     if not (runsc_available() if a.backend == "runsc" else is_available()):
         sys.stderr.write(f"[exod] WARNING: sandbox backend '{a.backend}' is NOT enforceable on this host — "
                          f"every step will be REFUSED (fail-closed), never run unconfined.\n")
-    exod = Exod(sk, grant_issuer_pub=issuer_pub, vault=load_vault(a.vault),
-                runner=lambda prof, step_argv: run_confined(prof, step_argv, backend=a.backend))
+    exod = Exod(sk, grant_issuer_pub=issuer_pub, vault=load_vault(a.vault), backend_floor=a.backend)
     print(f"exod · limb · socket={a.socket} · backend={a.backend} · keyid={_principal(sk.public_key())} · "
           f"trusts-issuer {_principal(issuer_pub)} · vault={'yes' if a.vault else 'none'}")
     exod.serve(a.socket)
