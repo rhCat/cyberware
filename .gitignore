@@ -16,7 +16,6 @@ coverage.xml
 .ruff_cache/
 povd_logs/
 vendor/wheelhouse/*.whl
-workzone/version1.1/runs/
 # a porter/test run with RECORD_STORE unexpanded drops a literal-named dir at the root — never commit it
 ${RECORD_STORE}/
 _site/
