@@ -176,6 +176,80 @@ def test_banner_surfaces_needs_approval(node_and_mirror):
     assert "high-risk ran" in html
 
 
+def test_rich_record_mirrored_and_still_value_free(node_and_mirror, monkeypatch):
+    """The inspection record captures the FULL value-free record (plan, closure pins, approval, model-check,
+    provenance, event chain) — but still ALLOWLISTS, so a node can't smuggle a secret in an extra field."""
+    rich = {"run_id": "r1", "skill": "fs", "perk": "rm", "decision": "allow", "destructive": True,
+            "approved": ["rm", "destructive"], "seq": ["rm_tool"], "plan_sha": "p" * 64,
+            "snippet_shas": {"rm.py": "abc123"}, "credential_ids": ["api-key"], "wrapper": "#!/bin/sh\nrm",
+            "var_keys": ["DIR"], "problems": [], "tlc": "ok", "tlc_tla": "MODULE X", "tlc_log": "no deadlock",
+            "traceparent": "00-trace-span-01", "sources": ["s1"],
+            "events": [{"type": "step_result", "step": "1", "status": "ok", "authority": "exod",
+                        "exod_keyid": "ed25519:abc", "token": "EVENT_SECRET"}],
+            "token": "TOPLEVEL_SECRET", "output": "stdout bytes", "vault": "x"}
+
+    def get(url, token=None, timeout=6):
+        if "/monitor/run/" in url:
+            return dict(rich)
+        return _fake_get(url, token, timeout)
+
+    monkeypatch.setattr(F, "_get", get)
+    F.mirror_node(node_and_mirror[0], node_and_mirror[1])
+    r1 = json.load(open(os.path.join(node_and_mirror[1], "body-1", "runs", "r1.json")))
+    # the rich value-free fields are captured for inspection
+    for k in ("approved", "snippet_shas", "credential_ids", "wrapper", "tlc_tla", "tlc_log", "traceparent"):
+        assert k in r1, f"{k} missing from the inspection record"
+    assert r1["events"][0]["exod_keyid"] == "ed25519:abc"
+    # but the smuggled secrets (top-level AND per-event) are dropped
+    blob = json.dumps(r1)
+    for secret in ("TOPLEVEL_SECRET", "EVENT_SECRET", "stdout bytes", '"token"', '"output"', '"vault"'):
+        assert secret not in blob, f"{secret!r} leaked"
+
+
+def test_flow_svg_is_mirrored_once(node_and_mirror, monkeypatch):
+    node, mdir = node_and_mirror
+    calls = {"n": 0}
+
+    def fake_raw(url, token=None, timeout=8):
+        calls["n"] += 1
+        return "image/svg+xml", b'<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+
+    monkeypatch.setattr(F, "_get_raw", fake_raw)
+    F.mirror_node(node, mdir)
+    svg = F.load_run_svg(mdir, "body-1", "r1")
+    assert svg and svg.startswith(b"<svg")
+    n1 = calls["n"]
+    F.mirror_node(node, mdir)                                 # second sweep must NOT re-fetch existing SVGs
+    assert calls["n"] == n1
+
+
+def test_render_run_has_inspection_sections():
+    detail = {"run_id": "r1", "_node": "body-1", "skill": "fs", "perk": "rm", "decision": "allow",
+              "destructive": True, "approved": ["rm"], "credential_ids": ["api-key"], "seq": ["rm_tool"],
+              "plan_sha": "p" * 40, "snippet_shas": {"rm.py": "sha"}, "var_keys": ["DIR"], "problems": [],
+              "tlc": "ok", "traceparent": "00-t-s-01", "wrapper": "#!/bin/sh",
+              "events": [{"type": "granted", "step": "1"},
+                         {"type": "step_result", "step": "1", "status": "ok", "authority": "exod"}]}
+    html = F.render_run("body-1", "r1", detail, has_svg=True)
+    for needle in ("ledger — event chain", "plan &amp; closure", "verification", "claim &amp; approval",
+                   "/raw/body-1/r1", "/flow/body-1/r1", "/proxy/body-1/trace/r1", "closure file", "exod"):
+        assert needle in html, f"inspection section missing: {needle}"
+
+
+def test_proxy_allowlist_rejects_arbitrary_paths():
+    assert F._proxiable("trace/r1") and F._proxiable("intoto/r1") and F._proxiable("flow/run/r1")
+    assert F._proxiable("catalog") and F._proxiable("oversight")
+    # exact-match boundary: govern, the write/other endpoints, and catalog/oversight LOOKALIKES are NOT proxiable
+    for bad in ("govern", "monitor/state", "catalogAdmin", "oversightWrite", "health", "../etc/passwd", "catalog/x"):
+        assert not F._proxiable(bad), bad
+
+
+def test_node_redirect_is_not_followed_so_the_token_cannot_be_exfiltrated():
+    # a compromised node could 302 to an attacker host; urllib would otherwise keep the X-Govd-Monitor token.
+    # the opener refuses ALL redirects → the token can never leave the configured node.
+    assert F._NoRedirect().redirect_request("req", "fp", 302, "msg", {}, "http://attacker.example/steal") is None
+
+
 def test_safe_runid_blocks_path_traversal():
     for evil in ("../../etc/passwd", "..", "a/b\\c", "..\\..\\x", "/abs/path"):
         s = F._safe(evil)
