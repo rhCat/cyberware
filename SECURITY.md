@@ -29,3 +29,8 @@ The governance kernel — `infra/` (govd, the executor channel, the verifiers) a
 is in scope. The enforcement surfaces (`govd.py`, `executor.py`, `oversight.py`, the `*verify.py` cores) are
 the highest-value targets. Findings that bypass a governance boundary are especially welcome: a refusal that
 should have fired but did not, a value or secret crossing the agent↔govd boundary, or a step running unblessed.
+
+The **delegated execution boundary (SV-3)** is also in scope: **exod** (`infra/exec/exod.py`), the
+`closureverify.py` / `grantverify.py` / `exodverify.py` cores, and the confined sandbox (`infra/exec/sandbox.py`).
+High-value findings there include a forged exod signature accepted as authoritative status, a grant-nonce
+replay that goes undetected, a step running as root despite `exec-never-root`, or a sandbox confinement escape.
