@@ -29,10 +29,48 @@ GOVD_MONITOR_TOKEN_<NODENAME>. fleet.json (tailnet/overlay IPs — never public;
   ]}
 """
 from __future__ import annotations
-import argparse, concurrent.futures, html, json, os, threading, time, urllib.error, urllib.parse, urllib.request
+import argparse, concurrent.futures, html, json, os, re, secrets, threading, time, urllib.error, urllib.parse, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DEFAULT_MIRROR = "~/.cyberware/fleet-ledgers"      # the central durable copy of every node's value-free ledgers
+_DASH_HTML = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "govern", "govd_dashboard.html")
+
+# the node sub-paths the EMBED (the individual-monitor iframe) proxies — exactly what govd_dashboard.html fetches.
+_EMBED_PREFIX = ("monitor/run/", "flow/run/")
+_EMBED_EXACT = ("monitor/state",)
+
+# strip the active content a (compromised) node's flow SVG could carry — the SPA innerHTMLs it, so harden it
+# server-side: drop <script>/<foreignObject>, every on*-handler, and javascript: URIs.
+_SVG_STRIP = re.compile(rb"(?is)<script.*?</script>|<foreignObject.*?</foreignObject>"
+                        rb"|\son\w+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)|javascript:")
+
+
+def _sanitize_svg(data: bytes) -> bytes:
+    return _SVG_STRIP.sub(b"", data)
+
+
+def _embed_html(node_name: str, nonce: str) -> bytes:
+    """The TRUSTED local-monitor SPA (govd_dashboard.html from the repo — never the node's HTML, so a node can't
+    inject script into the dashboard origin), with a shim injected BEFORE it that (a) prefixes every absolute
+    fetch path to /embed/<node>/ and (b) emulates EventSource by polling /monitor/state (so we need no fragile
+    SSE-streaming proxy). The token is added server-side by the proxy — the iframe carries only a dummy. Every
+    inline <script> is stamped with `nonce` so the page's CSP (script-src 'nonce-…') can run THESE scripts while
+    blocking any inline event-handler a node's (innerHTML'd, sanitized) flow SVG might still smuggle in."""
+    src = open(_DASH_HTML, "r", encoding="utf-8").read()
+    marker = '<div id="root"></div>\n<script>'
+    if marker not in src:                                    # fail loud rather than serve a silently-broken SPA
+        raise RuntimeError("embed: dashboard asset changed — the shim-injection marker is gone")
+    pfx = "/embed/" + urllib.parse.quote(node_name)
+    shim = ("<script>(function(){var P=" + json.dumps(pfx) + ";var _f=window.fetch.bind(window);"
+            "window.fetch=function(u,o){return _f((typeof u===\"string\"&&u.charAt(0)===\"/\")?P+u:u,o);};"
+            "window.EventSource=function(u){var s=this;s.onmessage=null;s.onerror=null;"
+            "function poll(){_f(P+\"/monitor/state\",{cache:\"no-store\"})"
+            ".then(function(r){return r.ok?r.text():Promise.reject();})"
+            ".then(function(t){if(s.onmessage)s.onmessage({data:t});})"
+            ".catch(function(){if(s.onerror)s.onerror();});}"
+            "s._t=setInterval(poll,2500);s.close=function(){clearInterval(s._t);};};})();</script>")
+    src = src.replace(marker, '<div id="root"></div>\n' + shim + "\n<script>", 1)
+    return src.replace("<script>", f'<script nonce="{nonce}">').encode()   # nonce every inline script
 
 
 def _expand(p):
@@ -249,6 +287,28 @@ def _proxiable(sub):
     """Whether `sub` is a safe node read-endpoint to proxy. Prefixes require a trailing-slash boundary; catalog
     and oversight match EXACTLY — so `catalogX` / `oversightWrite` / `govern` are NOT proxiable."""
     return sub in _PROXY_EXACT or any(sub.startswith(p) for p in _PROXY_PREFIX)
+
+
+def _embed_proxiable(sub):
+    """The endpoints the individual-monitor iframe (the embedded SPA) is allowed to reach on a node."""
+    return sub in _EMBED_EXACT or any(sub.startswith(p) for p in _EMBED_PREFIX)
+
+
+def render_node_iframe(node, reachable):
+    """The per-node view = the ACTUAL individual-monitor UI in an iframe (the trusted SPA, served from
+    /embed/<node>/, talking to the token-injecting proxy). When the node is down there is no live UI, so point
+    at the durable central mirror board instead."""
+    name = _esc(node.get("name"))
+    links = (f'<a class="back" href="/">← fleet</a> · <a class="back" href="/mnode/{name}">central mirror board ↗</a>'
+             f' · <span class="role">{_esc(node.get("role","-"))}</span>')
+    if not reachable:
+        return _page(f"{node.get('name')}", links + f'<h1>{name} <span class="off">offline</span></h1>'
+                     f'<p class="muted">node unreachable — the live monitor UI needs the node. '
+                     f'<a href="/mnode/{name}">open the central mirror board ↗</a> (durable, inspectable offline).</p>')
+    content = (links + f'<iframe src="/embed/{name}/?token=proxied" title="{name} monitor" '
+               'style="width:100%;height:90vh;border:1px solid #30363d;border-radius:8px;background:#0d1117;margin-top:10px">'
+               '</iframe>')
+    return _page(f"{node.get('name')} — monitor", content)
 
 
 def fleet_from_mirror(nodes, mirror_dir, live_health=True):
@@ -606,16 +666,59 @@ def serve(nodes, port, refresh, mirror_dir, mirror_interval):
         def _send(self, code, page):
             self._bytes(code, "text/html; charset=utf-8", page.encode())
 
-        def _bytes(self, code, ctype, data):
+        def _bytes(self, code, ctype, data, extra=None):
             self.send_response(code)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(data)))
+            for k, v in (extra or {}).items():
+                self.send_header(k, v)
             self.end_headers()
             self.wfile.write(data)
 
+        def _embed(self, up):
+            """Serve the individual-monitor SPA (`/embed/<node>/`) or proxy ONE of its data fetches to the node
+            (token added server-side; the dummy ?token is stripped). The SPA is the TRUSTED repo asset; only
+            value-free JSON / a sanitized flow SVG flow back, so a node can never inject script into this origin."""
+            seg = up.path[len("/embed/"):]
+            node_name, _, sub = seg.partition("/")
+            node = by_name.get(urllib.parse.unquote(node_name))
+            if not node:
+                return self._send(404, _page("404", "unknown node"))
+            if not sub:                                              # the dashboard HTML (trusted, from the repo)
+                nonce = secrets.token_urlsafe(12)
+                csp = (f"default-src 'self'; script-src 'nonce-{nonce}'; style-src 'unsafe-inline'; "
+                       "img-src 'self' data:; connect-src 'self'; frame-ancestors 'self'")
+                return self._bytes(200, "text/html; charset=utf-8",
+                                   _embed_html(urllib.parse.unquote(node_name), nonce),
+                                   extra={"Content-Security-Policy": csp})
+            sub = urllib.parse.unquote(sub)
+            if not _embed_proxiable(sub):
+                return self._send(404, _page("404", "not proxiable"))
+            target = node["url"].rstrip("/") + "/" + urllib.parse.quote(sub, safe="/")
+            tok = _token(node)
+            q = [(k, v) for k, v in urllib.parse.parse_qsl(up.query) if k != "token"]   # drop the dummy token
+            if q:
+                target += "?" + urllib.parse.urlencode(q)
+            try:
+                _ct, data = _get_raw(target, tok)
+            except urllib.error.HTTPError as e:
+                return self._bytes(e.code, "application/json", b'{"error":"upstream"}')
+            except Exception:
+                return self._bytes(502, "application/json", b'{"error":"node unreachable"}')
+            if tok and tok.encode() in data:                        # a node must NEVER echo our token to the browser
+                data = data.replace(tok.encode(), b"[redacted]")
+            if sub.startswith("flow/run/"):                          # the SPA innerHTMLs this — sanitize it
+                return self._bytes(200, "image/svg+xml; charset=utf-8", _sanitize_svg(data))
+            return self._bytes(200, "application/json; charset=utf-8", data)
+
         def do_GET(self):
-            parts = [urllib.parse.unquote(s) for s in
-                     urllib.parse.urlparse(self.path).path.strip("/").split("/") if s]
+            up = urllib.parse.urlparse(self.path)
+            if up.path.startswith("/embed/"):                       # the individual-monitor iframe + its proxy
+                try:
+                    return self._embed(up)
+                except Exception as e:
+                    return self._send(500, _page("error", f'<p class="muted">{_esc(e)}</p>'))
+            parts = [urllib.parse.unquote(s) for s in up.path.strip("/").split("/") if s]
             try:
                 if not parts:                                       # overview (mirror-backed)
                     results, feed = fleet_from_mirror(nodes, mirror_dir)
@@ -623,7 +726,17 @@ def serve(nodes, port, refresh, mirror_dir, mirror_interval):
                 if parts[0] == "risk":                              # fleet-wide risk / approval queue
                     results, feed = fleet_from_mirror(nodes, mirror_dir)
                     return self._send(200, render_risk(feed, risk_summary(feed), refresh))
-                if parts[0] == "node" and len(parts) == 2:          # per-node board (from the mirror)
+                if parts[0] == "node" and len(parts) == 2:          # per-node = the LIVE individual-monitor UI (iframe)
+                    node = by_name.get(parts[1])
+                    if not node:
+                        return self._send(404, _page("404", '<a class="back" href="/">← fleet</a><p class="muted">unknown node</p>'))
+                    try:
+                        _get(node["url"].rstrip("/") + "/health")
+                        reachable = True
+                    except Exception:
+                        reachable = False
+                    return self._send(200, render_node_iframe(node, reachable))
+                if parts[0] == "mnode" and len(parts) == 2:         # the durable central MIRROR board (offline-capable)
                     node = by_name.get(parts[1])
                     if not node:
                         return self._send(404, _page("404", '<a class="back" href="/">← fleet</a><p class="muted">unknown node</p>'))
