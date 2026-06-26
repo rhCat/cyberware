@@ -96,6 +96,8 @@ let token = qs.get("token") || sessionStorage.getItem("govd_monitor_token") || "
 const state = { snap:null, selected:null, detail:null, tab:"Run" };
 const flowCache = {};   // run_id -> task-blueprint svg (fetched once; the blueprint is static per run)
 let lastSig = "";       // signature of the last RENDERED view; an idle poll whose signature matches is a no-op
+let lastNav = "";       // navigation identity (run + tab + page) of the last render — tells an in-place refresh
+                        // (keep the panes' scroll) apart from a real navigation (start the detail pane at the top)
 const root = document.getElementById("root");
 const dot = document.getElementById("dot"), stamp = document.getElementById("stamp"), chips = document.getElementById("chips");
 const enc = encodeURIComponent;
@@ -142,9 +144,18 @@ function viewSig(){
   const s = state.snap ? {...state.snap, now:0} : null;
   return JSON.stringify([state.selected, state.tab, decPage, s, state.detail]);
 }
+function viewNav(){
+  // navigation identity: changes when the user opens a different run, switches tabs, or pages decisions — NOT on a
+  // data refresh. A same-viewNav re-render is an in-place update, so the panes keep their scroll instead of jumping.
+  return state.selected + "|" + state.tab + "|" + decPage;
+}
 
 function render(){
   if(!state.snap) return;
+  // capture the panes' scroll BEFORE the innerHTML rebuild so an in-place refresh doesn't yank the view to the top.
+  // A real navigation (different run / tab / page) has a new viewNav, so the detail pane intentionally resets.
+  const _pn=root.querySelector(".nav"), _pm=root.querySelector(".main");
+  const _navTop=_pn?_pn.scrollTop:0, _mainTop=_pm?_pm.scrollTop:0, _sameView=(lastNav===viewNav());
   const s=state.snap;
   chips.innerHTML="";
   const t=s.totals||{};
@@ -170,7 +181,9 @@ function render(){
 
   if(state.selected===null) overview(main, s); else detailView(main);
   app.append(nav,main); root.appendChild(app);
-  lastSig=viewSig();                                   // remember what we just drew, so an unchanged poll no-ops
+  nav.scrollTop=_navTop;                               // the run list never jumps on an in-place refresh
+  if(_sameView) main.scrollTop=_mainTop;              // the detail/overview pane keeps its scroll across a refresh
+  lastSig=viewSig(); lastNav=viewNav();                // remember what we just drew, so an unchanged poll no-ops
 }
 
 function sect(title){ const s=el("section"); s.appendChild(el("div","hd",title)); const b=el("div","pad"); s.appendChild(b); return {s,b}; }

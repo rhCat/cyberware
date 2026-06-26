@@ -5,6 +5,10 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
+import re
+import shutil
+import subprocess
 import tempfile
 import urllib.error
 import urllib.parse
@@ -262,6 +266,46 @@ def test_embed_serves_trusted_spa_with_a_prefix_and_polling_shim():
     assert html.index("window.EventSource=function") < html.index('"use strict"')
     # every inline script is nonce-stamped (so a CSP script-src 'nonce-…' runs THESE but blocks injected handlers)
     assert '<script nonce="NONCE123">' in html and "<script>" not in html
+    # the shim keys change-detection off the snapshot MINUS the per-second clock (else every idle poll "changes")
+    assert "delete o.now" in html
+    # the embed carries the dark scrollbar styling
+    assert "::-webkit-scrollbar" in html and "scrollbar-color:#30363d" in html
+
+
+def test_embed_shim_suppresses_clock_only_polls_but_fires_on_real_change():
+    """Behavioral: run the SHIPPED shim key() in node against govd-shaped snapshots. Two snapshots that differ
+    only in the per-second `now` must collapse to the same key (idle poll → onmessage NOT fired); a genuine change
+    (a step advancing) must produce a different key (→ fired). This is the test that would have caught the inert
+    first attempt, which diffed the raw text incl. `now` and so re-fired — and re-jumped — every 2.5s."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available — behavioral shim test skipped (structural 'delete o.now' still asserted)")
+    html = F._embed_html("n", "X").decode()
+    m = re.search(r"function key\(t\)\{.*?catch\(e\)\{return t;\}\}", html, re.S)
+    assert m, "shim key() not found — the now-stripping change-detector is gone"
+    base = {"now": "2026-06-25T00:00:01Z", "runs_live": 2,
+            "runs": [{"run_id": "r1", "decision": "allow", "progress": "1/3"}], "totals": {"allow": 5}}
+    later_clock = {**base, "now": "2026-06-25T00:00:09Z"}            # only the clock moved → must be suppressed
+    real_change = {**later_clock, "runs": [{"run_id": "r1", "decision": "allow", "progress": "2/3"}]}  # → must fire
+    script = m.group(0) + (
+        ";const k0=key(JSON.stringify(%s)),k1=key(JSON.stringify(%s)),k2=key(JSON.stringify(%s));"
+        "if(k0!==k1){console.error('FAIL: clock-only poll not suppressed');process.exit(1);}"
+        "if(k1===k2){console.error('FAIL: real change not detected');process.exit(1);}"
+        "process.exit(0);"
+    ) % (json.dumps(base), json.dumps(later_clock), json.dumps(real_change))
+    r = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=20)
+    assert r.returncode == 0, (r.stdout + r.stderr)
+
+
+def test_dashboard_render_preserves_scroll_on_in_place_refresh():
+    """The detail-view page-jump is fixed at its source: the SPA's render() captures the panes' scrollTop before the
+    innerHTML rebuild and restores it when the navigation identity (run|tab|page) is unchanged — so an in-place
+    refresh keeps scroll while a real navigation still starts the detail pane at the top."""
+    spa = (pathlib.Path(F.__file__).resolve().parents[1] / "govern" / "govd_dashboard.html").read_text()
+    assert "function viewNav()" in spa and "lastNav" in spa            # the in-place-vs-navigation discriminator
+    assert "scrollTop" in spa and "_sameView" in spa                  # capture + conditional restore are present
+    # restore is GATED on sameView (navigation must NOT restore the detail pane's old scroll)
+    assert "if(_sameView) main.scrollTop" in spa
 
 
 def test_sanitize_svg_strips_active_content():
