@@ -21,6 +21,81 @@ because glue is what this needs.
 > how to run a skill through the governed channel (validate → compose → compile → oversee → execute),
 > how to grow the registry (`cws-create`, `cws-addperk`), and what you must never do.
 
+## Setup — run a governed task
+
+Get a **governor** running, then have an agent run a task through it. The wire is **value-free** either
+way: only the claim (skill, perk, var KEYS) and the status cross — never code, never secrets.
+
+### 1 · Run the governor (Docker)
+
+A **signed** image of the govd governance server is published to GitHub Packages — pull and run an overseen
+govd in one line (it bakes the chip, validates it at boot, and refuses to start on drift):
+
+```sh
+docker run --rm -p 5773:5773 ghcr.io/rhcat/cyberware:latest    # boots govd; prints a monitor token → http://127.0.0.1:5773/
+docker run -p 5773:5773 -v cyberware-govd:/data/govd ghcr.io/rhcat/cyberware:latest   # persist the provenance ledger
+```
+
+Verify the image's signature (keyless cosign via GitHub OIDC — no key to manage):
+
+```sh
+cosign verify ghcr.io/rhcat/cyberware:latest \
+  --certificate-identity-regexp 'https://github.com/rhCat/cyberware/.github/workflows/server-image.yml@.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+**The image catalog** — four signed images, each published on a `vN.N.N` tag by its workflow; verify any of
+them the same keyless way (substitute the image name and its `*-image.yml` in the `--certificate-identity-regexp`):
+
+| image | built by | what it is |
+|---|---|---|
+| `ghcr.io/rhcat/cyberware` | `server-image.yml` · `Dockerfile` | the **governance server** — lean (govd + TLC). Governs + records; never executes. |
+| `ghcr.io/rhcat/cyberware-body` | `body-image.yml` · `Dockerfile.body` | **delegated mode** — govd + **exod** confined in one non-root Linux image (bwrap / gVisor). |
+| `ghcr.io/rhcat/cyberware-modelcheck` | `modelcheck-image.yml` | the **full prover** — govd + Apalache + TLAPS for deep model-checking. |
+| `ghcr.io/rhcat/cyberware-compute` | `compute-image.yml` | the CI **compute** environment. |
+
+Serve a **live** chip instead of the baked one: add `-e CLOUD_MODE=1` (clones `rhCat/skillChip` at boot and
+refuses on drift). Published on a `vN.N.N` tag (or on demand) by
+[`server-image.yml`](.github/workflows/server-image.yml).
+
+### 2 · Run a task — cooperative or delegated
+
+The agent holds only a **token + the endpoint**; it sends the value-free **claim** and runs the plan govd
+blesses. **govd itself never executes — in either mode.** What differs is *who* runs the blessed steps and
+*where*:
+
+**Cooperative (the default — runs on any OS).** The **agent** executes: it fetches the blessed value-free
+plan, verifies its own registry matches the blessed hashes, and runs the steps itself on its own host,
+reporting status to govd over a per-run WebSocket. govd governs the claim and records provenance — it runs
+nothing. Because the agent does the running, this works **anywhere, including macOS**.
+
+```sh
+./govd-client --url http://127.0.0.1:5773 --ledger task-ledger.json
+# hardened / remote govd: add --token-file <path>  (or set GOVD_TOKEN_FILE) — the agent's principal
+# Bearer token, read from the file so the raw value never lands in argv. An open/local govd needs none.
+```
+
+Governor image: **`ghcr.io/rhcat/cyberware`**.
+
+**Delegated (Linux nodes — confined execution).** The **agent runs nothing**. govd mints a single-use
+**signed grant** and hands it to **exod** — a separate OS principal — which runs each step **confined**,
+drops to an unprivileged uid (`nobody`), and **Ed25519-signs** the authoritative status; govd records that
+signed status (an agent self-report is rejected). The confinement is the whole point, and it is built on
+**Linux kernel sandboxing** — bubblewrap's unprivileged user namespaces, or gVisor / `runsc`. That is why
+delegated mode needs a **Linux** node: macOS has no equivalent, so confined execution isn't available there
+(cooperative still is).
+
+```sh
+./govd-client --url http://127.0.0.1:5773 --ledger task-ledger.json --delegated
+```
+
+Body image: **`ghcr.io/rhcat/cyberware-body`** (govd-delegated + exod in one non-root Linux container).
+`exec_mode` is **operator-set** in the govd config (and per-principal), not agent-negotiable; a delegated
+govd with no exod attached refuses every step (fail-closed), and `GET /health` reports `exec_mode` +
+`exod_attached`. Provenance lands in the **server's** ledger — read it with
+`GET /ledger/<run_id>?token=<session_token>` (the run's own session token, not the agent Bearer, not the
+monitor token). Architecture: [containment-delegation.md](docs/containment-delegation.md).
+
 ## Two sides — engine + cartridge
 
 cyberware is the **engine**; the skills are the **cartridge** — the [**skillChip**](https://github.com/rhCat/skillChip), a separate repo vendored here as the `skillChip/` **git submodule** (the feed-stock cartridge). The engine reads the chip from `registry.SKILLCHIP` — `<repo>/skillChip` by default, or wherever **`$CYBERWARE_SKILLCHIP`** points; swap the chip and the same engine governs a different feed-stock. The chip is self-describing: `skillChip/index.json` is its manifest (every skill + `skill_sha`, plus a roll-up `chip_sha`). The govd container **validates the chip at boot** and can acquire it two ways: baked-local (default) or **`CLOUD_MODE=1`** — a live clone of `CLOUD_SOURCE` at `CLOUD_SOURCE_TAG` (token via `CLOUD_SOURCE_TOKEN` for a private source); see [governance-service.md](docs/governance-service.md).
@@ -92,7 +167,10 @@ refusals then hold **with the in-process scan disabled** — proven by the `cws-
 refused) and budgeted by `cws-bench`. See
 [architecture.md](docs/architecture.md#the-kernel-enforced-execution-boundary-sv-3).
 
-## Quickstart
+## The local pipeline (no server)
+
+The same governance also runs **without** a server — the raw engine stages, end to end. The quickest way
+to see exactly what `executor.py` enforces:
 
 ```sh
 L=examples/pg_ops.select.task-ledger.json
@@ -102,74 +180,6 @@ python3 -m infra.govern.compiler   --ledger $L -o /tmp/run.sh           # → th
 python3 -m infra.govern.oversight  --script /tmp/run.sh                 # OVERSIGHT_RULE
 python3 -m infra.govern.executor   --script /tmp/run.sh --step 1        # governed run (the ONLY channel)
 ```
-
-## Two run modes — cooperative + delegated
-
-Every governed run picks one of two execution modes. The wire is identical and **value-free** in both
-(only the claim and the status cross the boundary); they differ in **who** executes and **where**.
-
-**Cooperative — the agent executes, any OS (the default).** The agent fetches the blessed value-free plan,
-verifies its **own** registry matches the blessed hashes, then runs the porters+cores from that registry
-step by step. govd governs the claim and records status over a per-run WebSocket — it **never executes**
-(`govd_client.run_governed`). Runs anywhere, including macOS.
-
-```sh
-./govd-client --url http://127.0.0.1:5773 --ledger task-ledger.json
-# hardened / remote govd: add --token-file <path>  (or set GOVD_TOKEN_FILE) — the agent's principal
-# Bearer token, read from the file so the raw value never lands in argv. An open/local govd needs none.
-```
-
-Governor image: **`ghcr.io/rhcat/cyberware`** (never executes).
-
-**Delegated — the node executes confined, Linux only.** The agent POSTs the same claim and drives the WS
-but runs **nothing**. govd (in `delegated` exec_mode) mints a single-use **signed grant** and hands it to
-**exod** over a UDS; exod runs each step **confined** (bwrap, or gVisor / `runsc`), drops to uid `nobody`,
-and **Ed25519-signs** the authoritative status. govd records exod's signed status — an agent self-report is
-rejected (`govd_client.run_delegated`). Needs Linux user namespaces / gVisor; not viable on macOS.
-
-```sh
-./govd-client --url http://127.0.0.1:5773 --ledger task-ledger.json --delegated
-```
-
-Body image: **`ghcr.io/rhcat/cyberware-body`** (govd-delegated + exod in one non-root Linux container).
-`exec_mode` is **operator-set** in the govd config (and per-principal), not agent-negotiable; a delegated
-govd with no exod attached refuses every step (fail-closed), and `GET /health` reports `exec_mode` +
-`exod_attached`. Provenance lands in the **server's** ledger — read it with
-`GET /ledger/<run_id>?token=<session_token>` (the run's own session token, not the agent Bearer, not the
-monitor token). Architecture: [containment-delegation.md](docs/containment-delegation.md).
-
-## Run the governed server (Docker)
-
-A **signed** image of the govd governance server is published to GitHub Packages — pull and run an overseen
-govd in one line (it bakes the chip, validates it at boot, and refuses to start on drift):
-
-```sh
-docker run --rm -p 5773:5773 ghcr.io/rhcat/cyberware:latest    # boots govd; prints a monitor token → http://127.0.0.1:5773/
-docker run -p 5773:5773 -v cyberware-govd:/data/govd ghcr.io/rhcat/cyberware:latest   # persist the provenance ledger
-```
-
-Verify the image's signature (keyless cosign via GitHub OIDC — no key to manage):
-
-```sh
-cosign verify ghcr.io/rhcat/cyberware:latest \
-  --certificate-identity-regexp 'https://github.com/rhCat/cyberware/.github/workflows/server-image.yml@.*' \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com
-```
-
-**The image catalog** — four signed images, each published on a `vN.N.N` tag by its workflow; verify any of
-them the same keyless way (substitute the image name and its `*-image.yml` in the `--certificate-identity-regexp`):
-
-| image | built by | what it is |
-|---|---|---|
-| `ghcr.io/rhcat/cyberware` | `server-image.yml` · `Dockerfile` | the **governance server** — lean (govd + TLC); never executes (cooperative mode). |
-| `ghcr.io/rhcat/cyberware-body` | `body-image.yml` · `Dockerfile.body` | **delegated mode** — govd + **exod** confined in one non-root Linux image (bwrap / gVisor). |
-| `ghcr.io/rhcat/cyberware-modelcheck` | `modelcheck-image.yml` | the **full prover** — govd + Apalache + TLAPS for deep model-checking. |
-| `ghcr.io/rhcat/cyberware-compute` | `compute-image.yml` | the CI **compute** environment. |
-
-Serve a **live** chip instead of the baked one: add `-e CLOUD_MODE=1` (clones `rhCat/skillChip` at boot and
-refuses on drift). The image is the **governor** — it observes + governs and never executes; the agent runs the
-blessed plan's porters from its own registry against it. Published on a `vN.N.N` tag (or on demand) by
-[`server-image.yml`](.github/workflows/server-image.yml).
 
 ## Authoring + visualizing
 
@@ -251,7 +261,7 @@ The infra is covered by a real suite under [`tests/`](tests/) — the governance
   case. The proof is **pinned in each skill's `index.json`**, so it can't drift from the tool.
 
 ```sh
-pytest tests          # ~250 tests, a few seconds
+pytest tests          # ~1,200 tests; the unit + integration core is seconds, the per-skill self-tests are the long tail
 ```
 
 CI runs this and **gates on it** (`.github/workflows/codeqc.yml`, regenerated by the `ci-codeqc` skill
