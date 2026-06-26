@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo_flow5.gif" alt="cyberware" width="240">
+  <img src="docs/logo_flow5.gif" alt="cyberware" width="240">
 </p>
 
 # cyberware
@@ -13,6 +13,12 @@ infrastructure the agent cannot reason its way around.
 Reliable, accountable actions are what make **scale** safe: when every action passes the same gate and
 lands in one ledger, you can run a **fleet or swarm** of agents with real control — autonomy that grows
 without surrendering accountability.
+
+<p align="center">
+  <img src="docs/architecture.png" alt="cyberware architecture — four planes (thinking · agent · the cyberware control layer · the execution substrate) with cyberware as the sole gateway between the agent and the substrate" width="100%">
+</p>
+
+<p align="center"><sub>The four planes, with cyberware as the control layer between the agent and the substrate. cyberware is <b>value-free</b>: it governs data <i>access</i> and records value-free provenance, but data and secrets never transit it — they stay in the execution substrate. Deeper dive: <a href="docs/architecture.md">architecture.md</a>.</sub></p>
 
 Blueprints are [L++](https://github.com/rhCat/lpp) (the 4-axiom logic frame). Python is the glue —
 because glue is what this needs.
