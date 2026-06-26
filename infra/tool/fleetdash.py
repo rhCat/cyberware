@@ -49,10 +49,24 @@ def _token(node):
     return os.environ.get("GOVD_MONITOR_TOKEN_" + str(node.get("name", "")).replace("-", "_").upper(), "")
 
 
+_MAX_BODY = 8 * 1024 * 1024                                 # cap a node response we read into memory / mirror to disk
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a, **k):
+        return None                                         # NEVER follow a node redirect
+
+
+# A node could return a 3xx to an attacker host; urllib follows redirects AND keeps the X-Govd-Monitor token
+# header — exfiltrating it. This opener refuses to follow ANY redirect (a 3xx surfaces as an HTTPError, caught
+# by callers), so the monitor token can never leak to a redirect target.
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def _get(url, token=None, timeout=6):
     req = urllib.request.Request(url, headers={"X-Govd-Monitor": token} if token else {})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read())
+    with _OPENER.open(req, timeout=timeout) as r:
+        return json.loads(r.read(_MAX_BODY + 1)[:_MAX_BODY])
 
 
 def _node_monitor(node, path):
@@ -60,14 +74,27 @@ def _node_monitor(node, path):
     return _get(node["url"].rstrip("/") + path, token=_token(node))
 
 
+def _get_raw(url, token=None, timeout=8):
+    """Fetch a non-JSON resource (the flow SVG, a proxied read endpoint) → (content_type, bytes), bounded to
+    _MAX_BODY. The token is added server-side (header), never in the browser URL; redirects are NOT followed
+    (an attacker node can't 302 the token away)."""
+    req = urllib.request.Request(url, headers={"X-Govd-Monitor": token} if token else {})
+    with _OPENER.open(req, timeout=timeout) as r:
+        data = r.read(_MAX_BODY + 1)
+        if len(data) > _MAX_BODY:
+            raise ValueError("node response exceeds the size cap")
+        return r.headers.get("Content-Type", "application/octet-stream"), data
+
+
 # ============================ central mirror (durable copy of every node's ledgers) ============================
 # DEFENSE IN DEPTH: govd's own monitor is value-free, but the CENTER must not TRUST a (possibly compromised /
 # MITM'd) node to be — it persists ONLY these known value-free fields, dropping anything else a node might
 # smuggle into a /monitor/run response (a secret, an oversized blob). Mirrors govd's value-free projections.
-_RUN_KEYS = ("run_id", "ts", "principal", "skill", "perk", "decision", "destructive",
-             "seq", "plan_sha", "var_keys", "problems", "tlc", "restored", "failed", "progress")
+_RUN_KEYS = ("run_id", "ts", "principal", "skill", "perk", "decision", "destructive", "approved",
+             "seq", "plan_sha", "snippet_shas", "credential_ids", "wrapper", "var_keys", "problems",
+             "tlc", "tlc_tla", "tlc_log", "traceparent", "sources", "restored", "failed", "progress")
 _EVENT_KEYS = ("type", "step", "status", "exit", "reason", "span", "authority", "keyid",
-               "snippet_shas", "meter", "ts", "traceparent")
+               "snippet_shas", "meter", "ts", "traceparent", "result_nonce", "exod_keyid", "plan_sha")
 
 
 def _value_free(detail):
@@ -87,9 +114,13 @@ def _mbase(mirror_dir, name):
 
 def _atomic_write(path, obj):
     """Crash-safe write: a unique tmp + os.replace, so a reader never sees a half-written ledger."""
+    _atomic_write_bytes(path, json.dumps(obj).encode())
+
+
+def _atomic_write_bytes(path, data):
     tmp = path + f".tmp.{os.getpid()}.{threading.get_ident()}"
-    with open(tmp, "w") as f:
-        json.dump(obj, f)
+    with open(tmp, "wb") as f:
+        f.write(data)
     os.replace(tmp, path)
 
 
@@ -136,6 +167,14 @@ def mirror_node(node, mirror_dir):
             detail = _value_free(detail)                      # ALLOWLIST — never trust the node to be value-free
             detail["run_id"], detail["_node"], detail["_mirrored_at"] = rid, name, snap.get("now")
             _atomic_write(os.path.join(runs_dir, _safe(rid) + ".json"), detail)
+            svg_path = os.path.join(runs_dir, _safe(rid) + ".svg")
+            if not os.path.exists(svg_path):                  # the blueprint/oversight FLOW svg — record-static, fetch once
+                try:
+                    ct, svg = _get_raw(node["url"].rstrip("/") + "/flow/run/" + urllib.parse.quote(rid), tok)
+                    if svg[:5] in (b"<svg ", b"<?xml"):
+                        _atomic_write_bytes(svg_path, svg)
+                except Exception:
+                    pass
             index[rid] = {k: detail.get(k) for k in
                           ("run_id", "ts", "principal", "skill", "perk", "decision", "destructive")}
             index[rid]["authority"] = _run_authority(detail)
@@ -192,6 +231,24 @@ def load_node_mirror(mirror_dir, name):
 def load_run(mirror_dir, name, run_id):
     """A single run's full mirrored detail (durable — inspectable even when the node is down)."""
     return _read_json(os.path.join(_mbase(mirror_dir, name), "runs", _safe(run_id) + ".json"), None)
+
+
+def load_run_svg(mirror_dir, name, run_id):
+    """The run's mirrored blueprint/oversight flow SVG bytes (offline), or None."""
+    p = os.path.join(_mbase(mirror_dir, name), "runs", _safe(run_id) + ".svg")
+    return open(p, "rb").read() if os.path.isfile(p) else None
+
+
+# the ONLY node sub-paths fleetdash will proxy live (token-injected) — read-only inspection endpoints. The
+# target host is always the configured node (no SSRF to arbitrary hosts); this bounds it to safe read paths.
+_PROXY_PREFIX = ("trace/", "intoto/", "flow/run/", "ledger/", "monitor/run/")
+_PROXY_EXACT = ("catalog", "oversight")
+
+
+def _proxiable(sub):
+    """Whether `sub` is a safe node read-endpoint to proxy. Prefixes require a trailing-slash boundary; catalog
+    and oversight match EXACTLY — so `catalogX` / `oversightWrite` / `govern` are NOT proxiable."""
+    return sub in _PROXY_EXACT or any(sub.startswith(p) for p in _PROXY_PREFIX)
 
 
 def fleet_from_mirror(nodes, mirror_dir, live_health=True):
@@ -321,6 +378,9 @@ _STYLE = """
  .pill{display:inline-block;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:600}
  .pill.approval{background:#3d1418;color:#ffb4ac} .pill.high{background:#3a2c0a;color:#e3b341} .pill.reject{background:#21262d;color:#8b949e}
  .off{color:#f85149;font-size:11px} .stalez{color:#6e7681;font-size:11px}
+ pre{background:#161b22;border:1px solid #21262d;border-radius:6px;padding:10px;overflow:auto;max-height:340px;color:#8b949e;white-space:pre-wrap;word-break:break-word}
+ details{margin:6px 0} summary{cursor:pointer;color:#58a6ff;padding:4px 0}
+ img{display:block;margin:8px 0}
 """
 
 
@@ -433,12 +493,21 @@ def render_node(node, summary, refresh=5):
     return _page(f"{node.get('name')} — node board", content, refresh)
 
 
-def render_run(name, run_id, detail):
-    """Per-run detail from the mirror: steps, exod authority, decision, problems, plan hash — local-monitor parity."""
+def _details(summary, inner):
+    return f'<details><summary>{summary}</summary>{inner}</details>'
+
+
+def render_run(name, run_id, detail, has_svg=False):
+    """Per-run LEDGER INSPECTION — local-monitor parity from the durable mirror: the full value-free record
+    (claim + approval, the step plan, the event chain, plan + closure pins, the model-check + provenance) + the
+    blueprint/oversight FLOW svg + a raw-JSON view. Fully inspectable even when the node is OFFLINE."""
     back = f'<a class="back" href="/node/{_esc(name)}">← {_esc(name)}</a>'
     if not detail:
         return _page("run", back + f'<h1>run {_esc(run_id)}</h1>'
                      '<p class="muted">not in the central mirror (the node may not have run it, or the mirror has not polled it yet)</p>')
+    rid, node_e = _esc(run_id), _esc(detail.get("_node", name))
+    dcls = {"allow": "ok", "reject": "no", "push_back": "warn"}.get(detail.get("decision"), "")
+
     by_step = {e.get("step"): e for e in detail.get("events", []) if e.get("type") == "step_result"}
     granted = {e.get("step") for e in detail.get("events", []) if e.get("type") == "granted"}
     srows = []
@@ -448,20 +517,66 @@ def render_run(name, run_id, detail):
                  else "granted" if str(i) in granted else "pending")
         cls = {"ok": "ok", "error": "no", "granted": "warn"}.get(state, "")
         srows.append(f'<tr><td>{i}</td><td>{_esc(tool)}</td><td>{_esc((e or {}).get("authority","—"))}</td>'
-                     f'<td class="{cls}">{_esc(state)}</td></tr>')
-    steps = "".join(srows) or '<tr><td colspan="4" class="muted">no steps recorded</td></tr>'
-    dcls = {"allow": "ok", "reject": "no", "push_back": "warn"}.get(detail.get("decision"), "")
+                     f'<td>{_esc((e or {}).get("exit","—"))}</td><td class="{cls}">{_esc(state)}</td></tr>')
+    steps = "".join(srows) or '<tr><td colspan="5" class="muted">no steps declared</td></tr>'
+
+    chain = "".join(                                          # the event chain — the ledger itself
+        f'<tr><td>{_esc(e.get("type"))}</td><td>{_esc(e.get("step","—"))}</td>'
+        f'<td>{_esc(e.get("status","—"))}</td><td>{_esc(e.get("authority","—"))}</td>'
+        f'<td><code>{_esc(str(e.get("exod_keyid") or e.get("keyid") or "")[:18]) or "—"}</code></td>'
+        f'<td class="t">{_esc(str(e.get("ts"))[:19])}</td></tr>'
+        for e in detail.get("events", [])) or '<tr><td colspan="6" class="muted">no events recorded</td></tr>'
+
+    snip = detail.get("snippet_shas") or {}
+    sniprows = "".join(f'<tr><td>{_esc(k)}</td><td><code>{_esc(str(v)[:32])}</code></td></tr>'
+                       for k, v in snip.items()) or '<tr><td colspan="2" class="muted">none</td></tr>'
     probs = ", ".join((p.get("id", "?") if isinstance(p, dict) else str(p))
                       for p in detail.get("problems", [])) or "none"
+    tlc = detail.get("tlc")
+    tlc_str = ("✓ proven" if tlc in (True, "ok", "pass") else "—" if tlc in (None, "") else _esc(tlc))
+    tp = detail.get("traceparent") or ""
+
+    extras = ""
+    if detail.get("wrapper"):
+        extras += _details("blessed wrapper (run.sh)", f'<pre>{_esc(detail["wrapper"])}</pre>')
+    if detail.get("tlc_tla"):
+        extras += _details("model-check spec (TLA+)", f'<pre>{_esc(detail["tlc_tla"])}</pre>')
+    if detail.get("tlc_log"):
+        extras += _details("model-check log", f'<pre>{_esc(detail["tlc_log"])}</pre>')
+    flow = (f'<h2>flow — blueprint &amp; oversight</h2><img src="/flow/{node_e}/{rid}" alt="run flow" '
+            'style="max-width:100%;background:#fff;border-radius:8px;padding:6px">' if has_svg else "")
+
     content = (back + f'<h1>{_esc(detail.get("skill"))}/{_esc(detail.get("perk"))} '
                f'<span class="{dcls}">{_esc(detail.get("decision"))}</span> {_risk_pill(detail)}</h1>'
-               f'<p class="kv">where <b>{_esc(detail.get("_node", name))}</b> · who <b>{_esc(detail.get("principal","?"))}</b> · when '
-               f'<b>{_esc(str(detail.get("ts"))[:19])}</b> · destructive <b>{_esc(detail.get("destructive",False))}</b> · '
-               f'run <code>{_esc(run_id)}</code></p>'
-               f'<p class="kv">plan_sha <code>{_esc((detail.get("plan_sha") or "")[:24])}</code> · '
-               f'var_keys <b>{_esc(detail.get("var_keys",[]))}</b> · problems <b>{_esc(probs)}</b></p>'
-               f'<h2>steps</h2><table><thead><tr><th>#</th><th>tool</th><th>exec (authority)</th>'
-               f'<th>state</th></tr></thead><tbody>{steps}</tbody></table>')
+               f'<p class="kv">where <b>{node_e}</b> · who <b>{_esc(detail.get("principal","?"))}</b> · when '
+               f'<b>{_esc(str(detail.get("ts"))[:19])}</b> · run <code>{rid}</code> · '
+               f'<a href="/raw/{node_e}/{rid}">raw ledger ↗</a></p>'
+
+               '<h2>claim &amp; approval</h2>'
+               f'<p class="kv">destructive <b>{_esc(detail.get("destructive",False))}</b> · '
+               f'approved <b>{_esc(detail.get("approved",[]) or "—")}</b> · '
+               f'credential keys <b>{_esc(detail.get("credential_ids",[]) or "—")}</b> · '
+               f'problems <b class="{"no" if probs != "none" else ""}">{_esc(probs)}</b></p>'
+
+               f'<h2>steps</h2><table><thead><tr><th>#</th><th>tool</th><th>exec (authority)</th><th>exit</th>'
+               f'<th>state</th></tr></thead><tbody>{steps}</tbody></table>'
+
+               f'<h2>ledger — event chain ({len(detail.get("events",[]))})</h2>'
+               f'<table><thead><tr><th>type</th><th>step</th><th>status</th><th>authority</th><th>keyid</th>'
+               f'<th>when</th></tr></thead><tbody>{chain}</tbody></table>'
+
+               '<h2>plan &amp; closure</h2>'
+               f'<p class="kv">plan_sha <code>{_esc((detail.get("plan_sha") or "")[:32]) or "—"}</code> · '
+               f'var_keys <b>{_esc(detail.get("var_keys",[]))}</b></p>'
+               f'<table><thead><tr><th>closure file</th><th>pinned sha256</th></tr></thead><tbody>{sniprows}</tbody></table>'
+
+               '<h2>verification &amp; provenance</h2>'
+               f'<p class="kv">model-check <b class="{"ok" if tlc in (True,"ok","pass") else ""}">{tlc_str}</b> · '
+               f'traceparent <code>{_esc(tp[:40]) or "—"}</code> · '
+               f'<a href="/proxy/{node_e}/trace/{rid}">trace ↗</a> · '
+               f'<a href="/proxy/{node_e}/intoto/{rid}">in-toto ↗</a></p>'
+               + (f'<h2>artifacts</h2>{extras}' if extras else "")
+               + flow)
     return _page(f"run {run_id}", content)
 
 
@@ -489,12 +604,14 @@ def serve(nodes, port, refresh, mirror_dir, mirror_interval):
             pass
 
         def _send(self, code, page):
-            b = page.encode()
+            self._bytes(code, "text/html; charset=utf-8", page.encode())
+
+        def _bytes(self, code, ctype, data):
             self.send_response(code)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(b)))
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
             self.end_headers()
-            self.wfile.write(b)
+            self.wfile.write(data)
 
         def do_GET(self):
             parts = [urllib.parse.unquote(s) for s in
@@ -512,11 +629,47 @@ def serve(nodes, port, refresh, mirror_dir, mirror_interval):
                         return self._send(404, _page("404", '<a class="back" href="/">← fleet</a><p class="muted">unknown node</p>'))
                     results, _ = fleet_from_mirror([node], mirror_dir)
                     return self._send(200, render_node(node, results[0], refresh))
-                if parts[0] == "run" and len(parts) == 3:           # per-run detail (durable mirror)
+                if parts[0] == "run" and len(parts) == 3:           # per-run LEDGER INSPECTION (durable mirror)
                     node = by_name.get(parts[1])
                     if not node:
                         return self._send(404, _page("404", '<a class="back" href="/">← fleet</a><p class="muted">unknown node</p>'))
-                    return self._send(200, render_run(node["name"], parts[2], load_run(mirror_dir, node["name"], parts[2])))
+                    has_svg = load_run_svg(mirror_dir, node["name"], parts[2]) is not None if mirror_dir else False
+                    return self._send(200, render_run(node["name"], parts[2],
+                                                      load_run(mirror_dir, node["name"], parts[2]) if mirror_dir else None,
+                                                      has_svg))
+                if parts[0] == "raw" and len(parts) == 3:           # the raw ledger record (value-free JSON)
+                    node = by_name.get(parts[1])
+                    detail = load_run(mirror_dir, node["name"], parts[2]) if node and mirror_dir else None
+                    body = _esc(json.dumps(detail, indent=2)) if detail else "not in the mirror"
+                    return self._send(200, _page("raw ledger", f'<a class="back" href="/run/{_esc(parts[1])}/{_esc(parts[2])}">← run</a>'
+                                                 f'<h1>raw ledger · {_esc(parts[2])}</h1><pre>{body}</pre>'))
+                if parts[0] == "flow" and len(parts) == 3:          # the blueprint/oversight SVG (mirror, else live)
+                    node = by_name.get(parts[1])
+                    if not node:
+                        return self._send(404, _page("404", "unknown node"))
+                    svg = load_run_svg(mirror_dir, node["name"], parts[2]) if mirror_dir else None
+                    if svg is None:                                 # not mirrored — proxy live (token server-side)
+                        try:
+                            _ct, svg = _get_raw(node["url"].rstrip("/") + "/flow/run/" + urllib.parse.quote(parts[2]), _token(node))
+                        except Exception:
+                            svg = None
+                    if not svg:
+                        return self._send(404, _page("404", "no flow recorded"))
+                    return self._bytes(200, "image/svg+xml; charset=utf-8", svg)
+                if parts[0] == "proxy" and len(parts) >= 3:         # token-injecting read proxy to a node endpoint
+                    node = by_name.get(parts[1])
+                    sub = "/".join(parts[2:])
+                    if not node or not _proxiable(sub):
+                        return self._send(404, _page("404", "not proxiable"))
+                    try:
+                        _ct, data = _get_raw(node["url"].rstrip("/") + "/" + urllib.parse.quote(sub, safe="/"), _token(node))
+                        # NEVER pass the node's Content-Type through — a node returning text/html would XSS the
+                        # dashboard origin. Serve every proxied read as inert text/plain (raw JSON is readable).
+                        return self._bytes(200, "text/plain; charset=utf-8", data)
+                    except urllib.error.HTTPError as e:
+                        return self._send(e.code, _page("upstream", f'<p class="muted">node returned HTTP {e.code}</p>'))
+                    except Exception as e:
+                        return self._send(502, _page("upstream", f'<p class="muted">{_esc(type(e).__name__)}</p>'))
                 return self._send(404, _page("404", '<p class="muted">not found</p>'))
             except Exception as e:
                 return self._send(500, _page("error", f'<p class="muted">{_esc(e)}</p>'))
