@@ -129,7 +129,11 @@ For a hosted channel, **`infra/govern/govd.py`** is a governance **control/audit
 **claim** (skill, perk, var **keys** — never values, files, or secrets), and govd blesses a **value-free
 plan** (sequence + snippet sha256s + wrapper) from its **own** trusted registry and pins the plan's
 sha256. The agent binds its own vars **locally** and runs **locally**, holding a **WebSocket** that
-reports **status** only; govd monitors the plan **hash** and owns the provenance ledger. Secrets are never
+reports **status** only; govd monitors the plan **hash** and owns the provenance ledger. That is
+**cooperative** mode (the default). In **delegated** mode (the `cyberware-body` image, Linux) govd mints a
+single-use signed grant and **exod** — a separate confined OS principal — runs each step and Ed25519-signs
+the authoritative status; the agent runs **nothing** (`./govd-client … --delegated`). See
+[`docs/containment-delegation.md`](docs/containment-delegation.md). Secrets are never
 plaintext — pass a `*_FILE` pointer read at runtime via `cat`. Destructive perks gate on declared
 approval. `docker build -t cyberware-govd . && docker run -p 5773:5773 cyberware-govd`, or
 `python3 -m infra.govern.govd --mode local`.

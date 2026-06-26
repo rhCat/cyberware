@@ -38,14 +38,21 @@ provenance ledger. Like a bank session: the ledger, not the contents of your box
 ```
 GET  /health                          -> {status, mode, host, port, registry, chip_sha, chip, runs}
 GET  /catalog                         -> value-free discovery: skills · perks · var-KEYS · skill_sha · verified
+GET  /price?skill=…&perk=…[&model&mode] -> value-free USAGE QUOTE before a run (LLM cost + tool fee, itemized; total reconciles to a Stripe charge; ungated)
 GET  /flow/run/<run_id>?token=…        -> THIS run's task-blueprint SVG (perk's gated sequence; value-free; monitor-gated)
 GET  /flow/<skill>                     -> the skill's generic lifecycle blueprint.svg (value-free; ungated)
 POST /govern  {skill, perk, var_keys, approve?}
        -> 200 allow      {run_id, decision, plan, plan_sha, session_token, ws}     plan = sequence+wrapper+hashes
           409 push_back  {run_id, decision, needs_approve, ...}                    destructive perk → approve
           403 reject     {run_id, decision, problems, ...}                         (bad key / secret key / missing input)
-GET  /ledger/<run_id>?token=…          -> the server-side provenance chain (requires the run's token)
+GET  /ledger/<run_id>?token=…          -> the server-side provenance chain (requires the run's SESSION token — not the agent Bearer, not the monitor token)
+GET  /monitor/state                   -> dashboard snapshot: runs · decisions · live feed (value-free; monitor-token gated)
+GET  /monitor/stream                  -> Server-Sent-Events push of the snapshot on change (monitor-token gated)
+GET  /monitor/run/<run_id>            -> one run's value-free detail for the dashboard (monitor-token gated)
+GET  /trace/<run_id>                  -> the run's cross-plane trace: claim→grant→step spans (monitor-token gated)
+GET  /intoto/<run_id>                 -> the run's in-toto provenance statement (monitor-token gated)
 ```
+(`/oversight` is a **WebSocket**, not HTTP — see the WebSocket section below.)
 
 The `plan` is value-free **and code-free**: `{skill, perk, sequence, wrapper, snippet_shas, skill_sha}`.
 `snippet_shas` is the perk's whole `src/` closure (every `.sh` porter **and** `.py` core) taken from the

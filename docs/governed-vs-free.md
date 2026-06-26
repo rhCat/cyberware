@@ -109,7 +109,7 @@ free for discovery, governed for commitment — drawn across the whole industry.
 
 ## Honest status
 
-cyberware is a research/build project — **v1.1, building in the open**, with an MIT-licensed chip — that
+cyberware is a research/build project — **v1.1 closed, still building in the open**, with an MIT-licensed chip — that
 **dogfoods its own governance** (it builds itself through itself). The security ladder is closed except one
 brick gated on hardware (the microVM perf budget needs `/dev/kvm`); the settlement plane and additional skill
 sources are in progress. No users-served, throughput, or social-proof claims are made here; the architecture

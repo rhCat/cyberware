@@ -401,7 +401,7 @@
   <section id="govern" aria-labelledby="s3h">
     <div class="eyebrow"><span class="sec-idx">03</span> / how it governs — the value-free plan</div>
     <h2 class="sec-h" id="s3h"><span class="gsig">▸</span>The governor blesses a plan that carries no code and no secrets.</h2>
-    <p class="lead">The agent sends govd a CLAIM — skill, perk, variable KEYS — never values, never files, never secrets, never code. govd checks it against ITS OWN trusted registry, model-checks the workflow, and blesses a PLAN: a tool sequence plus each snippet's sha256 plus a <span class="cyan">${VAR}</span> wrapper. The agent binds its secrets locally and runs the steps from its own verified registry.</p>
+    <p class="lead">The agent sends govd a CLAIM — skill, perk, variable KEYS — never values, never files, never secrets, never code. govd checks it against ITS OWN trusted registry, model-checks the workflow, and blesses a PLAN: a tool sequence plus each snippet's sha256 plus a <span class="cyan">${VAR}</span> wrapper. The agent binds its secrets locally and runs the steps from its own verified registry — that is <strong>cooperative</strong> mode (any OS). In <strong>delegated</strong> mode (a Linux <em>body</em>) a separate confined OS principal, <strong>exod</strong>, runs each step and Ed25519-signs the authoritative status instead; the agent runs nothing. The wire is identical and value-free either way, and the mode is the operator's choice, not the agent's.</p>
 
     <div class="pane">
       <div class="pane-bar"><span class="dot b"></span><span class="dot"></span><span class="pane-title">wire · only a hash crosses</span></div>
