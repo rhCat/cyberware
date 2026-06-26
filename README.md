@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo_flow5.gif" alt="cyberware" width="240">
+</p>
+
 # cyberware
 
 **A verifiable governance runtime for skill execution.** Same infrastructure as the Cyberware
