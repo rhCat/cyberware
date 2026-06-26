@@ -4,7 +4,9 @@ description: >-
   Run real operational tasks — filesystem, git, docker, http, postgres, search, code-quality, releases,
   and more — through cyberware's GOVERNED channel instead of ad-hoc shell. You emit only a CLAIM (a skill,
   a perk, and your var KEYS) and run the value-free plan the governance server blesses; you never write,
-  paste, or improvise the commands. Reach for this whenever a task maps to a governed skill.
+  paste, or improvise the commands. Two execution modes: cooperative (default — you run the blessed plan
+  from your own registry, any OS) and delegated (`--delegated`, a Linux body whose exod runs each step
+  confined and signs it; you run nothing). Reach for this whenever a task maps to a governed skill.
 ---
 
 # cyberware — the governed channel for an agent
@@ -18,7 +20,7 @@ plan from your **own** registry under live oversight and read back a verdict. Th
 > *claim* (names + var KEYS) and *status*. The skill code is the registry's, blessed by hash — never
 > yours to author. Your only output is the claim and the call.
 
-Set `GOVD` to the server (e.g. `export GOVD=http://127.0.0.1:5773`). The repo ships `./govd-client`.
+Set `GOVD_URL` to the server (e.g. `export GOVD_URL=http://127.0.0.1:5773`). The repo ships `./govd-client`.
 
 ## The loop — five steps
 
@@ -27,7 +29,7 @@ Set `GOVD` to the server (e.g. `export GOVD=http://127.0.0.1:5773`). The repo sh
 **2 · Discover, then read the sub-skill.** Ask govd what it governs:
 
 ```sh
-./govd-client --url $GOVD --discover          # or just: GET $GOVD/catalog
+./govd-client --url $GOVD_URL --discover          # or just: GET $GOVD_URL/catalog
 ```
 
 You get every governed **skill**, its **perks**, each perk's **var KEYS** (required/optional), and a
@@ -38,6 +40,7 @@ status for *your* copy of each:
 | `verified` | govd governs it **and** your registry matches the blessed hash | **yes** |
 | `drift` | your copy differs from the governed one | no — reconcile first |
 | `unverified` | a **new** skill govd's image has never seen | no — add it, rebuild the image |
+| `server_drift` | govd's **own** copy of the skill fails its authenticity index — its blessing is untrustworthy | no — wait for a govd image rebuild |
 
 Pick a **`verified`** skill + perk, then read its `skillChip/<skill>/SKILL.md` and the perk's
 `perks/<perk>/metadata.json` (rules · usage · limitation · example) for the inputs. **Discovery + the
@@ -57,7 +60,9 @@ call. You do **not** write commands, scripts, or a `run.sh`.
 ```
 
 ```sh
-./govd-client --url $GOVD --ledger task-ledger.json
+./govd-client --url $GOVD_URL --ledger task-ledger.json
+# hardened / remote govd: add --token-file <path> (or GOVD_TOKEN_FILE) — your principal Bearer token,
+# read from the file so the raw value never lands in argv. An open/local govd needs none.
 ```
 
 `fetch` sends govd the var **keys** only (`SEARCH_DIR`, `MIN_SIZE`) — never the values. **Secrets are
@@ -76,11 +81,22 @@ the composition + TLA⁺/TLC model check, and returns one of:
 - **`reject`** → bad var key, a plaintext secret, a missing input, registry drift, or a deadlock. Fix the
   *claim* — never route around the refusal.
 
+The loop above is **cooperative** mode (the default): you run the porters+cores from your registry and
+report status only. Against a Linux **body** you can run **delegated** instead — add `--delegated`:
+
+```sh
+./govd-client --url $GOVD_URL --ledger task-ledger.json --delegated
+```
+
+govd hands a signed grant to **exod**, which runs each step confined and Ed25519-signs the authoritative
+status; you run **nothing**, and govd records exod's status (an agent self-report is rejected). Either way
+the wire is value-free and you read the same verdict. See [containment-delegation.md](docs/containment-delegation.md).
+
 You never edit the blessed `run.sh`: a tamper snapshot refuses on drift, and the WS gate refuses any step
 whose `plan_sha` or upstream order doesn't match the pinned plan.
 
 **5 · Read the verdict, move on.** The call returns `{decision, plan_sha, results:[{step, exit}], ledger}`.
-The full provenance is govd's, at `GET $GOVD/ledger/<run_id>?token=…`. Confirm the steps ran `ok`, note the
+The full provenance is govd's, at `GET $GOVD_URL/ledger/<run_id>?token=…`. Confirm the steps ran `ok`, note the
 `plan_sha`, continue. Done.
 
 ## Never

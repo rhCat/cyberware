@@ -1,8 +1,11 @@
 # Containment via exod delegation (v1.1 full-close headline)
 
-**Status (2026-06-22):** the foundation is merged AND the live wiring is **built + adversarially reviewed**;
-all 8 confirmed review findings are folded in (see *Review findings folded in* below). Remaining: push +
-PR + CI + merge, then the exec-image (Linux+bwrap) validation pass on the action-runner node.
+**Status (2026-06-26): SHIPPED (v1.1 closed).** Delegation is live: govd in `delegated` exec_mode hands a
+single-use **signed grant** to **exod**, which runs each step confined (bwrap / gVisor) and **Ed25519-signs**
+the authoritative status — govd never executes. The **`cyberware-body`** image unifies govd-delegated + exod
+in one non-root Linux container (`ghcr.io/rhcat/cyberware-body`, `Dockerfile.body`). Cooperative
+(`run_governed`) stays the default; delegated (`run_delegated`, `--delegated`) is opt-in and Linux-only. The
+sections below record the design verdict, what shipped, and the adversarial review that hardened it.
 
 ## The decision (design-panel verdict)
 govd **delegates to exod the limb** over the UDS — it does **not** execute itself. Decisive reasons,
@@ -23,7 +26,9 @@ stub**; execution lives only in exod.
   (`grant.credentials`, signed) via its own vault and injects them into the confined step's profile env
   (`--setenv` after `--clearenv`); fail-closed without a vault. Tests in `tests/test_exod.py`.
 
-## Remaining build plan (the live wiring — the next PR)
+## The live wiring (shipped in v1.1)
+All eight items below landed and are covered by tests + adversarial review — this is the as-built map.
+
 1. **exod sidecar `__main__`** (`infra/exec/exod.py`): a CLI that loads exod's identity key + the trusted
    grant-issuer pub (`keystore.FileKeyStore`) + a `FileVault`/`SopsAgeVault`, then `Exod(...).serve(socket)`.
    This is what the exec-image sidecar/systemd unit runs.
@@ -48,10 +53,11 @@ stub**; execution lives only in exod.
    `forged_status_refused`. Client mode unchanged.
 5. **Reject agent self-report in delegated mode**: govd already recorded exod's authoritative result, so an
    agent-sent `step_result` is a no-op refusal via `result_acceptable`'s already-recorded path.
-6. **Retire `govd_executor.serve`** to a refusing stub (`{status:'refused', reason:'execution_moved_to_exod'}`),
-   keeping the never-root selftest semantics. Execution lives ONLY in exod.
-7. **`GET /health`** exposes `exod:{reachable, keyid}`; a delegated govd that can't reach exod refuses every
-   step (fail-closed) and `/health` shows it.
+6. **`govd_executor.serve` stays a working reference** for the server-side **cooperative** model (the
+   never-root selftest + backward-compat) — it was *not* retired to a stub. Confinement lives in **exod** for
+   **delegated** mode only; the two coexist and the operator selects per principal via `exec_mode`.
+7. **`GET /health`** exposes `exec_mode` + `exod_attached` (top-level); a delegated govd that can't reach
+   exod refuses every step (fail-closed) and `/health` shows it.
 8. **`govd_client.run_delegated()`** — a thin variant that sends `step_request` and loops on acks, spawning
    NOTHING. `run_governed` stays the legacy cooperative local-dev mode (untouched).
 
@@ -95,14 +101,15 @@ allowlist to a denylist (any staged non-`contracts.json` file is refused).
   the real exod meter.
 - **Full multi-agent adversarial review before merge** (enforcement-surface + a security-critical rewire).
 
-## Docs/claims to fix when it lands
-- `govd.py` header + boot banner: keep "never executes", ADD delegated mode (authoritative status is exod's
-  signed result); document `exec_mode` + the `exod.*` config keys.
-- `govd_executor.py` docstring: record execution moved to exod (module retired to a stub); update the
-  `exec-never-root` memory.
-- The gh-pages homepage / status report: stop describing the DEFAULT path as containment until delegated
-  mode ships; state plainly that the cooperative path runs client-side unconfined and confinement is
-  delivered via exod (delegated mode) on the exec image.
+## Follow-ups (post-ship)
+- The `/health` `exec_mode` + `exod_attached` surface has shipped; the README ("Two run modes" + the image
+  catalog), SKILL.md, cyberware.md, and the homepage now state both modes plainly — the cooperative path
+  runs client-side (unconfined by the kernel; the agent's own host), and confinement is delivered via exod
+  (delegated mode) on the `cyberware-body` Linux image.
+- Open: the `govd.py` module header + boot banner still describe the cooperative path only — keep "never
+  executes" but add delegated mode (the authoritative status is exod's signed result) and document
+  `exec_mode` + the `exod.*` config keys. (`govd_executor.py`'s docstring is correct as the cooperative
+  reference — see item 6 above; no change needed there.)
 
 ## Known boundary — delegated mode requires self-contained, flat-src perks
 The closure gate verifies a perk's OWN top-level `src` against the grant pin. Two perk shapes are therefore
