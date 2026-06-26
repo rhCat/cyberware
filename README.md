@@ -58,43 +58,52 @@ Serve a **live** chip instead of the baked one: add `-e CLOUD_MODE=1` (clones `r
 refuses on drift). Published on a `vN.N.N` tag (or on demand) by
 [`server-image.yml`](.github/workflows/server-image.yml).
 
-### 2 · Run a task — cooperative or delegated
+### 2 · Run a task — same govd, two places the work can run
 
-The agent holds only a **token + the endpoint**; it sends the value-free **claim** and runs the plan govd
-blesses. **govd itself never executes — in either mode.** What differs is *who* runs the blessed steps and
-*where*:
+Both modes start the **same way**: the agent holds only a **token + the endpoint**, sends govd a value-free
+**claim** (skill, perk, var KEYS), and govd blesses a plan. **govd governs every run, on any OS — that part
+never changes.** All you choose is **who runs the blessed steps, and where:**
 
-**Cooperative (the default — runs on any OS).** The **agent** executes: it fetches the blessed value-free
-plan, verifies its own registry matches the blessed hashes, and runs the steps itself on its own host,
-reporting status to govd over a per-run WebSocket. govd governs the claim and records provenance — it runs
-nothing. Because the agent does the running, this works **anywhere, including macOS**.
+```
+                          ┌─ COOPERATIVE (default) → the AGENT runs the steps, on its own machine → any OS
+  agent ─claim→ govd ─────┤
+   (governs + blesses)    └─ DELEGATED (opt-in)    → EXOD runs them confined on a node, + signs   → Linux only
+```
+
+Either way, every run lands in **one ledger**. The difference is purely *who executes and where* — not
+whether you can use govd.
+
+**Cooperative** is the default and runs **anywhere (macOS, Linux, …)**: the agent fetches the blessed plan,
+checks its own copy matches the blessed hashes, and runs the steps itself, reporting status to govd over a
+WebSocket. govd records everything and runs nothing.
 
 ```sh
 ./govd-client --url http://127.0.0.1:5773 --ledger task-ledger.json
-# hardened / remote govd: add --token-file <path>  (or set GOVD_TOKEN_FILE) — the agent's principal
-# Bearer token, read from the file so the raw value never lands in argv. An open/local govd needs none.
+# hardened / remote govd: add --token-file <path> (or GOVD_TOKEN_FILE) — the agent's Bearer token,
+# read from the file so the raw value never lands in argv. An open / local govd needs none.
 ```
 
-Governor image: **`ghcr.io/rhcat/cyberware`**.
-
-**Delegated (Linux nodes — confined execution).** The **agent runs nothing**. govd mints a single-use
-**signed grant** and hands it to **exod** — a separate OS principal — which runs each step **confined**,
-drops to an unprivileged uid (`nobody`), and **Ed25519-signs** the authoritative status; govd records that
-signed status (an agent self-report is rejected). The confinement is the whole point, and it is built on
-**Linux kernel sandboxing** — bubblewrap's unprivileged user namespaces, or gVisor / `runsc`. That is why
-delegated mode needs a **Linux** node: macOS has no equivalent, so confined execution isn't available there
-(cooperative still is).
+**Delegated** (add `--delegated`) hands the run to the **node** instead of the agent: govd mints a single-use
+signed grant for **exod** — a separate, locked-down OS user — which runs each step inside a **sandbox**, drops
+to an unprivileged uid, and **Ed25519-signs** the result, so the ledger trusts the node, not the agent.
 
 ```sh
 ./govd-client --url http://127.0.0.1:5773 --ledger task-ledger.json --delegated
 ```
 
-Body image: **`ghcr.io/rhcat/cyberware-body`** (govd-delegated + exod in one non-root Linux container).
-`exec_mode` is **operator-set** in the govd config (and per-principal), not agent-negotiable; a delegated
-govd with no exod attached refuses every step (fail-closed), and `GET /health` reports `exec_mode` +
-`exod_attached`. Provenance lands in the **server's** ledger — read it with
-`GET /ledger/<run_id>?token=<session_token>` (the run's own session token, not the agent Bearer, not the
-monitor token). Architecture: [containment-delegation.md](docs/containment-delegation.md).
+`exec_mode` is **operator-set** on the govd (per node, per principal) — the agent can't pick it; a delegated
+govd with no exod attached refuses every step (fail-closed), and `GET /health` shows `exec_mode` +
+`exod_attached`. The signed provenance lands in the **server's** ledger, read with
+`GET /ledger/<run_id>?token=<session_token>`.
+
+> **cyberware is not Linux-only.** govd (the governance) and cooperative execution run on **any OS**, Mac
+> included. The *only* thing that needs Linux is the **delegated sandbox** — bubblewrap and gVisor are Linux
+> kernel features with no macOS equivalent. Delegated is an optional **confinement upgrade** you switch on
+> per node, never a requirement to use cyberware.
+
+Images: **`ghcr.io/rhcat/cyberware`** (the governor — any OS) and, for delegated nodes,
+**`ghcr.io/rhcat/cyberware-body`** (govd + exod, Linux). Architecture:
+[containment-delegation.md](docs/containment-delegation.md).
 
 ## Two sides — engine + cartridge
 
