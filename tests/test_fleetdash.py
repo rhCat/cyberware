@@ -250,6 +250,46 @@ def test_node_redirect_is_not_followed_so_the_token_cannot_be_exfiltrated():
     assert F._NoRedirect().redirect_request("req", "fp", 302, "msg", {}, "http://attacker.example/steal") is None
 
 
+def test_embed_serves_trusted_spa_with_a_prefix_and_polling_shim():
+    """The iframe gets the TRUSTED repo dashboard (not the node's HTML) with a shim injected BEFORE it that
+    prefixes fetches to /embed/<node>/ and emulates EventSource by polling — so no node HTML/JS reaches the
+    dashboard origin and no SSE-streaming proxy is needed."""
+    html = F._embed_html("dgx-spark", "NONCE123").decode()
+    assert "govd_monitor_token" in html                       # it IS the real local-monitor SPA
+    assert '"/embed/dgx-spark"' in html and "window.fetch=function" in html   # path-prefix shim
+    assert "window.EventSource=function" in html and "/monitor/state" in html  # SSE→polling shim
+    # the shim must appear BEFORE the SPA's own "use strict" script so its overrides are in place first
+    assert html.index("window.EventSource=function") < html.index('"use strict"')
+    # every inline script is nonce-stamped (so a CSP script-src 'nonce-…' runs THESE but blocks injected handlers)
+    assert '<script nonce="NONCE123">' in html and "<script>" not in html
+
+
+def test_sanitize_svg_strips_active_content():
+    dirty = (b'<svg xmlns="http://www.w3.org/2000/svg" onload="root()"><script>steal()</script>'
+             b'<rect onload="x()" onclick="y()" width="1" height="1"/>'
+             b'<a xlink:href="javascript:evil()">t</a>'
+             b'<image href="JavaScript:bad()"/>'
+             b'<foreignObject><body onload="z()"></body></foreignObject></svg>')
+    clean = F._sanitize_svg(dirty).lower()
+    for bad in (b"<script", b"onload", b"onclick", b"javascript:", b"<foreignobject"):
+        assert bad not in clean, bad
+    assert b"<rect" in clean and b"<svg" in clean             # the harmless geometry survives
+
+
+def test_embed_allowlist():
+    assert F._embed_proxiable("monitor/state") and F._embed_proxiable("monitor/run/r1") and F._embed_proxiable("flow/run/r1")
+    for bad in ("govern", "ledger/r1", "oversight", "catalog", "monitor/stream", "../x", "monitor/statex"):
+        assert not F._embed_proxiable(bad), bad
+
+
+def test_render_node_iframe_live_vs_offline():
+    node = {"name": "dgx-spark", "role": "body", "url": "http://x:5773"}
+    live = F.render_node_iframe(node, reachable=True)
+    assert '<iframe src="/embed/dgx-spark/?token=proxied"' in live and "/mnode/dgx-spark" in live
+    off = F.render_node_iframe(node, reachable=False)
+    assert "offline" in off and "<iframe" not in off and "/mnode/dgx-spark" in off   # falls back to the mirror board
+
+
 def test_safe_runid_blocks_path_traversal():
     for evil in ("../../etc/passwd", "..", "a/b\\c", "..\\..\\x", "/abs/path"):
         s = F._safe(evil)
