@@ -20,6 +20,7 @@ the chain's own canonical link digest (the tamper-detection column the reconcile
 from __future__ import annotations
 import json
 import os
+import threading
 
 from infra.store import chainstore
 
@@ -61,6 +62,14 @@ class SqliteWalBackend(StoreBackend):
     def __init__(self, db_path):
         self.db_path = os.path.abspath(os.path.expanduser(db_path))
         self.cx = None
+        # The connection is opened check_same_thread=False and is genuinely shared across threads: the mirror
+        # writer (infra/store/mirror._drain), the lease guard it calls (LeaseManager.held → lease_holder), and the
+        # main / renew path all touch ONE cx (lease.ha_selftest; govd HA become_active). Python's sqlite3 does NOT
+        # serialize concurrent use of a single connection — interleaving statements, especially across a lease
+        # method's BEGIN IMMEDIATE…COMMIT, raises SQLITE_MISUSE ("bad parameter or other API misuse"). Serialize
+        # every cx access through this lock so each statement / transaction is atomic per-connection. (WAL +
+        # busy_timeout already cover the cross-CONNECTION case; this covers the cross-THREAD, same-cx case.)
+        self._lock = threading.RLock()
 
     def configured(self) -> bool:
         return True
@@ -68,125 +77,142 @@ class SqliteWalBackend(StoreBackend):
     def open(self):
         import sqlite3
         os.makedirs(os.path.dirname(self.db_path) or ".", exist_ok=True)
-        self.cx = sqlite3.connect(self.db_path, isolation_level=None, check_same_thread=False)
-        self.cx.execute("PRAGMA journal_mode=WAL")
-        self.cx.execute("PRAGMA synchronous=NORMAL")
-        # P5-T04: under HA two instances share this db (lease + index). busy_timeout makes a racing
-        # BEGIN IMMEDIATE WAIT for the RESERVED lock instead of raising "database is locked" — so concurrent
-        # lease acquirers serialize cleanly (exactly one winner) rather than erroring.
-        self.cx.execute("PRAGMA busy_timeout=5000")
-        self.cx.execute("""CREATE TABLE IF NOT EXISTS idx_record(
-            run_id TEXT, seq INTEGER, prev TEXT, link_digest TEXT, kind TEXT, ts TEXT,
-            plan_sha TEXT, fields TEXT, PRIMARY KEY(run_id, seq))""")
-        self.cx.execute("""CREATE TABLE IF NOT EXISTS idx_decision(
-            rid INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, ts TEXT, link_digest TEXT, fields TEXT)""")
-        self.cx.execute("""CREATE TABLE IF NOT EXISTS idx_origin(
-            run_id TEXT PRIMARY KEY, plan_sha TEXT)""")
+        with self._lock:
+            self.cx = sqlite3.connect(self.db_path, isolation_level=None, check_same_thread=False)
+            self.cx.execute("PRAGMA journal_mode=WAL")
+            self.cx.execute("PRAGMA synchronous=NORMAL")
+            # P5-T04: under HA two instances share this db (lease + index). busy_timeout makes a racing
+            # BEGIN IMMEDIATE WAIT for the RESERVED lock instead of raising "database is locked" — so concurrent
+            # lease acquirers serialize cleanly (exactly one winner) rather than erroring.
+            self.cx.execute("PRAGMA busy_timeout=5000")
+            self.cx.execute("""CREATE TABLE IF NOT EXISTS idx_record(
+                run_id TEXT, seq INTEGER, prev TEXT, link_digest TEXT, kind TEXT, ts TEXT,
+                plan_sha TEXT, fields TEXT, PRIMARY KEY(run_id, seq))""")
+            self.cx.execute("""CREATE TABLE IF NOT EXISTS idx_decision(
+                rid INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, ts TEXT, link_digest TEXT, fields TEXT)""")
+            self.cx.execute("""CREATE TABLE IF NOT EXISTS idx_origin(
+                run_id TEXT PRIMARY KEY, plan_sha TEXT)""")
         return self
 
     def set_origin(self, run_id, plan_sha):
-        self.cx.execute("INSERT OR IGNORE INTO idx_origin VALUES(?,?)", (run_id, plan_sha))   # first wins
+        with self._lock:
+            self.cx.execute("INSERT OR IGNORE INTO idx_origin VALUES(?,?)", (run_id, plan_sha))   # first wins
 
     def get_origin(self, run_id):
-        r = self.cx.execute("SELECT plan_sha FROM idx_origin WHERE run_id=?", (run_id,)).fetchone()
+        with self._lock:
+            r = self.cx.execute("SELECT plan_sha FROM idx_origin WHERE run_id=?", (run_id,)).fetchone()
         return r[0] if r else None
 
     def index_record(self, run_id, seq, prev, link_digest, kind, ts, plan_sha, fields) -> dict:
-        cur = self.cx.execute("INSERT OR IGNORE INTO idx_record VALUES(?,?,?,?,?,?,?,?)",
-                              (run_id, seq, prev, link_digest, kind, ts, plan_sha, _canon(fields)))
+        with self._lock:
+            cur = self.cx.execute("INSERT OR IGNORE INTO idx_record VALUES(?,?,?,?,?,?,?,?)",
+                                  (run_id, seq, prev, link_digest, kind, ts, plan_sha, _canon(fields)))
+            rowcount = cur.rowcount
         return {"backend": self.name, "run_id": run_id, "seq": seq, "link_digest": link_digest,
-                "status": "indexed" if cur.rowcount == 1 else "duplicate"}
+                "status": "indexed" if rowcount == 1 else "duplicate"}
 
     def index_decision(self, summary) -> dict:
         ld = chainstore.link_digest({"type": "decision", "fields": summary,
                                      "run_id": summary.get("run_id"), "seq": -1})
-        self.cx.execute("INSERT INTO idx_decision(run_id, ts, link_digest, fields) VALUES(?,?,?,?)",
-                        (summary.get("run_id"), summary.get("ts", ""), ld, _canon(summary)))
+        with self._lock:
+            self.cx.execute("INSERT INTO idx_decision(run_id, ts, link_digest, fields) VALUES(?,?,?,?)",
+                            (summary.get("run_id"), summary.get("ts", ""), ld, _canon(summary)))
         return {"backend": self.name, "status": "indexed", "run_id": summary.get("run_id")}
 
     def rows(self, run_id) -> list:
-        cur = self.cx.execute(
-            "SELECT run_id,seq,prev,link_digest,kind,ts,plan_sha,fields FROM idx_record "
-            "WHERE run_id=? ORDER BY seq", (run_id,))
+        with self._lock:
+            cur = self.cx.execute(
+                "SELECT run_id,seq,prev,link_digest,kind,ts,plan_sha,fields FROM idx_record "
+                "WHERE run_id=? ORDER BY seq", (run_id,))
+            fetched = cur.fetchall()
         return [{"run_id": r[0], "seq": r[1], "prev": r[2], "link_digest": r[3], "kind": r[4],
-                 "ts": r[5], "plan_sha": r[6], "fields": json.loads(r[7])} for r in cur.fetchall()]
+                 "ts": r[5], "plan_sha": r[6], "fields": json.loads(r[7])} for r in fetched]
 
     def head(self, run_id):
-        r = self.cx.execute("SELECT seq, link_digest FROM idx_record WHERE run_id=? ORDER BY seq DESC LIMIT 1",
-                            (run_id,)).fetchone()
+        with self._lock:
+            r = self.cx.execute("SELECT seq, link_digest FROM idx_record WHERE run_id=? ORDER BY seq DESC LIMIT 1",
+                                (run_id,)).fetchone()
         return {"seq": r[0], "link_digest": r[1]} if r else None
 
     def run_ids(self) -> list:
-        return [r[0] for r in self.cx.execute("SELECT DISTINCT run_id FROM idx_record ORDER BY run_id")]
+        with self._lock:
+            return [r[0] for r in self.cx.execute("SELECT DISTINCT run_id FROM idx_record ORDER BY run_id").fetchall()]
 
     def reset(self):
-        for t in ("idx_record", "idx_decision", "idx_origin"):
-            self.cx.execute(f"DELETE FROM {t}")
+        with self._lock:
+            for t in ("idx_record", "idx_decision", "idx_origin"):
+                self.cx.execute(f"DELETE FROM {t}")
 
     # ── P5-T04: the single-writer lease (advisory lock) — atomic via BEGIN IMMEDIATE ──────────────────────
     def _ensure_leases(self):
-        self.cx.execute("""CREATE TABLE IF NOT EXISTS leases(
-            lease_id TEXT PRIMARY KEY, holder_id TEXT, expires_at REAL, acquired_at REAL)""")
+        with self._lock:                                               # reentrant: callers already hold it
+            self.cx.execute("""CREATE TABLE IF NOT EXISTS leases(
+                lease_id TEXT PRIMARY KEY, holder_id TEXT, expires_at REAL, acquired_at REAL)""")
 
     def try_acquire_lease(self, lease_id, holder_id, ttl, now=None) -> dict:
         import time as _t
         now = _t.time() if now is None else now
-        self.cx.execute("BEGIN IMMEDIATE")                              # serialize racing acquirers (RESERVED lock)
-        try:
-            self._ensure_leases()
-            row = self.cx.execute("SELECT holder_id, expires_at FROM leases WHERE lease_id=?",
-                                  (lease_id,)).fetchone()
-            if row is not None and row[0] != holder_id and row[1] is not None and row[1] > now:
-                self.cx.execute("COMMIT")                               # held by a LIVE other holder — refuse
-                return {"acquired": False, "holder": row[0], "expires_at": row[1]}
-            exp = now + ttl
-            self.cx.execute("INSERT INTO leases(lease_id, holder_id, expires_at, acquired_at) VALUES(?,?,?,?) "
-                            "ON CONFLICT(lease_id) DO UPDATE SET holder_id=excluded.holder_id, "
-                            "expires_at=excluded.expires_at, acquired_at=excluded.acquired_at",
-                            (lease_id, holder_id, exp, now))
-            self.cx.execute("COMMIT")
-            return {"acquired": True, "holder": holder_id, "expires_at": exp}
-        except Exception:
-            self.cx.execute("ROLLBACK")
-            raise
+        with self._lock:                                               # the WHOLE txn is one critical section
+            self.cx.execute("BEGIN IMMEDIATE")                          # serialize racing acquirers (RESERVED lock)
+            try:
+                self._ensure_leases()
+                row = self.cx.execute("SELECT holder_id, expires_at FROM leases WHERE lease_id=?",
+                                      (lease_id,)).fetchone()
+                if row is not None and row[0] != holder_id and row[1] is not None and row[1] > now:
+                    self.cx.execute("COMMIT")                           # held by a LIVE other holder — refuse
+                    return {"acquired": False, "holder": row[0], "expires_at": row[1]}
+                exp = now + ttl
+                self.cx.execute("INSERT INTO leases(lease_id, holder_id, expires_at, acquired_at) VALUES(?,?,?,?) "
+                                "ON CONFLICT(lease_id) DO UPDATE SET holder_id=excluded.holder_id, "
+                                "expires_at=excluded.expires_at, acquired_at=excluded.acquired_at",
+                                (lease_id, holder_id, exp, now))
+                self.cx.execute("COMMIT")
+                return {"acquired": True, "holder": holder_id, "expires_at": exp}
+            except Exception:
+                self.cx.execute("ROLLBACK")
+                raise
 
     def renew_lease(self, lease_id, holder_id, ttl, now=None) -> dict:
         import time as _t
         now = _t.time() if now is None else now
-        self.cx.execute("BEGIN IMMEDIATE")
-        try:
-            self._ensure_leases()
-            row = self.cx.execute("SELECT holder_id FROM leases WHERE lease_id=?", (lease_id,)).fetchone()
-            if row is None or row[0] != holder_id:                      # someone else holds it — renewal fails
+        with self._lock:
+            self.cx.execute("BEGIN IMMEDIATE")
+            try:
+                self._ensure_leases()
+                row = self.cx.execute("SELECT holder_id FROM leases WHERE lease_id=?", (lease_id,)).fetchone()
+                if row is None or row[0] != holder_id:                  # someone else holds it — renewal fails
+                    self.cx.execute("COMMIT")
+                    return {"renewed": False, "holder": row[0] if row else None}
+                exp = now + ttl
+                self.cx.execute("UPDATE leases SET expires_at=? WHERE lease_id=?", (exp, lease_id))
                 self.cx.execute("COMMIT")
-                return {"renewed": False, "holder": row[0] if row else None}
-            exp = now + ttl
-            self.cx.execute("UPDATE leases SET expires_at=? WHERE lease_id=?", (exp, lease_id))
-            self.cx.execute("COMMIT")
-            return {"renewed": True, "holder": holder_id, "expires_at": exp}
-        except Exception:
-            self.cx.execute("ROLLBACK")
-            raise
+                return {"renewed": True, "holder": holder_id, "expires_at": exp}
+            except Exception:
+                self.cx.execute("ROLLBACK")
+                raise
 
     def release_lease(self, lease_id, holder_id) -> dict:
-        self.cx.execute("BEGIN IMMEDIATE")
-        try:
-            self._ensure_leases()
-            row = self.cx.execute("SELECT holder_id FROM leases WHERE lease_id=?", (lease_id,)).fetchone()
-            released = row is not None and row[0] == holder_id          # only the holder may release
-            if released:
-                self.cx.execute("DELETE FROM leases WHERE lease_id=?", (lease_id,))
-            self.cx.execute("COMMIT")
-            return {"released": released}
-        except Exception:
-            self.cx.execute("ROLLBACK")
-            raise
+        with self._lock:
+            self.cx.execute("BEGIN IMMEDIATE")
+            try:
+                self._ensure_leases()
+                row = self.cx.execute("SELECT holder_id FROM leases WHERE lease_id=?", (lease_id,)).fetchone()
+                released = row is not None and row[0] == holder_id      # only the holder may release
+                if released:
+                    self.cx.execute("DELETE FROM leases WHERE lease_id=?", (lease_id,))
+                self.cx.execute("COMMIT")
+                return {"released": released}
+            except Exception:
+                self.cx.execute("ROLLBACK")
+                raise
 
     def lease_holder(self, lease_id, now=None):
         import time as _t
         now = _t.time() if now is None else now
-        self._ensure_leases()
-        row = self.cx.execute("SELECT holder_id, expires_at FROM leases WHERE lease_id=?", (lease_id,)).fetchone()
+        with self._lock:
+            self._ensure_leases()
+            row = self.cx.execute("SELECT holder_id, expires_at FROM leases WHERE lease_id=?",
+                                  (lease_id,)).fetchone()
         if row is None or row[1] is None or row[1] <= now:             # unclaimed or expired → no live holder
             return None
         return row[0]
