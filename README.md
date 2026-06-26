@@ -4,12 +4,15 @@
 
 # cyberware
 
-**A verifiable governance runtime for skill execution.** Same infrastructure as the Cyberware
-Alchemistry — L++ blueprints, contracts, compiled bash, audit ledgers — at a different angle: not
-the Athenor service that powers the whole alchemistry workflow, but the **independent, local
-enforcement layer**. The intelligence proposes; the framework validates, composes, compiles,
-oversees, and is the **only channel that executes** — whether the agent runs the blessed plan
-(**cooperative**) or a confined **exod** principal runs it (**delegated**). See **Two run modes** below.
+**cyberware is a governance runtime for AI-agent execution.** The agent proposes; **nothing runs except
+through cyberware** — and every action that does is **governed** (checked against policy before it runs),
+**verifiable** (provably the blessed step, pinned by hash — not whatever the model improvised), and
+**ledgered** (recorded as tamper-evident provenance). The guardrail is **code, not a prompt** — hard
+infrastructure the agent cannot reason its way around.
+
+Reliable, accountable actions are what make **scale** safe: when every action passes the same gate and
+lands in one ledger, you can run a **fleet or swarm** of agents with real control — autonomy that grows
+without surrendering accountability.
 
 Blueprints are [L++](https://github.com/rhCat/lpp) (the 4-axiom logic frame). Python is the glue —
 because glue is what this needs.
