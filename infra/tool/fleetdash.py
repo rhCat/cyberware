@@ -65,15 +65,19 @@ def _embed_html(node_name: str, nonce: str) -> bytes:
            "::-webkit-scrollbar-thumb{background:#30363d;border-radius:6px;border:2px solid #0d1117}"
            "::-webkit-scrollbar-thumb:hover{background:#484f58}"
            "html{scrollbar-width:thin;scrollbar-color:#30363d #0d1117}</style>")
-    # emulate EventSource by polling, but fire ONLY when the snapshot CHANGED (like SSE push-on-change) — an idle
-    # poll must not re-render the open detail view, which would reset its scroll (the detail-view page-jump).
+    # emulate EventSource by polling, but fire ONLY when the snapshot CHANGED — mirroring govd's own SSE, which
+    # pushes on change and ignores the per-second clock (govd.py digests the snapshot MINUS `now`). We key `last`
+    # off the same now-stripped form: otherwise `now` advancing every second makes every idle poll look "changed",
+    # re-rendering the open detail view and resetting its scroll (the detail-view page-jump). Reset on error so a
+    # recovered, byte-identical snapshot still re-fires once.
     shim = ("<script>(function(){var P=" + json.dumps(pfx) + ";var _f=window.fetch.bind(window);"
             "window.fetch=function(u,o){return _f((typeof u===\"string\"&&u.charAt(0)===\"/\")?P+u:u,o);};"
             "window.EventSource=function(u){var s=this;s.onmessage=null;s.onerror=null;var last=null;"
+            "function key(t){try{var o=JSON.parse(t);delete o.now;return JSON.stringify(o);}catch(e){return t;}}"
             "function poll(){_f(P+\"/monitor/state\",{cache:\"no-store\"})"
             ".then(function(r){return r.ok?r.text():Promise.reject();})"
-            ".then(function(t){if(t===last)return;last=t;if(s.onmessage)s.onmessage({data:t});})"
-            ".catch(function(){if(s.onerror)s.onerror();});}"
+            ".then(function(t){var k=key(t);if(k===last)return;last=k;if(s.onmessage)s.onmessage({data:t});})"
+            ".catch(function(){last=null;if(s.onerror)s.onerror();});}"
             "s._t=setInterval(poll,2500);s.close=function(){clearInterval(s._t);};};})();</script>")
     src = src.replace(marker, '<div id="root"></div>\n' + css + shim + "\n<script>", 1)
     return src.replace("<script>", f'<script nonce="{nonce}">').encode()   # nonce every inline script
