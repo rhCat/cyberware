@@ -262,6 +262,10 @@ def test_embed_serves_trusted_spa_with_a_prefix_and_polling_shim():
     assert html.index("window.EventSource=function") < html.index('"use strict"')
     # every inline script is nonce-stamped (so a CSP script-src 'nonce-…' runs THESE but blocks injected handlers)
     assert '<script nonce="NONCE123">' in html and "<script>" not in html
+    # the polling shim fires ONLY on change (no idle re-render → no detail-view scroll jump)
+    assert "if(t===last)return" in html
+    # the embed carries the dark scrollbar styling
+    assert "::-webkit-scrollbar" in html and "scrollbar-color:#30363d" in html
 
 
 def test_sanitize_svg_strips_active_content():

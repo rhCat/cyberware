@@ -61,15 +61,21 @@ def _embed_html(node_name: str, nonce: str) -> bytes:
     if marker not in src:                                    # fail loud rather than serve a silently-broken SPA
         raise RuntimeError("embed: dashboard asset changed — the shim-injection marker is gone")
     pfx = "/embed/" + urllib.parse.quote(node_name)
+    css = ("<style>::-webkit-scrollbar{width:11px;height:11px}::-webkit-scrollbar-track{background:#0d1117}"
+           "::-webkit-scrollbar-thumb{background:#30363d;border-radius:6px;border:2px solid #0d1117}"
+           "::-webkit-scrollbar-thumb:hover{background:#484f58}"
+           "html{scrollbar-width:thin;scrollbar-color:#30363d #0d1117}</style>")
+    # emulate EventSource by polling, but fire ONLY when the snapshot CHANGED (like SSE push-on-change) — an idle
+    # poll must not re-render the open detail view, which would reset its scroll (the detail-view page-jump).
     shim = ("<script>(function(){var P=" + json.dumps(pfx) + ";var _f=window.fetch.bind(window);"
             "window.fetch=function(u,o){return _f((typeof u===\"string\"&&u.charAt(0)===\"/\")?P+u:u,o);};"
-            "window.EventSource=function(u){var s=this;s.onmessage=null;s.onerror=null;"
+            "window.EventSource=function(u){var s=this;s.onmessage=null;s.onerror=null;var last=null;"
             "function poll(){_f(P+\"/monitor/state\",{cache:\"no-store\"})"
             ".then(function(r){return r.ok?r.text():Promise.reject();})"
-            ".then(function(t){if(s.onmessage)s.onmessage({data:t});})"
+            ".then(function(t){if(t===last)return;last=t;if(s.onmessage)s.onmessage({data:t});})"
             ".catch(function(){if(s.onerror)s.onerror();});}"
             "s._t=setInterval(poll,2500);s.close=function(){clearInterval(s._t);};};})();</script>")
-    src = src.replace(marker, '<div id="root"></div>\n' + shim + "\n<script>", 1)
+    src = src.replace(marker, '<div id="root"></div>\n' + css + shim + "\n<script>", 1)
     return src.replace("<script>", f'<script nonce="{nonce}">').encode()   # nonce every inline script
 
 
@@ -441,6 +447,11 @@ _STYLE = """
  pre{background:#161b22;border:1px solid #21262d;border-radius:6px;padding:10px;overflow:auto;max-height:340px;color:#8b949e;white-space:pre-wrap;word-break:break-word}
  details{margin:6px 0} summary{cursor:pointer;color:#58a6ff;padding:4px 0}
  img{display:block;margin:8px 0}
+ html{scrollbar-width:thin;scrollbar-color:#30363d #0d1117}
+ ::-webkit-scrollbar{width:11px;height:11px}
+ ::-webkit-scrollbar-track{background:#0d1117}
+ ::-webkit-scrollbar-thumb{background:#30363d;border-radius:6px;border:2px solid #0d1117}
+ ::-webkit-scrollbar-thumb:hover{background:#484f58}
 """
 
 
