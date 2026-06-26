@@ -42,6 +42,8 @@ jobs:
           cp docs/icon.png _site/icon.png                 # full crest — og:image / twitter:image / apple-touch / nav mark
           cp docs/watermark.png _site/watermark.png       # 56px pixel crest — the faint background watermark
           cp docs/logo_flow5.gif _site/logo_flow5.gif     # the hero/README flow animation (top of homepage + README)
+          cp docs/architecture.png _site/architecture.png # homepage §03 + README — the four-plane control-layer diagram
+          cp docs/skillchipeconomy.png _site/skillchipeconomy.png  # homepage §09 — the skillChip economy diagram
           cp -r skillChip _site/skillChip
           cp infra/document/pipeline.blueprint.svg  _site/pipeline.svg
           cp infra/document/pipeline.blueprint.json _site/pipeline.blueprint.json
