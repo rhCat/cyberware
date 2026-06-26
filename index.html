@@ -436,6 +436,10 @@
       </div>
     </div>
     <p class="one-liner">Nothing executable ever crosses the wire — so there's nothing on the wire to steal, and nothing to trust.</p>
+    <figure style="margin:1.7rem 0 0">
+      <img src="architecture.png" alt="cyberware architecture — four planes (thinking, agent, the cyberware control layer, and the execution substrate), with cyberware the sole gateway between the agent and the substrate; data and secrets stay in the substrate" style="width:100%;border:1px solid var(--gate-dim);border-radius:10px;display:block">
+      <figcaption style="color:var(--comment);font-size:.82rem;margin-top:.6rem;line-height:1.5">The full picture — four planes, with cyberware as the control layer between the agent and the substrate. Data and secrets stay in the substrate; only value-free information crosses cyberware.</figcaption>
+    </figure>
   </section>
 
   <div class="gate-rule" role="separator" aria-hidden="true"></div>
@@ -529,7 +533,7 @@
       <div class="rung"><span class="sv">SV-3</span><div class="body"><span class="mk">◐ </span><strong>Kernel-enforced execution boundary <span class="note">(9/10)</span></strong><span>A bubblewrap sandbox under a separate OS principal, exod, whose Ed25519 signature is the only status the ledger trusts. Refusals hold even with the in-process scanner switched off.</span><span class="note"># the boundary is the kernel + a signature, not a scanner. The one open brick is the microVM perf tier, which reports skipped where /dev/kvm is absent — never faked.</span></div></div>
       <div class="rung"><span class="sv">SV-4</span><div class="body"><span class="mk">✓ </span><strong>Signed, transparency-logged releases + revocation</strong><span>Releases are signed and logged; a compromised build can be revoked.</span></div></div>
       <div class="rung"><span class="sv">SV-5</span><div class="body"><span class="mk">✓ </span><strong>Model-checking across the three-prover stack</strong><span>Workflow blueprints proven deadlock-free by TLC, Apalache, and TLAPS.</span></div></div>
-      <div class="rung"><span class="sv">SV-6</span><div class="body"><span class="mk">✓ </span><strong>Settlement layer (future)</strong><span>A future settlement plane where attested work CAN be paid — billed on the meter the isolated principal signed, never the agent's stopwatch.</span></div></div>
+      <div class="rung"><span class="sv">SV-6</span><div class="body"><span class="mk">✓ </span><strong>Settlement layer</strong><span>Attested work is priced, metered, and settled — quote → meter → settle, billed on the meter the isolated principal signed (never the agent's stopwatch) and reconciled to the cent over a real payment rail.</span></div></div>
     </div>
     <p class="one-liner">A research build climbing in the open. The boundary is the kernel and a signature.</p>
   </section>
@@ -606,6 +610,10 @@
       </div>
     </div>
     <p class="lead">Democratizing skill <em>use</em> concentrates value in skill <em>authorship</em>: whoever encodes the correct, validated way to run the solver becomes the scarce, paid party — paid per use through skill lineage. Professionals don't get cheaper; their value moves from doing the thing to authoring the blessed way of doing it.</p>
+    <figure style="margin:1.7rem 0 .4rem">
+      <img src="skillchipeconomy.png" alt="the cyberware and skillChip economy — metered, attributed, settled: a governed run is priced, metered on the exod-signed meter, and settled, with the split paying the vendor, a lineage royalty to the skill's ancestor authors, and a transparent platform tax" style="width:100%;border:1px solid var(--gate-dim);border-radius:10px;display:block">
+      <figcaption style="color:var(--comment);font-size:.82rem;margin-top:.6rem;line-height:1.5">Metered, attributed, settled. The skill is the metering point — a governed run is priced, metered on the exod-signed meter, then settled; the split pays the vendor, a lineage royalty to the skill's ancestors, and a transparent platform tax.</figcaption>
+    </figure>
     <p class="one-liner">Software stops being something humans operate and becomes something agents consume under contract — and the contract layer is the business.</p>
   </section>
 
