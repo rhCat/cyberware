@@ -58,25 +58,31 @@ Serve a **live** chip instead of the baked one: add `-e CLOUD_MODE=1` (clones `r
 refuses on drift). Published on a `vN.N.N` tag (or on demand) by
 [`server-image.yml`](.github/workflows/server-image.yml).
 
-### 2 · Run a task — three separate things
+### 2 · Run a task
 
-The confusion always comes from mixing up three independent things. Keep them apart and it's simple:
+Every run has **two phases**, and only the second one is "the mode":
 
-1. **govd is a server you point at** (`--url`). Run it wherever — your laptop, an edge node, the cloud — and
-   reach it from wherever. **Connecting to govd is never tied to an OS.**
-2. **the agent is whatever runs `govd-client`** — your Mac, a CI runner, a server. All it needs is the URL
-   and a token.
-3. **the only real choice is where the blessed steps actually run** — and that is the two modes:
+1. **Govern** — govd checks the claim and **blesses a value-free plan.** This is *always* govd, in **both
+   modes**, on **any OS**. Blessing the plan *is* the governance — it is **not** what "cooperative vs
+   delegated" means.
+2. **Run** — someone then executes the blessed steps. *This* is the only choice:
 
-| mode | runs the blessed steps | …on | OS needed |
+| run mode | who executes the blessed steps | …on | OS needed |
 |---|---|---|---|
-| **cooperative** (default) | the agent itself | the **agent's** own machine | **any** — macOS, Linux, … |
-| **delegated** (opt-in) | `exod` on the node, sandboxed | the **node** | a **Linux** node (sandbox = bwrap / gVisor) |
+| **cooperative** (default) | the **agent** (your `govd-client`) | the agent's own machine | **any** — macOS, Linux, … |
+| **delegated** (opt-in) | **`exod`** on the node, sandboxed | the node | a **Linux** node (sandbox = bwrap / gVisor) |
 
-**Your exact case:** from a **Mac**, point at a govd running on an **edge** node and run the task
-**cooperatively**. The Mac is the agent, the edge govd governs the run, and the steps run **on the Mac** —
-no Linux anywhere. You'd only need Linux if you switched *that* run to **delegated**, i.e. asked the edge
-node to run the steps itself, sealed in a sandbox.
+Three things stay independent — keeping them apart is what makes it click:
+
+- **govd is a server you point `--url` at** — run it anywhere (laptop, edge node, cloud), reach it from
+  anywhere; connecting is never OS-tied.
+- **the agent is whatever runs `govd-client`** — your Mac, a CI runner, a server.
+- **only phase 2 cares about the OS** — and only `delegated`, because its sandbox is Linux-specific.
+
+**Your exact case:** from a **Mac**, point at a govd on an **edge** node and run **cooperatively**. The edge
+govd blesses the plan (phase 1), and your Mac runs the steps (phase 2) — **no Linux anywhere**. You'd only
+need Linux if you switched that run to **delegated**, asking the edge node to run the steps in its sandbox
+instead.
 
 ```sh
 # cooperative — point at ANY govd (here, one on the edge); the AGENT (this machine) runs the steps
@@ -94,9 +100,9 @@ Which modes a govd offers is **operator-set** (`exec_mode`, per node and per pri
 force delegated; a delegated govd with no `exod` attached refuses every step, and `GET /health` shows
 `exec_mode` + `exod_attached`.
 
-> **cyberware is not Linux-only.** govd runs on any OS and you connect from any OS; cooperative execution
-> runs on the agent's machine, any OS. The **only** Linux requirement is the **delegated sandbox** on the
-> node (bubblewrap / gVisor) — an optional confinement upgrade, never a requirement to use cyberware.
+> **cyberware is not Linux-only.** Phase 1 (govern) and cooperative phase 2 (run) work on **any OS**. The
+> **only** Linux requirement is the **delegated sandbox** on the node (bubblewrap / gVisor) — an optional
+> confinement upgrade, never a requirement to use cyberware.
 
 Images: **`ghcr.io/rhcat/cyberware`** (the governor — runs on any OS) and, for delegated nodes,
 **`ghcr.io/rhcat/cyberware-body`** (govd + exod, Linux). Architecture:
