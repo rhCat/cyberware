@@ -21,7 +21,8 @@ from infra.exec.grantverify import (  # noqa: F401  (single source of truth for 
 
 
 def mint_grant(private_key, *, run_id, plan_sha, nbf, exp, nonce,
-               snippet_shas=None, capabilities=None, credentials=None, tier="community", sandbox_tier=None):
+               snippet_shas=None, capabilities=None, credentials=None, tier="community", sandbox_tier=None,
+               acl_sha=None, skill=None, perk=None, destructive=None):
     """Issue a signed grant (a DSSE envelope). The body is the value-free capability claim; the signature
     binds it so any holder can verify it offline. The nonce MUST be a non-empty string (the replay key).
 
@@ -32,7 +33,11 @@ def mint_grant(private_key, *, run_id, plan_sha, nbf, exp, nonce,
     `sandbox_tier` is the orthogonal P3-T11 CATALOG tier (core/verified/community) that selects the confinement
     BACKEND at the limb: a `community` perk demands the gVisor (runsc) box, the trusted family runs in bwrap, and
     an undeclared (None) grant takes the operator's --backend floor (so legacy grants never regress). It is
-    emitted only when set, keeping older grant bodies byte-identical."""
+    emitted only when set, keeping older grant bodies byte-identical.
+
+    `acl_sha` / `skill` / `perk` / `destructive` (ACL M1) bind the per-actor ACL digest + the canonical claim
+    into the grant, so exod can JOIN it against the operator attestation and re-enforce the actor's ceiling
+    off-node. Like `sandbox_tier`, each is emitted only when set — a legacy (pre-ACL) grant body is unchanged."""
     if not (isinstance(nonce, str) and nonce):
         raise ValueError("grant nonce must be a non-empty string")
     body = {"run_id": run_id, "plan_sha": plan_sha, "snippet_shas": snippet_shas or {},
@@ -40,4 +45,12 @@ def mint_grant(private_key, *, run_id, plan_sha, nbf, exp, nonce,
             "nbf": int(nbf), "exp": int(exp), "nonce": nonce}
     if sandbox_tier is not None:
         body["sandbox_tier"] = sandbox_tier
+    if acl_sha is not None:
+        body["acl_sha"] = acl_sha
+    if skill is not None:
+        body["skill"] = skill
+    if perk is not None:
+        body["perk"] = perk
+    if destructive is not None:
+        body["destructive"] = bool(destructive)
     return sign.sign(body, private_key, payload_type=GRANT_TYPE)
