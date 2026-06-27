@@ -279,3 +279,134 @@ cyberware is **not Athenor** (the hosted service that powers the whole Cyberware
 workflow). It is the standalone, local enforcement layer — the same verifiable infrastructure
 (L++ blueprints, contracts, compiled bash, audit ledgers, authenticity indexes, in-skill proofs),
 pointed at general skill execution.
+
+## Crypto custody — the KeyStore seam
+
+Key custody sits behind **one adapter seam** (`infra/cwp/keystore.py`) so the backend can evolve — a file
+today, an HSM tomorrow — without touching the signing surface. The abstract `KeyStore` defines the whole
+custody contract: `generate` a key under an id, expose its 32-byte raw public key and its resolvable cwp
+`keyid` (`sign.keyid`), `sign` with it, and answer `has` / `list_keys`. The contract is deliberately
+narrow on one axis: **where the private key lives is the backend's secret**, never part of this surface.
+
+Two backends ship, and both pass the **same** `contract_suite`:
+
+- **`FileKeyStore`** — exportable custody: keys persist as raw private bytes on disk at mode `0600`
+  (`os.open(..., O_CREAT, 0o600)`), so a fresh instance over the same directory finds them again. This
+  proves the seam is *real* persistence, not in-memory bookkeeping.
+- **`SoftPkcs11KeyStore`** — an HSM-shaped backend: private keys live in an in-process `_token` dict and
+  **never leave it**. There is deliberately **no** export method — signing happens "in the token"
+  (`self._token[key_id].sign(...)`). It stands in for a real PKCS#11 adapter and proves the seam supports a
+  **non-exportable-key** backend behind the *identical* contract.
+
+`contract_suite(ks)` is the single suite every backend must satisfy: the keyid resolves
+(`ed25519:`-prefixed, 24 chars), `has`/`list_keys`/`missing_is_absent` are correct, a signature is 64 bytes,
+verifies over its own message, and **rejects a wrong message**. `keystore_drill` then asserts the seam-level
+properties: both backends pass the suite, the file backend persists across a fresh instance, and the HSM
+backend exposes none of `export_private` / `private_bytes` / `private_key` — non-exportability checked by
+construction, not by promise. So a future PKCS#11 or cloud-KMS adapter is a drop-in: pass the same suite and
+the signing surface above never learns the difference.
+
+## Supply-chain attestation — what runs is what was published
+
+The release path binds **the chip** and **the live engine** into signed, offline-verifiable artifacts, all
+anchored to a **pinned publisher root** committed in the repo at `spec/tuf/publisher-root.pub` (TUF-style:
+the root travels with the repo, the private key never does).
+
+**Blob attestation (in-toto).** `cosign.attest_blob` (`infra/cwp/cosign.py`) hashes a blob to its sha256,
+binds that digest as the `subject` of an **in-toto v0.1 Statement** (`intoto_statement` → `_type`,
+`predicateType`, `subject[].digest.sha256`, `predicate`), and Ed25519ph-signs the statement's canonical
+(JCS) bytes into a DSSE envelope a cosign `verify-attestation` consumer accepts. The cwp native signatures
+stay pure Ed25519; this adapter bridges the one algorithm gap (sigstore's Ed25519ph) through the OpenSSL CLI
+(`>= 3.4`), so envelopes interop in both directions.
+
+**The engine mutual handshake** (`infra/cwp/engineattest.py`). The engine is a reproducibly-built anchor; at
+release time the publisher signs an **engine attestation** — a DSSE over `{engine_digest, version}` where
+`engine_digest = sha256(engine bytes)`. Before two principals run together (engine ↔ govd/chip), each side
+both **verifies the other's attestation under the pinned root** *and* **re-measures the other's live binary**,
+requiring the live digest to equal the signed digest (`attest_live`). `mutual_handshake` succeeds only if
+**both** sides are `attested`; a **one-byte tamper on either side** changes the live measurement, the digests
+diverge, and the handshake fails **closed** to `engine_unattested`. An unsigned/forged attestation also fails
+here, because it never verifies under the pinned root.
+
+**The dual-signed release receipt.** Two distinct receipt objects exist, both DSSE/Ed25519ph:
+
+- `engineattest.release_receipt` binds the **chip release** (`release.sign_release`, the chip's `chip_sha`
+  plus every skill's `skill_sha` from the chip `index.json`) and the **engine attestation** into one object,
+  so `health_matches_signed_release` is checkable: the live engine must measure to the published
+  `engine_digest` *and* the chip release must verify — all under the pinned root.
+- `receipts.py` is the run-level receipt: **two independent** Ed25519-DSSE signatures over the **same**
+  in-toto Statement (e.g. the executor that ran a step and the approver that blessed it). `verify_receipt`
+  requires both signatures to verify under **two distinct keyids** *and* the payload to be a consumable
+  in-toto Statement. A single signature is **not** dual-signed; a tampered statement fails; and two
+  signatures from the **same** key (different keyid labels) do not pass as dual-signed against two distinct
+  public keys.
+
+The capstone is `publish.governed_release` (`infra/cwp/publish.py`): one receipt carrying the chip release,
+the engine attestation, **and** an offline transparency-log inclusion proof. `verify_governed_release`
+checks all three legs offline under the pinned root — re-verify the release signature, re-measure the live
+engine, replay the inclusion proof. `release.tri_layer_check` models the **tri-layer refusal** the design
+calls for: it runs the release verification and carries that one verdict to **all three named entry points**
+(chipfetch acquire, govd boot, exod run), so an unsigned or tampered release is refused at every layer rather
+than at one bypassable gate. This is a pure verification function — the published verification surface — not
+yet a live call wired into the `chipfetch`/`govd`/`exod` daemons themselves. Each module ships a hermetic
+selftest that tampers each leg in turn and confirms the receipt fails closed.
+
+## The store backend contract — a derived index every adapter must earn
+
+The chained JSONL (`infra/store/chainstore.py`) is the **artifact of record**; a `StoreBackend`
+(`infra/store/backend.py`) is a **derived, fully re-derivable** queryable index over it — what makes the
+provenance store queryable (and, on Postgres, durable + shared). Two backends ship behind one interface:
+
+- **`SqliteWalBackend`** — the default/free tier: local sqlite in WAL mode, always `configured`, no server.
+  The shared connection (`check_same_thread=False`) is serialized through an `RLock` so each statement and
+  each `BEGIN IMMEDIATE…COMMIT` lease transaction is atomic per-connection.
+- **`PsycopgBackend`** — the durable tier (psycopg3 / Postgres-15). It is **inert until a DSN is wired**:
+  `configured()` is `False` until `store.dsn_file`/`dsn` is set server-side, every op returns
+  `"unconfigured"`, and `psycopg` is imported **lazily inside the methods**, so the default tier and the
+  hermetic selftest never require psycopg or a live Postgres. The DSN is read at connect time and **never
+  echoed** — even the error path returns only the exception class + message (truncated), never the DSN.
+
+`make_backend(root, config)` selects: Postgres **iff** `store.dsn_file`/`dsn` is set, else local sqlite-WAL
+at `<root>/index.sqlite` — mirroring the inert-until-keyed posture of the settlement Stripe rail.
+`index_record` is an **insert-or-skip on `(run_id, seq)`** (`INSERT OR IGNORE` / `ON CONFLICT DO NOTHING`),
+so a crash that re-mirrors the chain tail can never double-write.
+
+`store_selftest` is the **six-property hermetic contract** every adapter must pass:
+
+1. **interface_conformance** — every method is callable on **both** backends (a convention probe, not
+   `abc.ABCMeta`).
+2. **round_trip** — index rows fold back to exactly the chain's non-genesis records (by `seq` and `fields`).
+3. **idempotent_replay** — re-mirroring the whole chain returns all `"duplicate"` and the index is
+   unchanged.
+4. **reconcile_exact** — each row's `link_digest` equals an **independent recompute straight from the chain
+   file** via `chainverify` (the artifact of record is the oracle, not the index).
+5. **torn_tail_safe** — a crash-torn final chain line is tolerated; the index ends exactly where the chain
+   validly ends.
+6. **backend_inert_until_configured** — `PsycopgBackend({})` is unconfigured and its ops are graceful
+   no-ops (`status == "unconfigured"`).
+
+So the Postgres tier never needs a live database to be *proven correct against the contract*, and a future
+adapter is admissible only when it passes the identical suite.
+
+## SV-3, enriched — a second sandbox backend that provably cannot weaken the boundary
+
+The community/SV-3 tier adds a **second** confinement backend behind the **same** value-free
+`SandboxProfile` (`infra/exec/sandbox.py`): gVisor (`runsc`) renders the profile as an **OCI runtime spec**
+(`oci_config`) — readonly rootfs, every capability dropped, `noNewPrivileges`, the network namespace
+unshared unless granted, the masked `/proc` paths, the read-only system binds + the one read-write
+workspace, the step dropped to `nobody` (uid/gid `65534`). The `SandboxProfile` is the single source of
+truth; each backend *realizes* it.
+
+The proof that the second backend cannot **weaken** the boundary is `confinement(profile, backend)`: it
+extracts the **full** security boundary from the **actual rendered output** (the bwrap argv or the OCI
+spec), **not** re-derived from the profile. The dict is **total** over the boundary's properties — the
+capability binds, the **full** namespace set (pid / ipc / uts / cgroup / user / mount + network), the
+nobody uid/gid, dropped caps, no-new-privileges, the readonly root, **and** the masked `/proc` surfaces.
+Two backends are **seam-equivalent iff their `confinement()` dicts are dict-equal**, and
+`community_tier_selftest` asserts exactly that for the core, a network-granted, and a custom-bind profile
+(`seam_parity = all(confinement(p, "bwrap") == confinement(p, "runsc") ...)`). Because the dict is total, a
+coarser equality would be vacuous: a dropped pid namespace or an un-masked `/proc` file would slip through —
+here it breaks parity and fails the selftest. The grant's sandbox **tier** selects the backend as a
+**monotone floor** (`backend_for_tier` / `strongest`): an untrusted `community` perk ratchets up to `runsc`,
+an unknown tier fails safe to `runsc`, and a trusted perk on a `runsc`-floored host is never silently
+downgraded.

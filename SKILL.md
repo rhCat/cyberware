@@ -78,8 +78,10 @@ the composition + TLA⁺/TLC model check, and returns one of:
   with no `--fetch-only` does all of this.)
 - **`push_back`** → a **destructive** perk needs explicit approval. Re-claim with `--approve <perk>` only
   if the destruction is intended.
-- **`reject`** → bad var key, a plaintext secret, a missing input, registry drift, or a deadlock. Fix the
-  *claim* — never route around the refusal.
+- **`reject`** → bad var key, a plaintext secret, a missing input, registry drift, a deadlock, or a claim
+  **outside your token's ACL scope** (a skill or tier you may not run, or a destructive/credentialed perk
+  your token isn't granted — an ACL denial is *not* clearable by `--approve`). Fix the *claim* — never
+  route around the refusal.
 
 The loop above is **cooperative** mode (the default): you run the porters+cores from your registry and
 report status only. Against a Linux **body** you can run **delegated** instead — add `--delegated`:
@@ -91,6 +93,12 @@ report status only. Against a Linux **body** you can run **delegated** instead �
 govd hands a signed grant to **exod**, which runs each step confined and Ed25519-signs the authoritative
 status; you run **nothing**, and govd records exod's status (an agent self-report is rejected). Either way
 the wire is value-free and you read the same verdict. See [containment-delegation.md](docs/containment-delegation.md).
+
+If your principal carries a **per-actor ACL**, a scoped claim on a body also rides an operator-signed
+**attestation** (`--attestation`) and a one-time possession **proof** (`--proof-key`) that exod re-checks
+off-node. When the operator runs exod in **enforce** mode (an ACL-issuer key pinned, `--acl-strict`), that
+re-check means a compromised govd can neither widen your token nor misattribute your run; without it exod
+audits rather than refuses. An unscoped (operator-trusted) token needs neither.
 
 You never edit the blessed `run.sh`: a tamper snapshot refuses on drift, and the WS gate refuses any step
 whose `plan_sha` or upstream order doesn't match the pinned plan.
