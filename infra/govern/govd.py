@@ -183,11 +183,13 @@ def tlc_check(bp):
     return _TLC_CACHE[key]
 
 
-def govern(ledger, cfg):
+def govern(ledger, cfg, *, scope=None, strict=False, now=None):
     """Govern a CLAIM — never payload. The agent sends skill, perk, and var KEYS (names only, no values,
     no file contents, no secrets); govd checks the claim against its OWN trusted registry and blesses a
     value-free execution PLAN (sequence + snippet hashes + wrapper), pinning its sha256. Destructiveness
     is a property of the declared perk, gated by approval — govd never inspects task data to decide it.
+    `scope` is the authenticated principal's per-actor ACL (M0; None = unscoped, `strict` denies the
+    unscoped case); it can only ADD a hard, non-self-approvable reject, never relax another gate.
     Pure: returns a verdict dict, writes nothing."""
     skill, perk = ledger.get("skill"), ledger.get("perk")
     var_keys = list(ledger.get("var_keys") or ledger.get("vars") or [])   # accept a name list or a dict's keys
@@ -196,6 +198,11 @@ def govern(ledger, cfg):
 
     if not skill or not perk:
         return {"decision": "reject", "problems": [{"id": "missing_skill_or_perk"}]}
+    # canonical-name guard: the perk, like the skill, must be a single safe path segment — never `/`, `..`,
+    # `./perk`, or `perk/` (which `os.path.join` would collapse so a DIFFERENT perk runs than the one the
+    # ACL/destructive/tier checks see). The byte-exact id match below closes the case-insensitive-FS variant.
+    if not registry.valid_skill_name(perk):
+        return {"decision": "reject", "problems": [{"id": "noncanonical_name", "detail": f"{skill}/{perk}"}]}
     pdir = os.path.join(registry.skill_dir(skill), "perks", perk)
     if not os.path.isdir(pdir):
         return {"decision": "reject", "problems": [{"id": "unknown_skill_perk", "detail": f"{skill}/{perk}"}]}
@@ -220,6 +227,12 @@ def govern(ledger, cfg):
     except (OSError, ValueError, KeyError) as e:
         return {"decision": "reject", "problems": [{"id": "registry_error", "detail": str(e)}]}
     destructive = next((p.get("destructive", False) for p in perks if p.get("id") == perk), False)
+
+    # canonical-id check: `skill`/`perk` must be the BYTE-EXACT on-disk ids, not merely an isdir hit — on a
+    # case-insensitive FS `CWS-FS`/`READ` resolve to the real dir but would mismatch the (case-sensitive) ACL
+    # and read the wrong destructive/tier. Reject the variant so the string the ACL checks is the one that runs.
+    if skill not in set(skill_index.all_skills()) or perk not in {p.get("id") for p in perks}:
+        return {"decision": "reject", "problems": [{"id": "noncanonical_name", "detail": f"{skill}/{perk}"}]}
 
     # authenticity gate: the server won't bless a registry that doesn't match its committed index
     ok_idx, drift = verify_skill(skill)
@@ -248,6 +261,16 @@ def govern(ledger, cfg):
     except Exception as e:
         return {"decision": "reject", "problems": problems + [{"id": "plan_error", "detail": str(e)}]}
     psha = compiler.plan_sha(plan)
+
+    # per-actor ACL gate (M0): the authenticated principal's capability scope (None = unscoped). A PURE
+    # RESTRICTION — it only APPENDS a problem (a hard, non-self-approvable reject), never relaxes a gate.
+    # perk_tier + credentialed come from govd's OWN trusted registry + the blessed plan, never task data.
+    perk_tier = delegate.perk_sandbox_tier(skill, perk)
+    credentialed = bool((plan or {}).get("credential_ids"))
+    acl_ok, acl_problem = principals.acl_allows(scope, skill, perk, perk_tier, destructive, credentialed,
+                                                now=now, strict=strict)
+    if not acl_ok:
+        problems.append(acl_problem)
 
     # 5. decide on the CLAIM: structural problems reject; a destructive perk needs explicit approval
     needs_approve = []
@@ -862,6 +885,10 @@ class Handler(BaseHTTPRequestHandler):
         # P1-T08: principal auth at the syscall boundary (header-only, before reading the body). A configured
         # principals registry makes Authorization: Bearer mandatory; local dev (no registry) runs as 'local'.
         reg = cfg.get("principals") or {}
+        # acl_strict (Phase B): the deny-by-default end-state must not be voidable by simply not configuring a
+        # registry — an empty/absent registry under strict is a hard refusal, never an allow-all 'local'.
+        if cfg.get("acl_strict") and not reg:
+            return self._json(503, {"error": "acl_strict requires a configured principals registry"})
         pid = "local"
         if reg:
             pid = principals.authenticate(principals.bearer_of(self.headers.get("Authorization", "")), reg)
@@ -883,7 +910,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(400, {"error": "request body must be a JSON object (task-ledger)"})
 
         try:
-            v = govern(ledger, cfg)
+            v = govern(ledger, cfg,
+                       scope=principals.resolve_scope(reg, pid) if reg else None,
+                       strict=bool(cfg.get("acl_strict")), now=time.time())
         except Exception as e:                           # never leak a stack trace; never 500 the thread
             return self._json(400, {"error": f"govern failed: {type(e).__name__}: {e}"})
         run_id = uuid.uuid4().hex[:16]
@@ -981,6 +1010,21 @@ class Handler(BaseHTTPRequestHandler):
                     ok, reason = authorize_step(store, bound, step, psha)
                     rec0 = store.get(bound)
                     reg0 = self.server.cfg.get("principals") or {}
+                    # M0: re-enforce the actor ACL on the LIVE principal at STEP time, so revocation, TTL
+                    # expiry, or a tightened scope bind an IN-FLIGHT multi-step run (not just the claim) and
+                    # execution authority re-binds to the live principal rather than mere session-token
+                    # possession. Runs before both the delegated and cooperative branches (a deny refuses).
+                    if ok and rec0 and reg0:
+                        _sc = principals.resolve_scope(reg0, rec0.get("principal"))
+                        _strict = bool(self.server.cfg.get("acl_strict"))
+                        if _sc is not None or _strict:
+                            _okv, _pv = principals.acl_allows(
+                                _sc, rec0.get("skill"), rec0.get("perk"),
+                                delegate.perk_sandbox_tier(rec0.get("skill"), rec0.get("perk")),
+                                rec0.get("destructive", False), bool(rec0.get("credential_ids")),
+                                now=time.time(), strict=_strict)
+                            if not _okv:
+                                ok, reason = False, "acl:" + _pv["id"]
                     delegated = ((reg0.get((rec0 or {}).get("principal")) or {}).get("exec_mode")
                                  or getattr(self.server, "exec_mode", "cooperative")) == "delegated"
                     if ok and delegated:
