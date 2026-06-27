@@ -1,6 +1,15 @@
-# Per-actor token ACL for govd — design
+# Per-actor token ACL for govd — design + as-built
 
-> Status: **design / v1.2** · grounded in code, adversarially reviewed (3-proposal panel → judge → red-team; 21 blocker/major findings folded in). Not yet implemented.
+> Status: **SHIPPED** (M0 / M1 / M2, on `main`) · this began as the design below and is now the as-built
+> reference. The three milestones are live: **M0** the base ACL gate — `principals.acl_allows` /
+> `resolve_scope` / `acl_sha` (pid+token_sha folded), appended to `govern()`'s problems[] as a hard,
+> non-self-approvable reject and re-checked on the WS step path; **M1** the operator-signed attestation
+> ceiling — `issue.mint_attestation` → exod `aclverify.verify_acl_attestation` (3-way dual-control, acl_sha
+> re-derived off-node); **M2** the client token-possession proof — `aclverify.mint_token_proof` /
+> `verify_token_proof`, welded in exod's `_acl_check`. **Phase A** (scoped principals enforced deny-by-default,
+> unscoped principals allowed) is the default; **Phase B** (acl_strict, deny-by-default for unscoped too) and
+> exod's enforce-vs-audit mode are the operator flip (pin the acl-issuer pub + `--acl-strict`). The design
+> below is preserved as the rationale — where it says "today / not yet / v1.2", read it as the pre-build motivation.
 
 ## Summary
 
