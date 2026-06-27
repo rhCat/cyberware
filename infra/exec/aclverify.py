@@ -35,7 +35,10 @@ def verify_acl_attestation(acl_issuer_pub, envelope, *, now, expect_acl_sha=None
         return False, "bad_signature"
     if envelope.get("payloadType") != ACL_ATTESTATION_TYPE:
         return False, "wrong_type"
-    body = attestation_body(envelope)
+    try:                                                     # a signed-but-unparseable payload fails CLOSED:
+        body = attestation_body(envelope)                    # verify_acl_attestation is TOTAL, it never raises
+    except Exception:
+        return False, "malformed_body"
     nbf, exp = body.get("nbf"), body.get("exp")
     if not isinstance(nbf, int) or not isinstance(exp, int):
         return False, "malformed_window"

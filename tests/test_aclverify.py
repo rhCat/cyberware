@@ -82,3 +82,14 @@ def test_attestation_id_and_proof_pubkey_carried():
                                  attestation_id="att-z", proof_pubkey="cHJvb2Y=")
     body = aclverify.attestation_body(env)
     assert body["attestation_id"] == "att-z" and body["proof_pubkey"] == "cHJvb2Y="
+
+
+def test_malformed_signed_payload_fails_closed_never_raises():
+    # putrefactio ErrorPropagation finding (aclverify.py:20): a VALIDLY-SIGNED but non-JSON payload must fail
+    # CLOSED (return), never raise — verify_acl_attestation is TOTAL. Sign raw non-JSON bytes directly to reach
+    # the guard (the normal mint API only ever emits JSON, so this path is not attacker-reachable).
+    import base64
+    raw = b"not-json-\x00\x01\xff"
+    env = {"payload": base64.b64encode(raw).decode(), "payloadType": TYPE,
+           "signatures": [{"keyid": "x", "sig": base64.b64encode(OP.sign(sign.pae(TYPE, raw))).decode()}]}
+    assert aclverify.verify_acl_attestation(OP_PUB, env, now=1500) == (False, "malformed_body")
