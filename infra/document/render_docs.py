@@ -114,10 +114,11 @@ function md(src){
     if((m=line.match(/^(#{1,6})\s+(.*)/))){const n=m[1].length;out.push("<h"+n+">"+inline(m[2])+"</h"+n+">");i++;continue;}
     if(/^[-*]\s+/.test(line)){const items=[];while(i<L.length&&/^[-*]\s+/.test(L[i])){let it=L[i++].replace(/^[-*]\s+/,"");while(i<L.length&&/^\s+\S/.test(L[i]))it+=" "+L[i++].trim();items.push("<li>"+inline(it)+"</li>");}out.push("<ul>"+items.join("")+"</ul>");continue;}
     if(/^\d+\.\s+/.test(line)){const items=[];while(i<L.length&&/^\d+\.\s+/.test(L[i])){let it=L[i++].replace(/^\d+\.\s+/,"");while(i<L.length&&/^\s+\S/.test(L[i]))it+=" "+L[i++].trim();items.push("<li>"+inline(it)+"</li>");}out.push("<ol>"+items.join("")+"</ol>");continue;}
-    if(line.match(/^>\s?(.*)/)){out.push("<blockquote>"+inline(line.replace(/^>\s?/,""))+"</blockquote>");i++;continue;}
+    if(/^>\s?/.test(line)){var bq=[];while(i<L.length&&/^>\s?/.test(L[i]))bq.push(L[i++].replace(/^>\s?/,""));out.push("<blockquote>"+inline(bq.join(" "))+"</blockquote>");continue;}
     if(/^([-*_])\1{2,}\s*$/.test(line.trim())){out.push("<hr>");i++;continue;}
     if(line.trim()===""){i++;continue;}
-    out.push("<p>"+inline(line)+"</p>");i++;
+    var para=[];while(i<L.length){var ln=L[i];if(ln.trim()===""||ln.startsWith("```")||/^(#{1,6}\s|[-*]\s|\d+\.\s|>\s?)/.test(ln)||/^([-*_])\1{2,}\s*$/.test(ln.trim()))break;if(ln.includes("|")&&i+1<L.length&&/^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$/.test(L[i+1]))break;para.push(ln);i++;}
+    out.push("<p>"+inline(para.join(" "))+"</p>");
   }
   return out.join("\n");
 }
