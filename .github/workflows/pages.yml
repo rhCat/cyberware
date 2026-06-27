@@ -55,6 +55,7 @@ jobs:
           cp infra/document/pipeline.blueprint.json _site/pipeline.blueprint.json
           cp cyberware.md _site/cyberware.md
           cp docs/*.md _site/docs/
+          python3 infra/document/render_docs.py --out _site   # the docs hub (explore.html) + a rendered page per doc
           # skills.json carries {name, dir} so the source-grouped chip (skillChip/<source>/<skill>) AND the
           # legacy flat layout (skillChip/<skill>) both resolve. The dashboard builds its base path from dir.
           python3 -c "import os,json; r='skillChip'; flat=[{'name':d,'dir':d} for d in os.listdir(r) if os.path.isfile(os.path.join(r,d,'perks.json'))]; nested=[{'name':s,'dir':d+'/'+s} for d in os.listdir(r) if os.path.isdir(os.path.join(r,d)) for s in os.listdir(os.path.join(r,d)) if os.path.isfile(os.path.join(r,d,s,'perks.json'))]; out=sorted(flat+nested, key=lambda e:e['name']); json.dump(out, open('_site/skills.json','w'))"
