@@ -153,9 +153,9 @@ function md(src) {
       while (i < L.length && /^\d+\.\s+/.test(L[i])) { let it = L[i++].replace(/^\d+\.\s+/, ""); while (i < L.length && /^\s+\S/.test(L[i])) it += " " + L[i++].trim(); items.push(`<li>${inline(it)}</li>`); }
       out.push(`<ol>${items.join("")}</ol>`); continue;
     }
-    if ((m = line.match(/^>\s?(.*)/))) { out.push(`<blockquote>${inline(m[1])}</blockquote>`); i++; continue; }
+    if (/^>\s?/.test(line)) { const bq = []; while (i < L.length && /^>\s?/.test(L[i])) bq.push(L[i++].replace(/^>\s?/, "")); out.push(`<blockquote>${inline(bq.join(" "))}</blockquote>`); continue; }
     if (line.trim() === "") { i++; continue; }
-    out.push(`<p>${inline(line)}</p>`); i++;
+    { const para = []; while (i < L.length) { const ln = L[i]; if (ln.trim() === "" || ln.startsWith("```") || /^(#{1,6}\s|[-*]\s|\d+\.\s|>\s?)/.test(ln)) break; if (ln.includes("|") && i + 1 < L.length && /^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$/.test(L[i + 1])) break; para.push(ln); i++; } out.push(`<p>${inline(para.join(" "))}</p>`); }
   }
   return out.join("\n");
 }
