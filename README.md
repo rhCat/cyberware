@@ -301,6 +301,13 @@ Every governed run is **priced** (an itemized quote — LLM tokens + the tool's 
 royalty** to the skill's ancestors (authorship is IP with a meter), and a transparent platform tax. The
 full thesis: [governed-vs-free.md](docs/governed-vs-free.md).
 
+Underneath the headline the payout is **gated, not implicit**: a priced run's payout is impossible until its
+plan-bound quote is **funded in escrow**, and settles **at most once** on a **dual-signed `validation:pass`**
+receipt — every amount an **exact decimal** (float banned by an AST lint) moved by conservation-checked
+double-entry. The same ledger carries the rails beneath it — disputes (m-of-n WebAuthn with bond clawback),
+reputation, a manipulation-resistant FMV index, a prepaid credit tier, refund-on-fail metering, and the
+TSA-anchored capstone completion receipt. Mechanics: [settlement.md](docs/settlement.md).
+
 ## Docs
 
 **[→ the homepage at cyberware.systems](https://cyberware.systems/)** + the live **[registry dashboard](https://cyberware.systems/dashboard.html)** — a static site

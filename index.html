@@ -356,6 +356,7 @@
       <a class="cta solid" href="https://github.com/rhCat/cyberware"><span aria-hidden="true">$</span> git clone the engine</a>
       <a class="cta ghost" href="https://github.com/rhCat/cyberware/blob/main/docs/SPEC.md">read docs/SPEC.md</a>
       <a class="cta ghost" href="dashboard.html">explore the registry <span aria-hidden="true">&#9656;</span></a>
+      <a class="cta ghost" href="atlas.html">inspect the intent atlas <span aria-hidden="true">&#9656;</span></a>
     </div>
     <div class="status-chip"><span class="pulse" aria-hidden="true"></span> v1.1 · building in the open · MIT-licensed chip</div>
   </section>
@@ -435,6 +436,7 @@
         </div>
       </div>
     </div>
+    <p class="lead">And the governor bounds not just <em>what</em> crosses the wire but <em>who</em> may claim <em>what</em>: a token can carry a capability scope — its allowed skills, a tier ceiling, and whether it may reach destructive perks or secrets. A claim outside that scope is denied at the governor and can't be self-approved. On a body, a scoped grant also rides an operator-signed attestation; when the operator enforces it, <strong>exod</strong> re-checks the attestation and a one-time possession proof off-node, so a compromised governor can neither widen a token nor misattribute a run.</p>
     <p class="one-liner">Nothing executable ever crosses the wire — so there's nothing on the wire to steal, and nothing to trust.</p>
     <figure style="margin:1.7rem 0 0">
       <img src="architecture.png" alt="cyberware architecture — four planes (thinking, agent, the cyberware control layer, and the execution substrate), with cyberware the sole gateway between the agent and the substrate; data and secrets stay in the substrate" style="width:100%;border:1px solid var(--gate-dim);border-radius:10px;display:block">
@@ -529,11 +531,11 @@
     <h2 class="sec-h" id="s6h"><span class="gsig">▸</span>Defense isn't a setting — it's a ladder, and each rung is independently checkable.</h2>
     <div class="ladder" id="ladder-rungs">
       <div class="rung"><span class="sv">SV-1</span><div class="body"><span class="mk">✓ </span><strong>Protocol &amp; canonical hashing</strong><span>RFC-8785 canonicalization — one bytes-exact form everything hashes from.</span></div></div>
-      <div class="rung"><span class="sv">SV-2</span><div class="body"><span class="mk">✓ </span><strong>Tamper-evident hash-chained ledger</strong><span>A provenance chain — skip a step and you leave a visible hole.</span></div></div>
-      <div class="rung"><span class="sv">SV-3</span><div class="body"><span class="mk">◐ </span><strong>Kernel-enforced execution boundary <span class="note">(9/10)</span></strong><span>A bubblewrap sandbox under a separate OS principal, exod, whose Ed25519 signature is the only status the ledger trusts. Refusals hold even with the in-process scanner switched off.</span><span class="note"># the boundary is the kernel + a signature, not a scanner. The one open brick is the microVM perf tier, which reports skipped where /dev/kvm is absent — never faked.</span></div></div>
-      <div class="rung"><span class="sv">SV-4</span><div class="body"><span class="mk">✓ </span><strong>Signed, transparency-logged releases + revocation</strong><span>Releases are signed and logged; a compromised build can be revoked.</span></div></div>
+      <div class="rung"><span class="sv">SV-2</span><div class="body"><span class="mk">✓ </span><strong>Tamper-evident hash-chained ledger</strong><span>A provenance chain — skip a step and you leave a visible hole. A record's payload can be <strong>crypto-shredded</strong> (its AES-256-GCM key destroyed) without breaking the chain, and an O(tail) <strong>Merkle checkpoint</strong> cold-verifies the whole history from its end.</span></div></div>
+      <div class="rung"><span class="sv">SV-3</span><div class="body"><span class="mk">◐ </span><strong>Kernel-enforced execution boundary <span class="note">(9/10)</span></strong><span>A bubblewrap sandbox that runs each step as a <strong>non-root</strong> principal (uid 65534, nobody) under a separate OS identity, exod, whose Ed25519 signature is the only status the ledger trusts — and which re-derives every snippet + closure hash at time-of-use, so a porter or core swapped in after the blessing is refused. Refusals hold even with the in-process scanner switched off.</span><span class="note"># the boundary is the kernel + a signature, not a scanner. The one open brick is the microVM perf tier, which reports skipped where /dev/kvm is absent — never faked.</span></div></div>
+      <div class="rung"><span class="sv">SV-4</span><div class="body"><span class="mk">✓ </span><strong>Signed, transparency-logged releases + revocation</strong><span>Releases are signed and logged; a compromised build can be revoked — and on connect the two principals <strong>re-measure each other's live binary</strong> and fail closed on a one-byte change, so the running engine is provably the attested one.</span></div></div>
       <div class="rung"><span class="sv">SV-5</span><div class="body"><span class="mk">✓ </span><strong>Model-checking across the three-prover stack</strong><span>Workflow blueprints proven deadlock-free by TLC, Apalache, and TLAPS.</span></div></div>
-      <div class="rung"><span class="sv">SV-6</span><div class="body"><span class="mk">✓ </span><strong>Settlement layer</strong><span>Attested work is priced, metered, and settled — quote → meter → settle, billed on the meter the isolated principal signed (never the agent's stopwatch) and reconciled to the cent over a real payment rail.</span></div></div>
+      <div class="rung"><span class="sv">SV-6</span><div class="body"><span class="mk">✓ </span><strong>Settlement layer</strong><span>Attested work is priced, metered, and settled — quote → meter → settle, billed on the meter the isolated principal signed (never the agent's stopwatch) and reconciled to the cent over a real payment rail. A run's payout is structurally impossible until its own plan-bound quote is funded in escrow, and pays out at most once, on a dual-signed validation:pass receipt. Every amount is an <strong>exact decimal</strong> (no float, lint-enforced) moved by conservation-checked double-entry; beneath the headline sit disputes (m-of-n WebAuthn), reputation, an FMV index, a prepaid credit tier, and refund-on-fail metering.</span></div></div>
     </div>
     <p class="one-liner">A research build climbing in the open. The boundary is the kernel and a signature.</p>
   </section>
@@ -630,9 +632,15 @@
           <a class="cta solid" href="https://github.com/rhCat/cyberware"><span aria-hidden="true">↳</span> github.com/rhCat/cyberware</a>
         </div>
         <div class="filelist">
+<div>$ open the live tools</div>
+<div>  <a href="dashboard.html">the registry dashboard</a> — every skill · perk · contract · snippet</div>
+<div>  <a href="atlas.html">the intent atlas</a> — every function's intent + flows, linked to source</div>
+<div>&nbsp;</div>
 <div>$ ls docs/</div>
 <div>  <a href="https://github.com/rhCat/cyberware/blob/main/docs/SPEC.md">docs/SPEC.md</a></div>
 <div>  <a href="https://github.com/rhCat/cyberware/blob/main/docs/architecture.md">docs/architecture.md</a></div>
+<div>  <a href="https://github.com/rhCat/cyberware/blob/main/docs/settlement.md">docs/settlement.md</a></div>
+<div>  <a href="https://github.com/rhCat/cyberware/blob/main/docs/ROADMAP.md">docs/ROADMAP.md</a></div>
 <div>  <a href="https://github.com/rhCat/skillChip">the MIT-licensed skillChip</a></div>
         </div>
       </div>

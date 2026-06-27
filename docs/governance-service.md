@@ -170,6 +170,18 @@ On startup the server **hydrates** from `record_root` — the most-recent run le
 reloaded into the dashboard for review. Set `GOVD_RECORD_ROOT` (or `record_root` in the config) to point
 elsewhere. Only `allow` runs are persisted (the executed ones); refusals are session-only in the feed.
 
+### Backends — the chain + the queryable index
+
+The ledger is two layers: the **chained-JSONL artifact-of-record** under `record_root` (above), and a
+**derived, queryable index** built over a pluggable `StoreBackend`. Two backends are interchangeable behind
+the same interface — **`SqliteWalBackend`** (the default: a local WAL sqlite, zero config) and
+**`PsycopgBackend`** (Postgres, for a shared/HA deployment). The Postgres tier is **inert until a DSN is
+wired** (`GOVD_STORE_DSN` / `GOVD_STORE_DSN_FILE`): with no DSN the server runs entirely on the sqlite index,
+and the DSN is **never echoed** to logs. `make_backend` selects the backend from config. Both must pass the
+**same six-property store contract** (conformance · round-trip · idempotent replay · reconcile-exact ·
+torn-tail-safe · Postgres-inert), and a continuous reconciler proves the index equals the chain — see
+[architecture.md](architecture.md). The chain is the source of truth; the index is rebuilt from it.
+
 The snapshot endpoint is gated by a **monitor token** (separate from the per-run session tokens). The
 default depends on the mode, so a network-exposed dashboard is never guessable:
 
