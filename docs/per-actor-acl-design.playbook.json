@@ -1,0 +1,156 @@
+[
+  {
+    "task_id": "m0-01-schema",
+    "skill": "cws-conform",
+    "perk": "schemas",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "m0-02-tier-label",
+    "skill": "cws-conform",
+    "perk": "labeling",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "m0-03-modelcheck",
+    "skill": "cws-modelcheck",
+    "perk": "check",
+    "vars": {},
+    "redeem": true
+  },
+  {
+    "task_id": "m0-04-impl-qc",
+    "skill": "py_qc",
+    "perk": "test",
+    "vars": {},
+    "redeem": true
+  },
+  {
+    "task_id": "m0-05-mutate",
+    "skill": "cws-mutate",
+    "perk": "mutate",
+    "vars": {},
+    "redeem": true
+  },
+  {
+    "task_id": "m0-06-redteam-claim",
+    "skill": "cws-redteam-sw",
+    "perk": "rt-grant-forged",
+    "vars": {},
+    "redeem": true
+  },
+  {
+    "task_id": "m0-07-sec",
+    "skill": "sec",
+    "perk": "secrets",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "m1-01-build-principal",
+    "skill": "cws-addperk",
+    "perk": "apply",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "m1-02-keystore-pin",
+    "skill": "cws-conform",
+    "perk": "keystore",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "m1-03-prove-3way",
+    "skill": "cws-modelcheck",
+    "perk": "prove",
+    "vars": {},
+    "redeem": true
+  },
+  {
+    "task_id": "m1-04-redteam-attest",
+    "skill": "cws-redteam",
+    "perk": "rt-grant-forged",
+    "vars": {},
+    "redeem": true
+  },
+  {
+    "task_id": "m1-05-build-rt-substitute",
+    "skill": "cws-addperk",
+    "perk": "apply",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "m1-06-chaos-keyrotate",
+    "skill": "cws-chaos",
+    "perk": "failover",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "m1-07-chaos-revoke",
+    "skill": "cws-chaos",
+    "perk": "drill",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "m2-01-build-rt-proof",
+    "skill": "cws-addperk",
+    "perk": "apply",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "m2-02-redteam-coopdowngrade",
+    "skill": "cws-redteam",
+    "perk": "rt-govd-executor",
+    "vars": {},
+    "redeem": true
+  },
+  {
+    "task_id": "m2-03-modelcheck-binding",
+    "skill": "cws-modelcheck",
+    "perk": "check",
+    "vars": {},
+    "redeem": true
+  },
+  {
+    "task_id": "m2-04-impl-aclverify",
+    "skill": "py_qc",
+    "perk": "test",
+    "vars": {},
+    "redeem": true
+  },
+  {
+    "task_id": "m2-05-mutate-aclverify",
+    "skill": "cws-mutate",
+    "perk": "mutate",
+    "vars": {},
+    "redeem": true
+  },
+  {
+    "task_id": "fin-01-codebaseqc",
+    "skill": "codebaseqc",
+    "perk": "audit",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "fin-02-ledgercheck",
+    "skill": "cws-ledgercheck",
+    "perk": "principal",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "fin-03-release",
+    "skill": "cws-release",
+    "perk": "sign",
+    "vars": {},
+    "redeem": true
+  }
+]
