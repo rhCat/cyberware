@@ -70,7 +70,7 @@ def materialize_workspace(rec, base, registry=None):
 
 
 def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base, registry=None,
-                 request=exod.request_step, now=None, grant_ttl=60):
+                 request=exod.request_step, now=None, grant_ttl=60, attestation=None):
     """Delegate ONE step to exod. Returns (reply, event): `reply` is the status-only dict sent back to the
     agent; `event` is the ledger record to append (exod's signed step_result, or a refusal record, or None
     when nothing should be recorded). govd NEVER runs the step — exod does, confined.
@@ -89,13 +89,29 @@ def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base,
     # P3-T11: the perk's declared catalog tier flows into the grant's sandbox_tier — exod uses it to select the
     # confinement backend (community → gVisor/runsc; trusted family → bwrap; undeclared → the operator floor).
     # Orthogonal to the SECRET tier above: a credentialed grant is still minted trusted regardless of backend.
+    # ACL M1: bind the per-actor ACL digest + the canonical claim into the grant — ALL-OR-NOTHING, gated on
+    # acl_sha. An UNSCOPED (non-ACL'd) actor's rec has no acl_sha, so NONE of acl_sha/skill/perk/destructive is
+    # passed and the grant body stays BYTE-IDENTICAL to the pre-ACL form (exod skips its acl check when acl_sha
+    # is absent, so it never needs them). For an ACL'd actor all four travel together; exod JOINs acl_sha
+    # against the operator attestation and re-runs acl_allows on skill/perk/destructive, enforcing off-node.
+    acl_sha = rec.get("acl_sha")
     grant = grants.mint_grant(grant_key, run_id=rec["run_id"], plan_sha=plan_sha,
                               snippet_shas=rec.get("snippet_shas") or {}, capabilities=["run"],
                               credentials=creds, tier=("trusted" if creds else "community"),
                               sandbox_tier=perk_sandbox_tier(rec.get("skill"), rec.get("perk"), registry),
+                              acl_sha=acl_sha,
+                              skill=rec.get("skill") if acl_sha else None,
+                              perk=rec.get("perk") if acl_sha else None,
+                              destructive=rec.get("destructive") if acl_sha else None,
                               nbf=now - 5, exp=now + grant_ttl, nonce=nonce)
+    # the operator attestation (held + relayed by the agent) rides verbatim to exod. govd does NOT hold the
+    # operator ACL-issuer private key, so it cannot FORGE an attestation — that is what stops it WIDENING a
+    # token past its attested ACL. It does NOT yet stop a compromised govd from RELAYING a DIFFERENT, valid,
+    # more-privileged token's attestation (the run<->token misattribution closed by the M2 client proof — not
+    # built; proof_pubkey is carried but unverified at M1).
     req = {"run_id": rec["run_id"], "plan_sha": plan_sha, "step": step,
-           "argv": ["bash", run_sh, "--step", step], "workspace": ws, "env": env, "grant": grant}
+           "argv": ["bash", run_sh, "--step", step], "workspace": ws, "env": env, "grant": grant,
+           "attestation": attestation}
     try:
         envl = request(exod_socket, req)
     except Exception:
