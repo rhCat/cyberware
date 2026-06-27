@@ -162,3 +162,31 @@ def test_perk_declared_tier_flows_into_the_grant(tmp_path):
     delegate.execute_step(rec, "1", "PSHA", exod_socket="x", grant_key=gk, exod_pub=exod_obj.public_key,
                           base=str(tmp_path / "ws"), request=capture, registry=reg, now=1000)
     assert captured["sandbox_tier"] == "community"                          # the declared tier reached the grant
+
+
+def test_grant_acl_fields_are_all_or_nothing_gated_on_acl_sha(tmp_path):
+    """ACL M1 (citrinitas D3): an UNSCOPED (no acl_sha) grant body stays BYTE-IDENTICAL to the pre-ACL form —
+    none of acl_sha/skill/perk/destructive is stamped, and no attestation rides. An ACL'd rec carries all four
+    binding fields together + relays the attestation. This pins the all-or-nothing gate at the live call site."""
+    from infra.exec.grantverify import grant_body
+    gk = Ed25519PrivateKey.generate()
+    cap = {}
+
+    def capture(_sock, req):
+        cap["g"] = grant_body(req["grant"])
+        cap["att"] = req.get("attestation")
+        raise RuntimeError("captured — short-circuit before exod runs")     # delegate fails closed; grant minted
+
+    # unscoped: rec has no acl_sha -> the grant body gains NONE of the ACL keys (byte-identical to pre-ACL)
+    delegate.execute_step(_rec(), "1", "PSHA", exod_socket="x", grant_key=gk, exod_pub=gk.public_key(),
+                          base=str(tmp_path / "a"), request=capture, now=1000)
+    assert not any(k in cap["g"] for k in ("acl_sha", "skill", "perk", "destructive"))
+    assert cap["att"] is None
+
+    # ACL'd: rec carries acl_sha -> all four binding fields travel together + the attestation is relayed
+    rec = {**_rec(), "acl_sha": "ab" * 32, "destructive": False}
+    delegate.execute_step(rec, "1", "PSHA", exod_socket="x", grant_key=gk, exod_pub=gk.public_key(),
+                          base=str(tmp_path / "b"), request=capture, now=1000, attestation={"payload": "x"})
+    g = cap["g"]
+    assert g["acl_sha"] == "ab" * 32 and g["skill"] == "fs" and g["perk"] == "find_large" and g["destructive"] is False
+    assert cap["att"] == {"payload": "x"}
