@@ -15,16 +15,9 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: [self-hosted]          # dev: private repo → self-hosted (free Actions minutes). Revert to ubuntu-latest when cyberware goes public.
+    runs-on: ubuntu-latest          # the deploy is a tiny static assemble (not an image build) → a hosted runner gives an isolated, race-free workspace. The heavy multi-arch image builds stay on self-hosted.
     steps:
-      - name: reclaim workspace ownership before checkout (self-hosted runner)
-        run: |
-          # A prior root-uid step (e.g. a docker run) can leave root-owned files in .git that the runner
-          # user cannot clean — actions/checkout then dies (EACCES rmdir .git/branches, .git/index.lock).
-          # Reclaim ownership, then drop a poisoned .git so checkout recreates it fresh.
-          sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE" || true
-          [ -n "$GITHUB_WORKSPACE" ] && sudo rm -rf "$GITHUB_WORKSPACE/.git" || true
-      - uses: actions/checkout@v4                  # main repo: the native runner token owns cyberware
+      - uses: actions/checkout@v4                  # clean hosted workspace — no reclaim needed
         with:
           persist-credentials: false                # don't leave a github.token extraheader that shadows the PAT
       - name: checkout the skillChip cartridge (submodule)
