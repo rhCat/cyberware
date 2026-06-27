@@ -74,7 +74,10 @@ class Exod:
         self._vault = vault                 # the limb resolves grant-authorized secrets server-side (P2-T12)
         self._backend_floor = backend_floor # P3-T11: the operator's --backend; a grant tier may only RATCHET it up
         self._grant_nonces = NonceCache()   # fast per-instance guard; the durable one is the ledger (below)
-        self._proof_nonces = NonceCache()   # ACL M2: single-use client token-possession proofs per (token,run,step)
+        # ACL M2: a fast in-memory single-use proof guard per (token,run,step). It RESETS on an exod restart;
+        # the ledger-durable GRANT nonce (below) is the actual cross-restart backstop against re-executing the
+        # same (run, step), so this is a secondary guard, not the durability floor.
+        self._proof_nonces = NonceCache()
         def _rawpub(p): return p.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
         self._banned_proof_pubs = {_rawpub(grant_issuer_pub), _rawpub(signing_key.public_key())}
         if acl_issuer_pub is not None:      # a proof key equal to ANY node-held key is degenerate (could self-prove)
