@@ -66,7 +66,7 @@ TOKEN_PROOF_TYPE = "application/vnd.cyberware.token-proof+json"
 
 def mint_token_proof(proof_key, *, run_id, plan_sha, step, token_sha):
     """The client signs a per-step token-possession proof with its proof PRIVATE key (whose public half the
-    operator bound into the attestation). Binds run_id/plan_sha/step + token_sha — values the client knows at
+    operator bound into the attestation). Binds (run_id, plan_sha, step, token_sha) — values the client knows at
     step-send time, with NO dependence on govd's grant nonce (minted inside govd, after the step arrives)."""
     body = {"run_id": run_id, "plan_sha": plan_sha, "step": str(step), "token_sha": token_sha}
     return sign.sign(body, proof_key, payload_type=TOKEN_PROOF_TYPE)
@@ -81,8 +81,8 @@ def verify_token_proof(proof_pubkey_raw, envelope, *, expect_run_id, expect_plan
     # (ok, reason). proof_pubkey_raw is the raw-32 proof key the OPERATOR bound into the attestation. The
     # DEGENERATE guard runs FIRST: a proof key equal to one the node controls (grant-issuer/acl-issuer/exod)
     # is rejected, so a compromised govd holding one of those cannot mint a self-satisfying proof. The signature
-    # is checked against THAT operator-bound key; the proof must bind this run/plan/step + the attestation's
-    # token_sha; single-use per (token_sha, run, step) defeats a replay onto another run or step.
+    # is checked against THAT operator-bound key; the proof must bind this run/plan/step to the attestation's
+    # token_sha; single-use per (token_sha, run, step) defeats a replay onto a different run/step.
     if proof_pubkey_raw in banned_pubkeys:
         return False, "proof_degenerate_pubkey"
     try:

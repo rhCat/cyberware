@@ -1057,7 +1057,8 @@ class Handler(BaseHTTPRequestHandler):
                             d_reply, d_event = delegate.execute_step(
                                 rec0, step, psha, exod_socket=sock, grant_key=gk, exod_pub=epub,
                                 base=getattr(self.server, "exec_workspace", os.path.join(store.root, "_work")),
-                                attestation=msg.get("attestation"))   # ACL M1: the agent-relayed operator attestation
+                                attestation=msg.get("attestation"),   # ACL M1: agent-relayed operator attestation
+                                token_proof=msg.get("token_proof"))   # ACL M2: agent-relayed token-possession proof
                             if d_event:
                                 store.append(bound, {**d_event, "ts": now(),
                                                      "span": tracing.child_span((rec0 or {}).get("traceparent"))})

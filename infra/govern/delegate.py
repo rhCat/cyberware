@@ -70,7 +70,7 @@ def materialize_workspace(rec, base, registry=None):
 
 
 def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base, registry=None,
-                 request=exod.request_step, now=None, grant_ttl=60, attestation=None):
+                 request=exod.request_step, now=None, grant_ttl=60, attestation=None, token_proof=None):
     """Delegate ONE step to exod. Returns (reply, event): `reply` is the status-only dict sent back to the
     agent; `event` is the ledger record to append (exod's signed step_result, or a refusal record, or None
     when nothing should be recorded). govd NEVER runs the step — exod does, confined.
@@ -111,7 +111,7 @@ def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base,
     # built; proof_pubkey is carried but unverified at M1).
     req = {"run_id": rec["run_id"], "plan_sha": plan_sha, "step": step,
            "argv": ["bash", run_sh, "--step", step], "workspace": ws, "env": env, "grant": grant,
-           "attestation": attestation}
+           "attestation": attestation, "token_proof": token_proof}
     try:
         envl = request(exod_socket, req)
     except Exception:

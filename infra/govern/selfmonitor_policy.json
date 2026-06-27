@@ -87,7 +87,7 @@
             "cap": 50,
             "floor": 1.0,
             "target": 0.9,
-            "note": "ACL M1 operator-attestation verifier (verify_acl_attestation: sig-FIRST, acl_sha re-derive + join, window, totality) \u2014 prose-clean core, both sides pinned"
+            "note": "ACL M1 attestation verifier + M2 token-possession proof (verify_acl_attestation + verify_token_proof) \u2014 prose-clean core, both sides pinned"
         }
     ]
 }

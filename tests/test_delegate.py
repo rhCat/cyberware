@@ -217,3 +217,34 @@ def test_acl_delegated_end_to_end_exod_reenforces_off_node(tmp_path):
     assert ok_reply.get("status") == "ok" and ok_event is not None         # in scope → exod ran it + signed
     no_reply, _ = _run(out_scope, tmp_path / "no")
     assert no_reply.get("status") == "refused"                            # out of scope → exod refused off-node
+
+
+def test_acl_m2_delegated_end_to_end_token_proof(tmp_path):
+    """ACL M2 e2e: an attestation that BINDS a client proof_pubkey → delegate relays the token_proof → exod
+    REQUIRES + verifies it. A valid proof executes; a missing proof (a govd relaying the attestation without
+    the actor's proof) is refused off-node — the run<->token misattribution close, through the full path."""
+    import base64
+    from cryptography.hazmat.primitives import serialization as _s
+    from infra.exec import aclverify
+    from infra.govern import issue, principals
+    op = Ed25519PrivateKey.generate()
+    gk = Ed25519PrivateKey.generate()
+    pk = Ed25519PrivateKey.generate()                                     # the actor's INDEPENDENT proof key
+    ppub_b64 = base64.b64encode(pk.public_key().public_bytes(_s.Encoding.Raw, _s.PublicFormat.Raw)).decode()
+    exod_obj = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=gk.public_key(),
+                    acl_issuer_pub=op.public_key(), acl_strict=True, runner=_Stub(0))
+    acl = {"skills": ["fs"], "perks": {"fs": ["find_large"]}, "max_tier": "community", "secrets": False}
+    rec = {**_rec(), "acl_sha": principals.acl_sha("agent-1", "sha-x", acl), "destructive": False}
+    att = issue.mint_attestation(op, pid="agent-1", token_sha="sha-x", acl=acl, nbf=990, exp=2000,
+                                 attestation_id="a1", proof_pubkey=ppub_b64)
+
+    def run(token_proof, base):
+        return delegate.execute_step(rec, "1", "PSHA", exod_socket="x", grant_key=gk, exod_pub=exod_obj.public_key,
+                                     base=str(base), request=_inproc(exod_obj), now=1000,
+                                     attestation=att, token_proof=token_proof)
+
+    good = aclverify.mint_token_proof(pk, run_id=rec["run_id"], plan_sha="PSHA", step="1", token_sha="sha-x")
+    ok_reply, ok_event = run(good, tmp_path / "ok")
+    assert ok_reply.get("status") == "ok" and ok_event is not None       # valid proof → exod ran it
+    no_reply, _ = run(None, tmp_path / "no")
+    assert no_reply.get("status") == "refused"                           # proof bound but not relayed → refused
