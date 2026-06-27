@@ -76,6 +76,26 @@ PY
   chown -R "$CW_USER:$CW_USER" "$CW_KEYS"
 fi
 
+# 3b. ACL M1 (optional): pin the operator ACL-issuer PUBLIC key IF it has been provisioned out-of-band (its
+#     PRIVATE half lives OFF this body — the operator owns it). When present, exod re-enforces each ACL'd
+#     actor's ceiling under three-way dual-control; absent, exod runs without ACL enforcement (Phase A — the
+#     in-process govd gate stays the live enforcer). Set CW_ACL_STRICT=1 to refuse (not audit) on an ACL fail.
+ACL_FLAG=""
+if [ -f "$CW_KEYS/acl-issuer.pub" ]; then
+  "$PY" - "$CW_KEYS" <<'PY'
+import sys, os
+d = sys.argv[1]
+def rd(n): return open(os.path.join(d, n), "rb").read()
+acl, grant, exod = rd("acl-issuer.pub"), rd("grant.pub"), rd("exod.pub")
+assert len(acl) == 32, "acl-issuer.pub must be raw 32 bytes"
+assert acl != grant and acl != exod, "acl-issuer pub must differ from grant + exod (three-way dual-control)"
+PY
+  chmod 0444 "$CW_KEYS/acl-issuer.pub" 2>/dev/null || true
+  ACL_FLAG=" --acl-issuer-pub $CW_KEYS/acl-issuer.pub"
+  [ "${CW_ACL_STRICT:-}" = "1" ] && ACL_FLAG="$ACL_FLAG --acl-strict"
+  log "ACL-issuer pub pinned — exod re-enforces ACLs (three-way dual-control)"
+fi
+
 # 4. principals registry (agent Bearer auth) + monitor token — same as the control plane
 if [ ! -f "$CW_ETC/monitor.token" ]; then
   umask 077; openssl rand -hex 24 > "$CW_ETC/monitor.token"; chown "$CW_USER:$CW_USER" "$CW_ETC/monitor.token"
@@ -117,7 +137,7 @@ WorkingDirectory=$CW_SRC
 Environment=PYTHONDONTWRITEBYTECODE=1
 RuntimeDirectory=cyberware
 RuntimeDirectoryMode=0750
-ExecStart=$PY -m infra.exec.exod --socket $EXOD_SOCK --key $CW_KEYS/exod.key --issuer-pub $CW_KEYS/grant.pub
+ExecStart=$PY -m infra.exec.exod --socket $EXOD_SOCK --key $CW_KEYS/exod.key --issuer-pub $CW_KEYS/grant.pub$ACL_FLAG
 Restart=always
 RestartSec=5
 [Install]

@@ -264,7 +264,7 @@ def run_governed(base_url, ledger, approve=(), registry=None):
             "ledger": base_url.rstrip("/") + "/ledger/" + verdict["run_id"] + "?token=" + tok}
 
 
-def run_delegated(base_url, ledger, approve=()):
+def run_delegated(base_url, ledger, approve=(), attestation=None):
     """SERVER-SIDE execution (P2-T12): the agent POSTs the claim, opens the per-run WS, and asks govd to
     EXECUTE each step — govd delegates to exod the limb, which runs it CONFINED and signs the authoritative
     status; govd records the SIGNED status. The agent runs NOTHING and holds no porter: intent-in, status-out
@@ -285,7 +285,10 @@ def run_delegated(base_url, ledger, approve=()):
     steps = [str(i) for i in range(1, len(plan["sequence"]) + 1)]   # plan is sole source of step truth (P1-T06)
     results = []
     for st in steps:
-        _ws_send(sock, json.dumps({"type": "step_request", "step": st, "plan_sha": psha}))
+        msg = {"type": "step_request", "step": st, "plan_sha": psha}
+        if attestation is not None:                     # ACL M1: relay the operator attestation to exod (the
+            msg["attestation"] = attestation            # agent holds it; govd only relays, it cannot forge it)
+        _ws_send(sock, json.dumps(msg))
         raw = _ws_recv(sock)
         if raw is None:
             results.append({"step": st, "refused": "server closed the oversight channel"}); break
@@ -318,6 +321,8 @@ def main():
     ap.add_argument("--fetch-only", action="store_true", help="just get the verdict/plan, do not execute")
     ap.add_argument("--token-file", help="file holding the principal Bearer token (a hardened/remote govd requires it; "
                                          "equivalent to GOVD_TOKEN_FILE — the raw token never lands in argv)")
+    ap.add_argument("--attestation", help="ACL M1: path to the operator ACL attestation (JSON), relayed to exod "
+                                          "on each delegated step so it can re-enforce the actor's ceiling")
     a = ap.parse_args()
     if a.token_file:
         os.environ["GOVD_TOKEN_FILE"] = a.token_file        # _auth_headers reads it; raw value stays in the file
@@ -332,7 +337,8 @@ def main():
     if a.fetch_only:
         out = fetch(a.url, ledger, a.approve)
     elif a.delegated:
-        out = run_delegated(a.url, ledger, a.approve)          # govd→exod: the node executes confined + signs
+        att = json.load(open(a.attestation)) if a.attestation else None
+        out = run_delegated(a.url, ledger, a.approve, attestation=att)   # govd→exod: confined + signed, ACL re-enforced
     else:
         out = run_governed(a.url, ledger, a.approve, registry=a.registry)
     print(json.dumps(out, indent=2))

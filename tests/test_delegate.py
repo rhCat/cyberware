@@ -190,3 +190,30 @@ def test_grant_acl_fields_are_all_or_nothing_gated_on_acl_sha(tmp_path):
     g = cap["g"]
     assert g["acl_sha"] == "ab" * 32 and g["skill"] == "fs" and g["perk"] == "find_large" and g["destructive"] is False
     assert cap["att"] == {"payload": "x"}
+
+
+def test_acl_delegated_end_to_end_exod_reenforces_off_node(tmp_path):
+    """ACL M1 end-to-end: an ACL'd rec → delegate binds acl_sha + relays the operator attestation → exod
+    (acl-issuer pinned, strict) re-derives acl_sha, JOINs it against the grant, and re-runs acl_allows. An
+    IN-SCOPE claim executes; an OUT-OF-SCOPE claim is REFUSED by exod off-node even though govd minted the
+    grant — the compromised-govd-can't-widen property, exercised through the full govd→delegate→exod path."""
+    from infra.govern import issue, principals
+    op = Ed25519PrivateKey.generate()
+    gk = Ed25519PrivateKey.generate()
+    exod_obj = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=gk.public_key(),
+                    acl_issuer_pub=op.public_key(), acl_strict=True, runner=_Stub(0))
+
+    def _run(acl, base):
+        # govd recomputes acl_sha from the live fields; the operator attests the SAME acl (so the join holds)
+        sha = principals.acl_sha("agent-1", "sha-x", acl)
+        att = issue.mint_attestation(op, pid="agent-1", token_sha="sha-x", acl=acl, nbf=990, exp=2000, attestation_id="a1")
+        rec = {**_rec(), "acl_sha": sha, "destructive": False}             # the claim is always fs/find_large
+        return delegate.execute_step(rec, "1", "PSHA", exod_socket="x", grant_key=gk, exod_pub=exod_obj.public_key,
+                                     base=str(base), request=_inproc(exod_obj), now=1000, attestation=att)
+
+    in_scope = {"skills": ["fs"], "perks": {"fs": ["find_large"]}, "max_tier": "community", "secrets": False}
+    out_scope = {"skills": ["fs"], "perks": {"fs": ["nope"]}, "max_tier": "community", "secrets": False}
+    ok_reply, ok_event = _run(in_scope, tmp_path / "ok")
+    assert ok_reply.get("status") == "ok" and ok_event is not None         # in scope → exod ran it + signed
+    no_reply, _ = _run(out_scope, tmp_path / "no")
+    assert no_reply.get("status") == "refused"                            # out of scope → exod refused off-node

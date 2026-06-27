@@ -29,7 +29,7 @@ def attested_acl(body):
 def verify_acl_attestation(acl_issuer_pub, envelope, *, now, expect_acl_sha=None, skew=DEFAULT_SKEW):
     # verify an operator ACL attestation OFFLINE. Returns (ok, reason). Signature is checked FIRST (a forged
     # attestation never reaches the join). acl_sha is RE-DERIVED from the body's own fields (pid, token_sha,
-    # skills, perks, max_tier, secrets) and never trusted on faith: it must match the body's stated acl_sha,
+    # skills, perks, max_tier, secrets), never trusted on faith: it must match the body's stated acl_sha,
     # AND, when the caller supplies one, the grant's acl_sha (the join that ties grant to attestation).
     if not sign.verify(envelope, acl_issuer_pub):
         return False, "bad_signature"

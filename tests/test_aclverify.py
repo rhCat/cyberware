@@ -84,6 +84,26 @@ def test_attestation_id_and_proof_pubkey_carried():
     assert body["attestation_id"] == "att-z" and body["proof_pubkey"] == "cHJvb2Y="
 
 
+def test_malformed_window_fails_closed():
+    # a signed attestation whose nbf/exp is not an int -> (False, malformed_window): kills the or-branch + the
+    # False-literal return. Sign a hand-built body so the window is malformed but the signature is valid.
+    body = {"pid": "p", "token_sha": "s", "acl_sha": principals.acl_sha("p", "s", ACL),
+            "skills": ACL["skills"], "perks": ACL["perks"], "max_tier": ACL["max_tier"], "secrets": ACL["secrets"],
+            "nbf": "soon", "exp": 5000, "attestation_id": "a"}
+    env = sign.sign(body, OP, payload_type=TYPE)
+    assert aclverify.verify_acl_attestation(OP_PUB, env, now=1500) == (False, "malformed_window")
+
+
+def test_skew_window_boundaries():
+    # exercise the +/- DEFAULT_SKEW (60) boundaries so the skew-sign mutants die: a `now` just inside the
+    # window verifies; just outside is not_yet_valid / expired (nbf=1000, exp=1100).
+    att = _att(now=1000, ttl=100)
+    assert aclverify.verify_acl_attestation(OP_PUB, att, now=945)[0] is True          # just inside nbf-skew (940)
+    assert aclverify.verify_acl_attestation(OP_PUB, att, now=935) == (False, "not_yet_valid")   # just outside
+    assert aclverify.verify_acl_attestation(OP_PUB, att, now=1155)[0] is True         # just inside exp+skew (1160)
+    assert aclverify.verify_acl_attestation(OP_PUB, att, now=1165) == (False, "expired")        # just outside
+
+
 def test_malformed_signed_payload_fails_closed_never_raises():
     # putrefactio ErrorPropagation finding (aclverify.py:20): a VALIDLY-SIGNED but non-JSON payload must fail
     # CLOSED (return), never raise — verify_acl_attestation is TOTAL. Sign raw non-JSON bytes directly to reach
