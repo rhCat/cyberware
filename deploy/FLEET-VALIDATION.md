@@ -7,7 +7,7 @@ the *running* nodes executing a real governed claim end-to-end is a separate pro
 ## First live confined claim (2026-06-23)
 
 A real governed claim was driven from an agent (a Mac on the tailnet) through a **deployed DGX confined body**
-(`body-1`, rootless `setup-confined-body-user.sh`, `exec_mode=delegated`):
+(rootless `setup-confined-body-user.sh`, `exec_mode=delegated`):
 
 ```
 claim: fs/find_large  SEARCH_DIR=/usr  MIN_SIZE=10M     (read-only; the limb has no network)
@@ -40,7 +40,7 @@ Discovery is ungated (`--discover` needs no token); only `/govern` requires the 
 
 ## Confined-execution overhead (2026-06-24)
 
-`cws-bench/bwrap-overhead` on `body-1` — N=30 benign steps through exod into the bwrap SandboxProfile,
+`cws-bench/bwrap-overhead` on the confined body — N=30 benign steps through exod into the bwrap SandboxProfile,
 timed from exod's **attested `meter.wall_ms`** (not the agent's stopwatch). Budget: p95 ≤ 100 ms.
 
 ```
