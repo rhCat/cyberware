@@ -79,3 +79,36 @@ def test_legacy_unscoped_grant_passes_but_strict_refuses():
 def test_acl_grant_without_a_pinned_issuer_is_unverifiable():
     no_pub = Exod(EXODK, grant_issuer_pub=GRANT.public_key(), runner=lambda *a, **k: None)
     assert no_pub._acl_check({"attestation": _att()}, _gbody(), now=1500) == "no_issuer_pinned"
+
+
+def test_m2_token_proof_required_and_misattribution_refused():
+    import base64
+    from cryptography.hazmat.primitives import serialization as _s
+    from infra.exec import aclverify
+    pk = sign.keygen_from_seed(b"client-proof".ljust(32, b"0"))    # the actor's INDEPENDENT proof key
+    ppub_b64 = base64.b64encode(pk.public_key().public_bytes(_s.Encoding.Raw, _s.PublicFormat.Raw)).decode()
+    att = issue.mint_attestation(OP, pid="agent-1", token_sha="sha-abc", acl=ACL, nbf=1000, exp=2000,
+                                 attestation_id="att-1", proof_pubkey=ppub_b64)
+    gb = {**_gbody(), "run_id": "R1", "plan_sha": "a" * 64}
+    e = _exod()                                                    # acl-issuer pinned, strict
+
+    def chk(proof):
+        req = {"attestation": att, "step": "1"}
+        if proof is not None:
+            req["token_proof"] = proof
+        return e._acl_check(req, gb, now=1500)
+
+    good = aclverify.mint_token_proof(pk, run_id="R1", plan_sha="a" * 64, step="1", token_sha="sha-abc")
+    assert chk(good) is None                                       # the actor's valid proof -> allowed
+    assert chk(None) == "proof_missing"                           # attestation binds a proof key, none presented
+    # MISATTRIBUTION: a compromised govd relays this attestation but holds only a DIFFERENT actor's proof
+    # (signed by a key != the attested proof_pubkey) -> the signature cannot satisfy the attested key.
+    other = sign.keygen_from_seed(b"other-actor".ljust(32, b"0"))
+    relayed = aclverify.mint_token_proof(other, run_id="R1", plan_sha="a" * 64, step="1", token_sha="sha-abc")
+    assert chk(relayed) == "proof_bad_signature"
+
+
+def test_m2_no_proof_required_when_attestation_omits_proof_pubkey():
+    att = issue.mint_attestation(OP, pid="agent-1", token_sha="sha-abc", acl=ACL, nbf=1000, exp=2000, attestation_id="a")
+    gb = {**_gbody(), "run_id": "R1", "plan_sha": "a" * 64}
+    assert _exod()._acl_check({"attestation": att, "step": "1"}, gb, now=1500) is None   # M1-only back-compat

@@ -15,6 +15,7 @@ The verification surface lives in exodverify.py (prose-clean, the R3 mutation ta
 daemon, signs results, records authoritative status, and re-exports the verifier so callers keep one import.
 """
 from __future__ import annotations
+import base64
 import dataclasses
 import hashlib
 import json
@@ -22,6 +23,8 @@ import os
 import socket
 import sys
 import time
+
+from cryptography.hazmat.primitives import serialization
 
 from infra.cwp import sign
 from infra.exec import vault as _vaultmod
@@ -33,7 +36,7 @@ from infra.exec.sandbox import (
 from infra.exec.exodverify import (  # noqa: F401  (single source of truth for the verify surface)
     STEP_RESULT_TYPE, NonceCache, _principal, result_body, verify_step_result,
 )
-from infra.exec.aclverify import attestation_body, attested_acl, verify_acl_attestation  # ACL M1
+from infra.exec.aclverify import attestation_body, attested_acl, verify_acl_attestation, verify_token_proof  # ACL M1/M2
 from infra.govern import principals          # the SAME pure acl_allows govern() uses — exod re-runs it off-node
 
 
@@ -71,6 +74,14 @@ class Exod:
         self._vault = vault                 # the limb resolves grant-authorized secrets server-side (P2-T12)
         self._backend_floor = backend_floor # P3-T11: the operator's --backend; a grant tier may only RATCHET it up
         self._grant_nonces = NonceCache()   # fast per-instance guard; the durable one is the ledger (below)
+        # ACL M2: a fast in-memory single-use proof guard per (token,run,step). It RESETS on an exod restart;
+        # the ledger-durable GRANT nonce (below) is the actual cross-restart backstop against re-executing the
+        # same (run, step), so this is a secondary guard, not the durability floor.
+        self._proof_nonces = NonceCache()
+        def _rawpub(p): return p.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        self._banned_proof_pubs = {_rawpub(grant_issuer_pub), _rawpub(signing_key.public_key())}
+        if acl_issuer_pub is not None:      # a proof key equal to ANY node-held key is degenerate (could self-prove)
+            self._banned_proof_pubs.add(_rawpub(acl_issuer_pub))
 
     @property
     def public_key(self):
@@ -199,13 +210,34 @@ class Exod:
         ok, why = verify_acl_attestation(self._acl_issuer_pub, att, now=now, expect_acl_sha=acl_sha)
         if not ok:
             return why
-        acl = attested_acl(attestation_body(att))
+        body = attestation_body(att)
+        acl = attested_acl(body)
         # sandbox_tier is the perk's catalog tier, derived by govd from its OWN trusted registry (never task
         # data) and grant-bound — a govd that lowers it can only TIGHTEN the ceiling, never widen the actor.
         okv, prob = principals.acl_allows(acl, gbody.get("skill"), gbody.get("perk"),
                                           gbody.get("sandbox_tier"), gbody.get("destructive"),
                                           bool(gbody.get("credentials")))
-        return None if okv else prob["id"]
+        if not okv:
+            return prob["id"]
+        # M2: when the operator bound a client proof key into the attestation, REQUIRE a matching token-possession
+        # proof. It binds the run to the token that actually HOLDS the proof key, so a compromised govd cannot
+        # MISATTRIBUTE the run to a different, more-privileged token whose attestation it merely relays.
+        proof_pub_b64 = body.get("proof_pubkey")
+        if proof_pub_b64:
+            proof = req.get("token_proof")
+            if not proof:
+                return "proof_missing"
+            try:
+                ppub_raw = base64.b64decode(proof_pub_b64)
+            except Exception:
+                return "proof_bad_pubkey"
+            okp, whyp = verify_token_proof(ppub_raw, proof, expect_run_id=gbody.get("run_id"),
+                                           expect_plan_sha=gbody.get("plan_sha"), expect_step=req.get("step"),
+                                           expect_token_sha=body.get("token_sha"),
+                                           banned_pubkeys=self._banned_proof_pubs, nonce_cache=self._proof_nonces)
+            if not okp:
+                return whyp
+        return None
 
     # ── the Unix-domain-socket channel — exod as a separate listening principal ──────────────────────
     def serve(self, socket_path: str, *, now_fn=lambda: int(time.time()), max_requests=None,
