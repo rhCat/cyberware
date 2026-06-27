@@ -200,6 +200,8 @@ class Exod:
         if not ok:
             return why
         acl = attested_acl(attestation_body(att))
+        # sandbox_tier is the perk's catalog tier, derived by govd from its OWN trusted registry (never task
+        # data) and grant-bound — a govd that lowers it can only TIGHTEN the ceiling, never widen the actor.
         okv, prob = principals.acl_allows(acl, gbody.get("skill"), gbody.get("perk"),
                                           gbody.get("sandbox_tier"), gbody.get("destructive"),
                                           bool(gbody.get("credentials")))

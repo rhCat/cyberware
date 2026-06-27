@@ -104,8 +104,11 @@ def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base,
                               perk=rec.get("perk") if acl_sha else None,
                               destructive=rec.get("destructive") if acl_sha else None,
                               nbf=now - 5, exp=now + grant_ttl, nonce=nonce)
-    # the operator attestation (held + relayed by the agent) rides verbatim to exod; govd holds neither the
-    # operator key nor the client proof key, so it cannot forge it — it only relays what the agent presents.
+    # the operator attestation (held + relayed by the agent) rides verbatim to exod. govd does NOT hold the
+    # operator ACL-issuer private key, so it cannot FORGE an attestation — that is what stops it WIDENING a
+    # token past its attested ACL. It does NOT yet stop a compromised govd from RELAYING a DIFFERENT, valid,
+    # more-privileged token's attestation (the run<->token misattribution closed by the M2 client proof — not
+    # built; proof_pubkey is carried but unverified at M1).
     req = {"run_id": rec["run_id"], "plan_sha": plan_sha, "step": step,
            "argv": ["bash", run_sh, "--step", step], "workspace": ws, "env": env, "grant": grant,
            "attestation": attestation}

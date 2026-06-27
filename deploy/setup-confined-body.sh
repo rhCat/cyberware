@@ -92,8 +92,12 @@ assert acl != grant and acl != exod, "acl-issuer pub must differ from grant + ex
 PY
   chmod 0444 "$CW_KEYS/acl-issuer.pub" 2>/dev/null || true
   ACL_FLAG=" --acl-issuer-pub $CW_KEYS/acl-issuer.pub"
-  [ "${CW_ACL_STRICT:-}" = "1" ] && ACL_FLAG="$ACL_FLAG --acl-strict"
-  log "ACL-issuer pub pinned — exod re-enforces ACLs (three-way dual-control)"
+  if [ "${CW_ACL_STRICT:-}" = "1" ]; then
+    ACL_FLAG="$ACL_FLAG --acl-strict"
+    log "ACL-issuer pub pinned — exod ENFORCES ACLs (three-way dual-control; refuse on fail)"
+  else
+    log "ACL-issuer pub pinned — exod AUDITS ACLs only (set CW_ACL_STRICT=1 to ENFORCE the ceiling)"
+  fi
 fi
 
 # 4. principals registry (agent Bearer auth) + monitor token — same as the control plane
