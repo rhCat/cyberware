@@ -145,6 +145,10 @@ Model: **core hard-enforced / non-core local-law / discovery via API / high-risk
 - **Principal-filtered `/catalog`**, **high-risk-must-be-core**, **real dual-control signoff** (approver
   is a *different* high-risk principal + a second factor), and wiring the built-but-uncalled `orgs.py`
   into the request path for per-org isolation.
+  - **Per-actor token ACL** — the first piece of this, designed in full: a per-token skill+tier+secret
+    capability scope, with an operator-signed attestation + client token-possession proof so a compromised
+    govd node can neither widen a token nor misattribute a run. See
+    [per-actor-acl-design.md](per-actor-acl-design.md) (M0 base ACL → M1 attestation → M2 binding).
 
 ### Theme 2 — Real-money settlement (Stripe rail)
 
