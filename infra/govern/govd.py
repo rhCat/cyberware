@@ -909,12 +909,15 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(ledger, dict):
             return self._json(400, {"error": "request body must be a JSON object (task-ledger)"})
 
+        scope = principals.resolve_scope(reg, pid) if reg else None
         try:
-            v = govern(ledger, cfg,
-                       scope=principals.resolve_scope(reg, pid) if reg else None,
-                       strict=bool(cfg.get("acl_strict")), now=time.time())
+            v = govern(ledger, cfg, scope=scope, strict=bool(cfg.get("acl_strict")), now=time.time())
         except Exception as e:                           # never leak a stack trace; never 500 the thread
             return self._json(400, {"error": f"govern failed: {type(e).__name__}: {e}"})
+        # ACL M1: recompute the actor's acl_sha from the LIVE registry fields (never an operator-supplied field)
+        # and stamp it on the record, so delegate can bind it into the grant for exod's join.
+        acl_sha = (principals.acl_sha(pid, (reg.get(pid) or {}).get("token_sha"), scope)
+                   if scope is not None else None)
         run_id = uuid.uuid4().hex[:16]
         # a per-run session token — the run's private credential (like a bank session). Issued once, here,
         # only to the caller; required to open the WS or read the ledger for this run.
@@ -931,6 +934,7 @@ class Handler(BaseHTTPRequestHandler):
                   "principal": pid, "token": token, "var_keys": var_keys, "decision": v["decision"],
                   "traceparent": traceparent,
                   "destructive": v.get("destructive", False), "approved": v.get("approved", []),
+                  "acl_sha": acl_sha,                       # ACL M1: bound into the delegated grant (None = unscoped)
                   "plan_sha": v.get("plan_sha"), "snippet_shas": (plan or {}).get("snippet_shas", {}),
                   "credential_ids": (plan or {}).get("credential_ids", []),   # server-authorized vault IDs (names only)
                   "seq": v.get("seq", []), "wrapper": (plan or {}).get("wrapper", ""), "tlc": v.get("tlc"),
@@ -1052,7 +1056,8 @@ class Handler(BaseHTTPRequestHandler):
                         try:
                             d_reply, d_event = delegate.execute_step(
                                 rec0, step, psha, exod_socket=sock, grant_key=gk, exod_pub=epub,
-                                base=getattr(self.server, "exec_workspace", os.path.join(store.root, "_work")))
+                                base=getattr(self.server, "exec_workspace", os.path.join(store.root, "_work")),
+                                attestation=msg.get("attestation"))   # ACL M1: the agent-relayed operator attestation
                             if d_event:
                                 store.append(bound, {**d_event, "ts": now(),
                                                      "span": tracing.child_span((rec0 or {}).get("traceparent"))})

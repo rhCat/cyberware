@@ -162,3 +162,58 @@ def test_perk_declared_tier_flows_into_the_grant(tmp_path):
     delegate.execute_step(rec, "1", "PSHA", exod_socket="x", grant_key=gk, exod_pub=exod_obj.public_key,
                           base=str(tmp_path / "ws"), request=capture, registry=reg, now=1000)
     assert captured["sandbox_tier"] == "community"                          # the declared tier reached the grant
+
+
+def test_grant_acl_fields_are_all_or_nothing_gated_on_acl_sha(tmp_path):
+    """ACL M1 (citrinitas D3): an UNSCOPED (no acl_sha) grant body stays BYTE-IDENTICAL to the pre-ACL form —
+    none of acl_sha/skill/perk/destructive is stamped, and no attestation rides. An ACL'd rec carries all four
+    binding fields together + relays the attestation. This pins the all-or-nothing gate at the live call site."""
+    from infra.exec.grantverify import grant_body
+    gk = Ed25519PrivateKey.generate()
+    cap = {}
+
+    def capture(_sock, req):
+        cap["g"] = grant_body(req["grant"])
+        cap["att"] = req.get("attestation")
+        raise RuntimeError("captured — short-circuit before exod runs")     # delegate fails closed; grant minted
+
+    # unscoped: rec has no acl_sha -> the grant body gains NONE of the ACL keys (byte-identical to pre-ACL)
+    delegate.execute_step(_rec(), "1", "PSHA", exod_socket="x", grant_key=gk, exod_pub=gk.public_key(),
+                          base=str(tmp_path / "a"), request=capture, now=1000)
+    assert not any(k in cap["g"] for k in ("acl_sha", "skill", "perk", "destructive"))
+    assert cap["att"] is None
+
+    # ACL'd: rec carries acl_sha -> all four binding fields travel together + the attestation is relayed
+    rec = {**_rec(), "acl_sha": "ab" * 32, "destructive": False}
+    delegate.execute_step(rec, "1", "PSHA", exod_socket="x", grant_key=gk, exod_pub=gk.public_key(),
+                          base=str(tmp_path / "b"), request=capture, now=1000, attestation={"payload": "x"})
+    g = cap["g"]
+    assert g["acl_sha"] == "ab" * 32 and g["skill"] == "fs" and g["perk"] == "find_large" and g["destructive"] is False
+    assert cap["att"] == {"payload": "x"}
+
+
+def test_acl_delegated_end_to_end_exod_reenforces_off_node(tmp_path):
+    """ACL M1 end-to-end: an ACL'd rec → delegate binds acl_sha + relays the operator attestation → exod
+    (acl-issuer pinned, strict) re-derives acl_sha, JOINs it against the grant, and re-runs acl_allows. An
+    IN-SCOPE claim executes; an OUT-OF-SCOPE claim is REFUSED by exod off-node even though govd minted the
+    grant — the compromised-govd-can't-widen property, exercised through the full govd→delegate→exod path."""
+    from infra.govern import issue, principals
+    op = Ed25519PrivateKey.generate()
+    gk = Ed25519PrivateKey.generate()
+    exod_obj = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=gk.public_key(),
+                    acl_issuer_pub=op.public_key(), acl_strict=True, runner=_Stub(0))
+
+    def _run(acl, base):
+        # govd recomputes acl_sha from the live fields; the operator attests the SAME acl (so the join holds)
+        sha = principals.acl_sha("agent-1", "sha-x", acl)
+        att = issue.mint_attestation(op, pid="agent-1", token_sha="sha-x", acl=acl, nbf=990, exp=2000, attestation_id="a1")
+        rec = {**_rec(), "acl_sha": sha, "destructive": False}             # the claim is always fs/find_large
+        return delegate.execute_step(rec, "1", "PSHA", exod_socket="x", grant_key=gk, exod_pub=exod_obj.public_key,
+                                     base=str(base), request=_inproc(exod_obj), now=1000, attestation=att)
+
+    in_scope = {"skills": ["fs"], "perks": {"fs": ["find_large"]}, "max_tier": "community", "secrets": False}
+    out_scope = {"skills": ["fs"], "perks": {"fs": ["nope"]}, "max_tier": "community", "secrets": False}
+    ok_reply, ok_event = _run(in_scope, tmp_path / "ok")
+    assert ok_reply.get("status") == "ok" and ok_event is not None         # in scope → exod ran it + signed
+    no_reply, _ = _run(out_scope, tmp_path / "no")
+    assert no_reply.get("status") == "refused"                            # out of scope → exod refused off-node
