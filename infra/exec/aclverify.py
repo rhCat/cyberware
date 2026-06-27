@@ -8,6 +8,8 @@ from __future__ import annotations
 import base64
 import json
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
 from infra.cwp import sign
 from infra.govern import principals    # the SAME pure decision core govern() uses; exod re-runs acl_allows
 
@@ -51,4 +53,55 @@ def verify_acl_attestation(acl_issuer_pub, envelope, *, now, expect_acl_sha=None
         return False, "acl_sha_mismatch"
     if expect_acl_sha is not None and expect_acl_sha != derived:
         return False, "acl_join_mismatch"
+    return True, "ok"
+
+
+# --- M2: the CLIENT token-possession proof — binds a run to the token that ACTUALLY holds it -----------------
+# The operator binds a client's INDEPENDENT proof public key into the attestation (proof_pubkey). The client
+# signs a per-step proof with the matching private key. exod verifies it against the attested proof_pubkey, so a
+# compromised govd relaying a DIFFERENT, more-privileged token's attestation cannot satisfy it (it does not hold
+# that token's proof key). This closes the run<->token misattribution residual M1 left open.
+TOKEN_PROOF_TYPE = "application/vnd.cyberware.token-proof+json"
+
+
+def mint_token_proof(proof_key, *, run_id, plan_sha, step, token_sha):
+    """The client signs a per-step token-possession proof with its proof PRIVATE key (whose public half the
+    operator bound into the attestation). Binds (run_id, plan_sha, step, token_sha) — values the client knows at
+    step-send time, with NO dependence on govd's grant nonce (minted inside govd, after the step arrives)."""
+    body = {"run_id": run_id, "plan_sha": plan_sha, "step": str(step), "token_sha": token_sha}
+    return sign.sign(body, proof_key, payload_type=TOKEN_PROOF_TYPE)
+
+
+def token_proof_body(envelope):
+    return json.loads(base64.b64decode(envelope["payload"]))
+
+
+def verify_token_proof(proof_pubkey_raw, envelope, *, expect_run_id, expect_plan_sha, expect_step,
+                       expect_token_sha, banned_pubkeys=(), nonce_cache=None):
+    # (ok, reason). proof_pubkey_raw is the raw-32 proof key the OPERATOR bound into the attestation. The
+    # DEGENERATE guard runs FIRST: a proof key equal to one the node controls (grant-issuer/acl-issuer/exod)
+    # is rejected, so a compromised govd holding one of those cannot mint a self-satisfying proof. The signature
+    # is checked against THAT operator-bound key; the proof must bind this run/plan/step to the attestation's
+    # token_sha; single-use per (token_sha, run, step) defeats a replay onto a different run/step.
+    if proof_pubkey_raw in banned_pubkeys:
+        return False, "proof_degenerate_pubkey"
+    try:
+        pub = Ed25519PublicKey.from_public_bytes(proof_pubkey_raw)
+    except Exception:
+        return False, "proof_bad_pubkey"
+    if not sign.verify(envelope, pub):
+        return False, "proof_bad_signature"
+    if envelope.get("payloadType") != TOKEN_PROOF_TYPE:
+        return False, "proof_wrong_type"
+    try:
+        b = token_proof_body(envelope)
+    except Exception:
+        return False, "proof_malformed_body"
+    if b.get("token_sha") != expect_token_sha:
+        return False, "proof_token_mismatch"
+    if (b.get("run_id") != expect_run_id or b.get("plan_sha") != expect_plan_sha
+            or b.get("step") != str(expect_step)):
+        return False, "proof_wrong_step"
+    if nonce_cache is not None and not nonce_cache.spend(expect_token_sha, f"{expect_run_id}:{expect_step}"):
+        return False, "proof_replay"
     return True, "ok"

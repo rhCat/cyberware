@@ -70,7 +70,7 @@ def materialize_workspace(rec, base, registry=None):
 
 
 def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base, registry=None,
-                 request=exod.request_step, now=None, grant_ttl=60, attestation=None):
+                 request=exod.request_step, now=None, grant_ttl=60, attestation=None, token_proof=None):
     """Delegate ONE step to exod. Returns (reply, event): `reply` is the status-only dict sent back to the
     agent; `event` is the ledger record to append (exod's signed step_result, or a refusal record, or None
     when nothing should be recorded). govd NEVER runs the step — exod does, confined.
@@ -104,14 +104,15 @@ def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base,
                               perk=rec.get("perk") if acl_sha else None,
                               destructive=rec.get("destructive") if acl_sha else None,
                               nbf=now - 5, exp=now + grant_ttl, nonce=nonce)
-    # the operator attestation (held + relayed by the agent) rides verbatim to exod. govd does NOT hold the
-    # operator ACL-issuer private key, so it cannot FORGE an attestation — that is what stops it WIDENING a
-    # token past its attested ACL. It does NOT yet stop a compromised govd from RELAYING a DIFFERENT, valid,
-    # more-privileged token's attestation (the run<->token misattribution closed by the M2 client proof — not
-    # built; proof_pubkey is carried but unverified at M1).
+    # the operator attestation + the client token_proof (both held + relayed by the agent) ride verbatim to
+    # exod. govd holds NEITHER the operator ACL-issuer key NOR any actor's proof key, so it cannot FORGE an
+    # attestation (cannot WIDEN a token past its attested ACL — M1) and cannot mint a token_proof for a token it
+    # does not hold (cannot MISATTRIBUTE a run to a different, more-privileged token — M2; exod re-verifies
+    # possession against the attested proof_pubkey). Residual: a govd that GENUINELY holds a token's keys IS that
+    # actor; plus DoS, audit-narrative, cooperative-downgrade absent a client floor, refuse-vs-audit (--acl-strict).
     req = {"run_id": rec["run_id"], "plan_sha": plan_sha, "step": step,
            "argv": ["bash", run_sh, "--step", step], "workspace": ws, "env": env, "grant": grant,
-           "attestation": attestation}
+           "attestation": attestation, "token_proof": token_proof}
     try:
         envl = request(exod_socket, req)
     except Exception:
