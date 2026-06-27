@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse, base64, collections, hashlib, json, os, socket, subprocess, sys, urllib.error, urllib.parse, urllib.request
 
 from infra import registry as _reg   # the agent's `registry` arg = its skillChip; default = the bundled chip
+from infra.exec import aclverify     # ACL M2: mint_token_proof + read the attestation's token_sha (client side)
 from infra.govern import compiler
 from infra.govern import runlog
 from infra.tool import skill_index   # the value-free catalog builder — shared with govd, so the two can't drift
@@ -264,7 +265,7 @@ def run_governed(base_url, ledger, approve=(), registry=None):
             "ledger": base_url.rstrip("/") + "/ledger/" + verdict["run_id"] + "?token=" + tok}
 
 
-def run_delegated(base_url, ledger, approve=(), attestation=None):
+def run_delegated(base_url, ledger, approve=(), attestation=None, proof_key=None):
     """SERVER-SIDE execution (P2-T12): the agent POSTs the claim, opens the per-run WS, and asks govd to
     EXECUTE each step — govd delegates to exod the limb, which runs it CONFINED and signs the authoritative
     status; govd records the SIGNED status. The agent runs NOTHING and holds no porter: intent-in, status-out
@@ -283,11 +284,16 @@ def run_delegated(base_url, ledger, approve=(), attestation=None):
         sock.close()
         return {"run_id": verdict["run_id"], "decision": "allow", "error": "oversight session not authorized"}
     steps = [str(i) for i in range(1, len(plan["sequence"]) + 1)]   # plan is sole source of step truth (P1-T06)
+    token_sha = (aclverify.attestation_body(attestation).get("token_sha")
+                 if (attestation is not None and proof_key is not None) else None)
     results = []
     for st in steps:
         msg = {"type": "step_request", "step": st, "plan_sha": psha}
         if attestation is not None:                     # ACL M1: relay the operator attestation to exod (the
             msg["attestation"] = attestation            # agent holds it; govd only relays, it cannot forge it)
+        if proof_key is not None and token_sha is not None:   # ACL M2: prove possession of THIS token's proof key
+            msg["token_proof"] = aclverify.mint_token_proof(proof_key, run_id=verdict["run_id"], plan_sha=psha,
+                                                            step=st, token_sha=token_sha)
         _ws_send(sock, json.dumps(msg))
         raw = _ws_recv(sock)
         if raw is None:
@@ -323,6 +329,8 @@ def main():
                                          "equivalent to GOVD_TOKEN_FILE — the raw token never lands in argv)")
     ap.add_argument("--attestation", help="ACL M1: path to the operator ACL attestation (JSON), relayed to exod "
                                           "on each delegated step so it can re-enforce the actor's ceiling")
+    ap.add_argument("--proof-key", dest="proof_key", help="ACL M2: the client's proof PRIVATE key (raw 32 bytes); "
+                                                          "signs a per-step token-possession proof relayed to exod")
     a = ap.parse_args()
     if a.token_file:
         os.environ["GOVD_TOKEN_FILE"] = a.token_file        # _auth_headers reads it; raw value stays in the file
@@ -338,7 +346,11 @@ def main():
         out = fetch(a.url, ledger, a.approve)
     elif a.delegated:
         att = json.load(open(a.attestation)) if a.attestation else None
-        out = run_delegated(a.url, ledger, a.approve, attestation=att)   # govd→exod: confined + signed, ACL re-enforced
+        pk = None
+        if a.proof_key:
+            from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+            pk = Ed25519PrivateKey.from_private_bytes(open(a.proof_key, "rb").read())
+        out = run_delegated(a.url, ledger, a.approve, attestation=att, proof_key=pk)   # govd→exod: ACL+proof re-enforced
     else:
         out = run_governed(a.url, ledger, a.approve, registry=a.registry)
     print(json.dumps(out, indent=2))
