@@ -258,9 +258,9 @@ def test_embed_serves_trusted_spa_with_a_prefix_and_polling_shim():
     """The iframe gets the TRUSTED repo dashboard (not the node's HTML) with a shim injected BEFORE it that
     prefixes fetches to /embed/<node>/ and emulates EventSource by polling — so no node HTML/JS reaches the
     dashboard origin and no SSE-streaming proxy is needed."""
-    html = F._embed_html("dgx-spark", "NONCE123").decode()
+    html = F._embed_html("body-2", "NONCE123").decode()
     assert "govd_monitor_token" in html                       # it IS the real local-monitor SPA
-    assert '"/embed/dgx-spark"' in html and "window.fetch=function" in html   # path-prefix shim
+    assert '"/embed/body-2"' in html and "window.fetch=function" in html   # path-prefix shim
     assert "window.EventSource=function" in html and "/monitor/state" in html  # SSE→polling shim
     # the shim must appear BEFORE the SPA's own "use strict" script so its overrides are in place first
     assert html.index("window.EventSource=function") < html.index('"use strict"')
@@ -327,11 +327,11 @@ def test_embed_allowlist():
 
 
 def test_render_node_iframe_live_vs_offline():
-    node = {"name": "dgx-spark", "role": "body", "url": "http://x:5773"}
+    node = {"name": "body-2", "role": "body", "url": "http://x:5773"}
     live = F.render_node_iframe(node, reachable=True)
-    assert '<iframe src="/embed/dgx-spark/?token=proxied"' in live and "/mnode/dgx-spark" in live
+    assert '<iframe src="/embed/body-2/?token=proxied"' in live and "/mnode/body-2" in live
     off = F.render_node_iframe(node, reachable=False)
-    assert "offline" in off and "<iframe" not in off and "/mnode/dgx-spark" in off   # falls back to the mirror board
+    assert "offline" in off and "<iframe" not in off and "/mnode/body-2" in off   # falls back to the mirror board
 
 
 def test_safe_runid_blocks_path_traversal():
