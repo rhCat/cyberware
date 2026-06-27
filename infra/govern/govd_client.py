@@ -284,8 +284,12 @@ def run_delegated(base_url, ledger, approve=(), attestation=None, proof_key=None
         sock.close()
         return {"run_id": verdict["run_id"], "decision": "allow", "error": "oversight session not authorized"}
     steps = [str(i) for i in range(1, len(plan["sequence"]) + 1)]   # plan is sole source of step truth (P1-T06)
-    token_sha = (aclverify.attestation_body(attestation).get("token_sha")
-                 if (attestation is not None and proof_key is not None) else None)
+    token_sha = None
+    if attestation is not None and proof_key is not None:
+        try:                                            # the agent's OWN --attestation file; a clean error, not a traceback
+            token_sha = aclverify.attestation_body(attestation).get("token_sha")
+        except Exception:
+            sys.exit("govd_client: --attestation is malformed (cannot read token_sha for the proof)")
     results = []
     for st in steps:
         msg = {"type": "step_request", "step": st, "plan_sha": psha}
