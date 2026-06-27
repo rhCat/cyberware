@@ -33,6 +33,8 @@ from infra.exec.sandbox import (
 from infra.exec.exodverify import (  # noqa: F401  (single source of truth for the verify surface)
     STEP_RESULT_TYPE, NonceCache, _principal, result_body, verify_step_result,
 )
+from infra.exec.aclverify import attestation_body, attested_acl, verify_acl_attestation  # ACL M1
+from infra.govern import principals          # the SAME pure acl_allows govern() uses — exod re-runs it off-node
 
 
 def _now() -> str:
@@ -49,11 +51,21 @@ class Exod:
     logic is testable off-Linux); the default is the real bwrap sandbox."""
 
     def __init__(self, signing_key, *, grant_issuer_pub, runner=run_confined, profile_factory=core_profile,
-                 vault=None, backend_floor="bwrap"):
+                 vault=None, backend_floor="bwrap", acl_issuer_pub=None, acl_strict=False):
         if _principal(grant_issuer_pub) == _principal(signing_key.public_key()):
             raise ValueError("exod identity key must differ from the grant-issuer key (no self-issued grants)")
+        # ACL M1 — three-way dual-control: when an operator ACL-issuer key is pinned it must differ from BOTH
+        # the grant-issuer and exod's own identity, so no single key can authorize a run AND attest its actor's
+        # ceiling. Asserted whenever a pub is set (both rollout phases).
+        if acl_issuer_pub is not None:
+            if _principal(acl_issuer_pub) == _principal(grant_issuer_pub):
+                raise ValueError("acl-issuer key must differ from the grant-issuer key (three-way dual-control)")
+            if _principal(acl_issuer_pub) == _principal(signing_key.public_key()):
+                raise ValueError("acl-issuer key must differ from exod's identity key (three-way dual-control)")
         self._sk = signing_key
         self._issuer_pub = grant_issuer_pub
+        self._acl_issuer_pub = acl_issuer_pub  # ACL M1: the operator ACL-issuer pub exod re-enforces against
+        self._acl_strict = bool(acl_strict)    # ACL M1: refuse (vs audit) on an ACL failure / an unscoped grant
         self._runner = runner
         self._profile = profile_factory
         self._vault = vault                 # the limb resolves grant-authorized secrets server-side (P2-T12)
@@ -99,6 +111,16 @@ class Exod:
                                   expect_run_id=run_id, expect_plan_sha=plan_sha)
         if not ok:
             return refuse("grant:" + reason)
+        # 1b. ACL M1 — re-enforce the actor's ceiling OFF-NODE. When the grant carries an acl_sha (an ACL'd
+        #     actor) and the operator pinned an acl-issuer pub, exod REQUIRES a valid operator attestation that
+        #     JOINS the grant (acl_sha match) and independently re-runs acl_allows on the grant's claim, so a
+        #     compromised govd cannot widen the token. Under acl_strict a failure REFUSES; otherwise it AUDITS
+        #     (proceeds — the M0 in-process gate stays the live enforcer while attestations roll out).
+        acl_deny = self._acl_check(req, gbody, now=now)
+        if acl_deny is not None:
+            if self._acl_strict:
+                return refuse("acl:" + acl_deny)
+            sys.stderr.write(f"[exod] acl audit — would refuse under strict: {acl_deny}\n")
         # 2. the grant must actually carry the capability being exercised
         if required_capability not in (gbody.get("capabilities") or []):
             return refuse("capability:" + required_capability)
@@ -160,6 +182,28 @@ class Exod:
         status = "ok" if p.returncode == 0 else "error"
         return self._sign_result(run_id=run_id, plan_sha=plan_sha, step=step, exit_code=p.returncode,
                                  status=status, output_sha=_sha(p.stdout or ""), nonce=rnonce, meter=meter)
+
+    def _acl_check(self, req, gbody, *, now):
+        """ACL M1 — the deny reason (str) if the grant's claim is OUTSIDE the operator-attested ACL, else None.
+        Returns None (no enforcement) for a legacy grant carrying no acl_sha when not strict. exod RE-DERIVES the
+        acl_sha (inside verify_acl_attestation) and independently re-runs acl_allows: it trusts govd's grant for
+        NOTHING about the ceiling. The attestation's own nbf/exp is the freshness bound, checked at verify."""
+        acl_sha = gbody.get("acl_sha") if isinstance(gbody, dict) else None
+        if acl_sha is None:
+            return "unscoped_grant" if self._acl_strict else None
+        if self._acl_issuer_pub is None:
+            return "no_issuer_pinned"
+        att = req.get("attestation")
+        if not att:
+            return "attestation_missing"
+        ok, why = verify_acl_attestation(self._acl_issuer_pub, att, now=now, expect_acl_sha=acl_sha)
+        if not ok:
+            return why
+        acl = attested_acl(attestation_body(att))
+        okv, prob = principals.acl_allows(acl, gbody.get("skill"), gbody.get("perk"),
+                                          gbody.get("sandbox_tier"), gbody.get("destructive"),
+                                          bool(gbody.get("credentials")))
+        return None if okv else prob["id"]
 
     # ── the Unix-domain-socket channel — exod as a separate listening principal ──────────────────────
     def serve(self, socket_path: str, *, now_fn=lambda: int(time.time()), max_requests=None,
@@ -293,6 +337,12 @@ def main(argv=None):
                     help="exod identity Ed25519 private key (raw 32 bytes)")
     ap.add_argument("--issuer-pub", default=os.environ.get("EXOD_ISSUER_PUB"),
                     help="govd's grant-issuer Ed25519 PUBLIC key (raw 32 bytes) — the ONLY key exod trusts")
+    ap.add_argument("--acl-issuer-pub", default=os.environ.get("EXOD_ACL_ISSUER_PUB"),
+                    help="ACL M1: operator ACL-issuer Ed25519 PUBLIC key (raw 32 bytes). When set, exod "
+                         "re-enforces each ACL'd actor's ceiling under three-way dual-control")
+    ap.add_argument("--acl-strict", action="store_true",
+                    default=os.environ.get("EXOD_ACL_STRICT", "").lower() in ("1", "true", "yes", "on"),
+                    help="ACL M1: REFUSE (not just audit) on an ACL failure or an unscoped grant")
     ap.add_argument("--vault", default=os.environ.get("EXOD_VAULT"),
                     help="vault spec: file:/path.json | sops:/path.enc#/age.key")
     ap.add_argument("--backend", default=os.environ.get("EXOD_SANDBOX_BACKEND", "bwrap"),
@@ -303,6 +353,8 @@ def main(argv=None):
         raise SystemExit("exod: --key and --issuer-pub are required (identity key + trusted grant issuer)")
     sk = Ed25519PrivateKey.from_private_bytes(open(a.key, "rb").read())
     issuer_pub = Ed25519PublicKey.from_public_bytes(open(a.issuer_pub, "rb").read())
+    acl_issuer_pub = (Ed25519PublicKey.from_public_bytes(open(a.acl_issuer_pub, "rb").read())
+                      if a.acl_issuer_pub else None)
     if os.path.dirname(a.socket):
         os.makedirs(os.path.dirname(a.socket), exist_ok=True)
     # P2-T04/P3-T11: --backend is the operator's confinement FLOOR. The default runner (run_confined) accepts the
@@ -312,9 +364,11 @@ def main(argv=None):
     if not (runsc_available() if a.backend == "runsc" else is_available()):
         sys.stderr.write(f"[exod] WARNING: sandbox backend '{a.backend}' is NOT enforceable on this host — "
                          f"every step will be REFUSED (fail-closed), never run unconfined.\n")
-    exod = Exod(sk, grant_issuer_pub=issuer_pub, vault=load_vault(a.vault), backend_floor=a.backend)
+    exod = Exod(sk, grant_issuer_pub=issuer_pub, vault=load_vault(a.vault), backend_floor=a.backend,
+                acl_issuer_pub=acl_issuer_pub, acl_strict=a.acl_strict)
+    acl_mode = "enforce" if (acl_issuer_pub and a.acl_strict) else "audit" if acl_issuer_pub else "off"
     print(f"exod · limb · socket={a.socket} · backend={a.backend} · keyid={_principal(sk.public_key())} · "
-          f"trusts-issuer {_principal(issuer_pub)} · vault={'yes' if a.vault else 'none'}")
+          f"trusts-issuer {_principal(issuer_pub)} · vault={'yes' if a.vault else 'none'} · acl={acl_mode}")
     exod.serve(a.socket)
 
 

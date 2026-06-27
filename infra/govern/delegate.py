@@ -70,7 +70,7 @@ def materialize_workspace(rec, base, registry=None):
 
 
 def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base, registry=None,
-                 request=exod.request_step, now=None, grant_ttl=60):
+                 request=exod.request_step, now=None, grant_ttl=60, attestation=None):
     """Delegate ONE step to exod. Returns (reply, event): `reply` is the status-only dict sent back to the
     agent; `event` is the ledger record to append (exod's signed step_result, or a refusal record, or None
     when nothing should be recorded). govd NEVER runs the step — exod does, confined.
@@ -89,13 +89,21 @@ def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base,
     # P3-T11: the perk's declared catalog tier flows into the grant's sandbox_tier — exod uses it to select the
     # confinement backend (community → gVisor/runsc; trusted family → bwrap; undeclared → the operator floor).
     # Orthogonal to the SECRET tier above: a credentialed grant is still minted trusted regardless of backend.
+    # ACL M1: bind the per-actor ACL digest + the canonical claim into the grant (emit-when-set — a non-ACL'd
+    # actor's rec has no acl_sha, so the grant body stays byte-identical). exod JOINs acl_sha against the
+    # operator attestation and re-runs acl_allows on skill/perk/destructive, re-enforcing the ceiling off-node.
     grant = grants.mint_grant(grant_key, run_id=rec["run_id"], plan_sha=plan_sha,
                               snippet_shas=rec.get("snippet_shas") or {}, capabilities=["run"],
                               credentials=creds, tier=("trusted" if creds else "community"),
                               sandbox_tier=perk_sandbox_tier(rec.get("skill"), rec.get("perk"), registry),
+                              acl_sha=rec.get("acl_sha"), skill=rec.get("skill"), perk=rec.get("perk"),
+                              destructive=rec.get("destructive"),
                               nbf=now - 5, exp=now + grant_ttl, nonce=nonce)
+    # the operator attestation (held + relayed by the agent) rides verbatim to exod; govd holds neither the
+    # operator key nor the client proof key, so it cannot forge it — it only relays what the agent presents.
     req = {"run_id": rec["run_id"], "plan_sha": plan_sha, "step": step,
-           "argv": ["bash", run_sh, "--step", step], "workspace": ws, "env": env, "grant": grant}
+           "argv": ["bash", run_sh, "--step", step], "workspace": ws, "env": env, "grant": grant,
+           "attestation": attestation}
     try:
         envl = request(exod_socket, req)
     except Exception:
