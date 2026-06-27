@@ -56,7 +56,7 @@ CSS = r"""
   --dim:#7fa394;--faint:#56756a;--green:#39FF6A;--cyan:#37e0e0;--mint:#9af5c0;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 var(--mono);
+body{margin:0;padding-top:40px;background:var(--bg);color:var(--ink);font:15px/1.65 var(--mono);
   background-image:radial-gradient(1100px 560px at 82% -12%,#0d1a16 0,transparent 60%);}
 a{color:var(--cyan);text-decoration:none}a:hover{text-decoration:underline}
 header{position:sticky;top:0;z-index:5;padding:14px 20px;border-bottom:1px solid var(--edge);
@@ -127,8 +127,6 @@ DOC_TMPL = """<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>__TITLE__ · cyberware</title>
 <style>__CSS__</style></head><body>
-<header><a class="home" href="/">▸ cyberware</a><span class="sep">/</span>
-<a href="/explore.html">explore</a><span class="sep">/</span><span class="crumb">__TITLE__</span></header>
 <div class="wrap"><article class="doc md" id="doc"><p class="loading">loading __SRC__ …</p></article>
 <div class="foot">Source: <a href="https://github.com/rhCat/cyberware/blob/main/__SRC__">__SRC__</a> ·
 <a href="/explore.html">← all topics</a></div></div>
@@ -136,20 +134,21 @@ DOC_TMPL = """<!doctype html><html lang="en"><head>
 fetch("__MDURL__").then(r=>r.ok?r.text():Promise.reject(r.status))
  .then(t=>{document.getElementById("doc").innerHTML=md(t);})
  .catch(e=>{document.getElementById("doc").innerHTML='<p class="loading">could not load __SRC__ ('+e+')</p>';});
-</script></body></html>
+</script>
+<script src="/toolbar.js" defer></script></body></html>
 """
 
 HUB_TMPL = """<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Explore · cyberware</title>
 <style>__CSS__</style></head><body>
-<header><a class="home" href="/">▸ cyberware</a><span class="sep">/</span><span class="crumb">explore the docs</span></header>
 <div class="wrap">
 <h1><span class="gsig">▸</span> Explore</h1>
 <p class="lead">The homepage is the pitch; this is the material. Every doc is its own page, and the two live tools below browse the running registry.</p>
 <div class="groups">__GROUPS__</div>
 <div class="foot">cyberware · built in the open · MIT · <a href="https://github.com/rhCat/cyberware">github.com/rhCat/cyberware</a></div>
-</div></body></html>
+</div>
+<script src="/toolbar.js" defer></script></body></html>
 """
 
 
