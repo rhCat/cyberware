@@ -31,11 +31,31 @@ for n, b in (("grant.key", rp(g)), ("grant.pub", ru(g)), ("exod.key", rp(e)), ("
 PY
 fi
 
-# 2. auth — a monitor token + an agent principal, minted ONCE. The plane is network-exposed (remote mode), so
-#    auth MUST be on (govd refuses an exposed plane with auth off). The agent token is handed to the brain.
-[ -f "$ETC/monitor.token" ] || { python3 -c "import secrets;print(secrets.token_hex(24))" > "$ETC/monitor.token"; chmod 600 "$ETC/monitor.token"; }
-if [ ! -f "$ETC/principals.json" ]; then
-  python3 - "$ETC" <<'PY'
+# 2. auth — DEPLOYMENT-CONFIGURABLE. The plane is network-exposed (remote mode) so auth MUST be on, but WHO
+#    the principals are is supplied by the deployment, never hardcoded here. Precedence:
+#      principals: GOVD_PRINCIPALS_URL (remote auth provider) > GOVD_PRINCIPALS (mounted file) > self-minted 'agent-1' fallback
+#      monitor token: GOVD_MONITOR_TOKEN (env) > self-minted file fallback
+# The entrypoint must NOT clobber a value the deployment passed in.
+if [ -z "${GOVD_MONITOR_TOKEN:-}" ] && [ ! -f "$ETC/monitor.token" ]; then
+  python3 -c "import secrets;print(secrets.token_hex(24))" > "$ETC/monitor.token"; chmod 600 "$ETC/monitor.token"
+fi
+if [ -n "${GOVD_PRINCIPALS_URL:-}" ]; then
+  PRINCIPALS="$ETC/principals.remote.json"
+  python3 - "$GOVD_PRINCIPALS_URL" "$PRINCIPALS" "${GOVD_PRINCIPALS_TOKEN:-}" <<'PY'
+import sys, json, urllib.request
+url, out, tok = sys.argv[1], sys.argv[2], sys.argv[3]
+req = urllib.request.Request(url, headers=({"Authorization": "Bearer " + tok} if tok else {}))
+d = json.load(urllib.request.urlopen(req, timeout=10))
+json.dump(d if "principals" in d else {"principals": d}, open(out, "w"))
+PY
+  echo "[body] principals from REMOTE provider: $GOVD_PRINCIPALS_URL"
+elif [ -n "${GOVD_PRINCIPALS:-}" ] && [ -f "${GOVD_PRINCIPALS}" ]; then
+  PRINCIPALS="$GOVD_PRINCIPALS"
+  echo "[body] principals from deployment-provided FILE: $PRINCIPALS"
+else
+  PRINCIPALS="$ETC/principals.json"
+  if [ ! -f "$PRINCIPALS" ]; then
+    python3 - "$ETC" <<'PY'
 import hashlib, json, os, secrets, sys
 E = sys.argv[1]; tok = secrets.token_hex(24)
 json.dump({"principals": {"agent-1": {"token_sha": hashlib.sha256(tok.encode()).hexdigest(),
@@ -43,7 +63,8 @@ json.dump({"principals": {"agent-1": {"token_sha": hashlib.sha256(tok.encode()).
 open(os.path.join(E, "agent-1.token.GIVE-TO-AGENT"), "w").write(tok)
 os.chmod(os.path.join(E, "principals.json"), 0o600); os.chmod(os.path.join(E, "agent-1.token.GIVE-TO-AGENT"), 0o400)
 PY
-  echo "[body] minted principal 'agent-1' — token at $ETC/agent-1.token.GIVE-TO-AGENT (hand to the brain, then delete)"
+    echo "[body] no principals supplied — minted FALLBACK 'agent-1' at $ETC/agent-1.token.GIVE-TO-AGENT"
+  fi
 fi
 
 # 3. govd config — DELEGATED to exod over the in-container UDS
@@ -52,7 +73,7 @@ cat > "$ETC/govd.json" <<JSON
   "mode": "remote",
   "remote": {"host": "0.0.0.0", "port": $PORT},
   "record_root": "$DATA",
-  "principals_path": "$ETC/principals.json",
+  "principals_path": "$PRINCIPALS",
   "exec_mode": "delegated",
   "exod": {"socket": "$SOCK", "grant_key": "$KEYS/grant.key", "pub": "$KEYS/exod.pub"}
 }
@@ -71,5 +92,5 @@ echo "[body] exod up (backend=$BACKEND, socket=$SOCK); starting govd (delegated)
 
 # 5. govd (delegated) in the foreground — reads the monitor token from its file; binds the container interface
 #    (map it to the node's tailnet IP with `-p <tailnet-ip>:$PORT:$PORT`).
-exec env GOVD_MONITOR_TOKEN="$(cat "$ETC/monitor.token")" GOVD_PRINCIPALS="$ETC/principals.json" \
+exec env GOVD_MONITOR_TOKEN="${GOVD_MONITOR_TOKEN:-$(cat "$ETC/monitor.token")}" GOVD_PRINCIPALS="$PRINCIPALS" \
   python3 -m infra.govern.govd --config "$ETC/govd.json" --mode remote --port "$PORT"
