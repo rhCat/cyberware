@@ -7,7 +7,7 @@
   window.__cwbar = 1;
 
   var path = (location.pathname || "/").replace(/index\.html$/, "").replace(/\/+$/, "") || "/";
-  var NAV = [["/", "home"], ["/explore.html", "explore"], ["/dashboard.html", "registry"], ["/atlas.html", "atlas"]];
+  var NAV = [["/", "home"], ["/explore.html", "explore"], ["/skill.html", "skill"], ["/dashboard.html", "registry"], ["/atlas.html", "atlas"]];
   function active(href) {
     var h = href.replace(/\/+$/, "") || "/";
     return path === h || path === h.replace(/\.html$/, "");
@@ -27,7 +27,8 @@
     ".cw-bar.cw-hide{transform:translateY(-101%);}" +
     ".cw-bar a{text-decoration:none;}" +
     ".cw-mark{color:#39FF6A;font-weight:600;letter-spacing:.3px;}" +
-    ".cw-nav{display:flex;gap:13px;}" +
+    ".cw-nav{display:flex;gap:13px;min-width:0;overflow-x:auto;scrollbar-width:none;}" +
+    ".cw-nav::-webkit-scrollbar{display:none;}" +
     ".cw-nav a{color:#7fa394;}.cw-nav a:hover{color:#cfe9dd;}" +
     ".cw-nav a.cw-on{color:#37e0e0;text-shadow:0 0 8px rgba(55,224,224,.45);}" +
     ".cw-crumb{color:#56756a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.cw-crumb b{color:#9af5c0;font-weight:500;}" +

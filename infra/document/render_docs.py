@@ -20,6 +20,7 @@ import sys
 # --- the curated topic map: every group -> the docs it surfaces (name, title, blurb) ------------------
 TOPICS = [
     {"group": "Start here", "blurb": "the thesis and the contract", "docs": [
+        ("SKILL", "The agent interface", "the governed-channel contract an agent follows — claim → blessed plan → run", "/skill.html"),
         ("governed-vs-free", "Governed vs free", "free up to the gate, accountable past it — and why an agent is software's newest customer"),
         ("SPEC", "The specification", "the normative contract: the claim, the value-free plan, the wire"),
     ]},
@@ -163,16 +164,20 @@ def hub_html() -> str:
     cards.append('<div class="grp tools"><h2>Live tools</h2><div class="gb">the running system, not a screenshot</div>%s</div>' % tools)
     for t in TOPICS:
         items = "".join(
-            '<a class="item" href="/docs/%s.html"><b>%s</b><span>%s</span></a>' % (
-                html.escape(name), html.escape(title), html.escape(blurb))
-            for name, title, blurb in t["docs"])
+            '<a class="item" href="%s"><b>%s</b><span>%s</span></a>' % (
+                html.escape(d[3] if len(d) > 3 else "/docs/%s.html" % d[0]),
+                html.escape(d[1]), html.escape(d[2]))
+            for d in t["docs"])
         cards.append('<div class="grp"><h2>%s</h2><div class="gb">%s</div>%s</div>' % (
             html.escape(t["group"]), html.escape(t["blurb"]), items))
     return HUB_TMPL.replace("__CSS__", CSS).replace("__GROUPS__", "".join(cards))
 
 
+ROOT_DOCS = {"cyberware": "cyberware.md", "SKILL": "SKILL.md"}   # docs that live at the repo root, not under docs/
+
+
 def doc_html(name: str, title: str) -> str:
-    src = "cyberware.md" if name == "cyberware" else "docs/%s.md" % name   # cyberware.md lives at the repo root
+    src = ROOT_DOCS.get(name, "docs/%s.md" % name)
     return (DOC_TMPL.replace("__CSS__", CSS).replace("__MDJS__", MD_JS)
             .replace("__TITLE__", html.escape(title)).replace("__MDURL__", "/" + src).replace("__SRC__", src))
 
@@ -186,11 +191,17 @@ def main(argv=None) -> int:
         f.write(hub_html())
     n = 0
     for t in TOPICS:
-        for name, title, _ in t["docs"]:
+        for d in t["docs"]:
+            if len(d) > 3:        # an explicit href → the page is generated elsewhere (SKILL → /skill.html); no /docs/ page
+                continue
+            name, title = d[0], d[1]
             with open(os.path.join(a.out, "docs", name + ".html"), "w") as f:
                 f.write(doc_html(name, title))
             n += 1
-    print('{"tool":"render_docs","hub":"%s/explore.html","doc_pages":%d}' % (a.out, n))
+    # the agent-interface guide (SKILL.md) gets its own top-level page/tab at the site root (like explore/atlas)
+    with open(os.path.join(a.out, "skill.html"), "w") as f:
+        f.write(doc_html("SKILL", "The agent interface"))
+    print('{"tool":"render_docs","hub":"%s/explore.html","doc_pages":%d,"skill":"%s/skill.html"}' % (a.out, n, a.out))
     return 0
 
 
