@@ -1207,9 +1207,18 @@ def serve(cfg):
         if fcfg.get("enabled", True):
             fhost = fcfg.get("host") or host
             fport = int(fcfg.get("port", fleetd.FLEET_PORT))
-            fsrv = fleetd.start(cfg, fhost, fport)
-            threading.Thread(target=fsrv.serve_forever, daemon=True).start()
-            print(f"  fleet:      http://{fhost}:{fport}/fleet/nodes   (Bearer-gated · roster={fleetd._roster_source(cfg)} · tailnet-only)")
+            if (fhost not in ("127.0.0.1", "::1", "localhost") and not cfg.get("principals")
+                    and os.environ.get("CYBERWARE_ALLOW_OPEN") != "1"):
+                # require_closed_auth equivalent for the FLEET plane: a non-loopback bind with NO principals
+                # registry would serve the aggregate roster unauthenticated. LOG-AND-SKIP — never `raise`, a
+                # SystemExit would escape the `except Exception` below and take :5773 down with it.
+                sys.stderr.write("[govd] fleet plane NOT started: non-loopback bind with no principals registry "
+                                 "(the aggregate roster would be unauthenticated). Set GOVD_PRINCIPALS, or export "
+                                 "CYBERWARE_ALLOW_OPEN=1 to override.\n")
+            else:
+                fsrv = fleetd.start(cfg, fhost, fport)
+                threading.Thread(target=fsrv.serve_forever, daemon=True).start()
+                print(f"  fleet:      http://{fhost}:{fport}/fleet/nodes   (Bearer-gated · roster={fleetd._roster_source(cfg)} · tailnet-only)")
     except Exception as e:
         sys.stderr.write(f"[govd] fleet plane not started: {e}\n")   # a fleet-plane failure must never block :5773
     _mt = cfg["monitor_token"]

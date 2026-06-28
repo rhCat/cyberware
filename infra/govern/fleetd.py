@@ -11,12 +11,16 @@ Design invariants (see deploy/FLEET-VALIDATION.md):
   * DEFAULT-ON + GRACEFUL-STANDALONE — with no roster the fleet is exactly [self]: no error, :5773 untouched.
     The no-config path mirrors principals.load_principals (empty-not-throw).
   * SAME TRUST ROOT — /fleet/* reuse govd's principals registry (the SHARED cfg['principals']): Bearer-gated,
-    deny-by-default, no new credential, no node keypair. A token revoked in the registry is denied here on the
-    next request (fleetd reads cfg['principals'] live).
+    deny-by-default, rate-limited, no new credential, no node keypair. A token revoked in the registry is
+    denied here on the next request. govd.serve() refuses to START this plane on a non-loopback bind with no
+    registry (the require_closed_auth equivalent), so the auth-disabled path is loopback-only.
   * NO SHARED WRITTEN STATE — there is NO register/gossip write surface. Each node only ever reports what it
     itself scrapes LIVE from peers' ungated :5773 /health + /catalog, so a fleet-token holder cannot forge
     "I run skill X at «attacker:5773»" and have it propagate (no roster-poisoning amplification).
-  * TAILNET-ONLY — binds the same interface as :5773; the host `-p <tailnet-ip>:8773:8773` mapping fences it.
+  * SSRF-FENCED — the peer probe + the roster fetch use http/https ONLY (no file/ftp/data handlers, no
+    redirects) and a wall-clock deadline + byte cap, so a roster URL cannot read disk / scan internal ports /
+    stall a worker.
+  * TAILNET-ONLY — binds govd's interface; the host `-p <tailnet-ip>:8773:8773` mapping fences it.
   * ROSTER FROM CONFIG, NEVER THE REPO — FLEETD_FLEET_URL > FLEETD_FLEET (file) > self-only; supplied to the
     container the same configurable way as GOVD_PRINCIPALS (never hardcoded, never committed).
 """
@@ -34,8 +38,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from infra.govern import principals
 
 FLEET_PORT = 8773
-PROBE_TIMEOUT = 2.0            # per-peer probe; a slow/dead peer never stalls a query past this
-PROBE_MAX_BYTES = 256 * 1024  # cap a peer response — a compromised peer cannot OOM the handler
+PROBE_TIMEOUT = 2.0            # per-peer probe WALL-CLOCK deadline; a slow/dead peer never stalls past this
+PROBE_MAX_BYTES = 256 * 1024  # cap a peer/roster response — a compromised source cannot OOM the handler
 CACHE_TTL = 5.0               # collapse query bursts (matches the repo's 5s poll convention)
 SOCKET_TIMEOUT = 15.0         # per-connection read timeout — no slowloris on the fleet plane
 
@@ -43,23 +47,78 @@ _TIER_RANK = {"core": 0, "verified": 1, "community": 2}   # catalog TRUST order 
 _CACHE: dict = {}             # {"roster": (ts, [descriptor, ...])} — tiny in-process TTL cache
 
 
+# ───────────────────────── SSRF-fenced HTTP (http/https only, no redirects) ─────────────────────────
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A peer/provider must not be able to redirect our request somewhere else (SSRF/loop guard)."""
+    def redirect_request(self, *a, **k):
+        return None
+
+
+def _build_opener():
+    """An opener with ONLY http/https + no-redirect — deliberately WITHOUT the default File/FTP/Data/Unknown
+    handlers, so a roster `url` of file:///… / ftp:// / data: cannot read disk or reach a non-HTTP service."""
+    o = urllib.request.OpenerDirector()
+    for h in (urllib.request.HTTPHandler(), urllib.request.HTTPSHandler(),
+              _NoRedirect(), urllib.request.HTTPErrorProcessor()):
+        o.add_handler(h)
+    return o
+
+
+_OPENER = _build_opener()
+
+
+def _safe_url(u) -> bool:
+    """True iff `u` is an http/https URL — the only schemes the discovery plane will ever dereference."""
+    try:
+        return isinstance(u, str) and urllib.parse.urlparse(u).scheme in ("http", "https")
+    except Exception:
+        return False
+
+
+def _read_capped(r, deadline) -> bytes:
+    """Read a response body in chunks under a WALL-CLOCK deadline + byte cap. A trickle-feed peer (urllib's
+    socket timeout resets per recv) cannot hold the worker past the deadline."""
+    chunks, total = [], 0
+    while total <= PROBE_MAX_BYTES:
+        if time.monotonic() > deadline:
+            raise TimeoutError("peer read exceeded deadline")
+        chunk = r.read(min(8192, PROBE_MAX_BYTES - total + 1))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        total += len(chunk)
+    return b"".join(chunks)[:PROBE_MAX_BYTES]
+
+
+def _get_json(url: str) -> dict:
+    """GET + parse JSON from a peer, http/https only, no redirects, deadline + size bounded."""
+    deadline = time.monotonic() + PROBE_TIMEOUT
+    with _OPENER.open(urllib.request.Request(url, method="GET"), timeout=PROBE_TIMEOUT) as r:
+        raw = _read_capped(r, deadline)
+    return json.loads(raw)
+
+
 # ───────────────────────── roster (config, never the repo) ─────────────────────────
 def load_roster(cfg) -> list:
     """The peer roster: FLEETD_FLEET_URL (remote provider) > FLEETD_FLEET (mounted file) > [] (self-only).
-    Absent/empty/unreadable -> [] — graceful standalone, NEVER raises (mirrors principals.load_principals)."""
+    Absent/empty/unreadable/non-http -> [] — graceful standalone, NEVER raises (mirrors load_principals)."""
     url = os.environ.get("FLEETD_FLEET_URL")
     if url:
+        if not _safe_url(url):
+            return []                                      # only http/https topology providers
         try:
             tok = os.environ.get("FLEETD_FLEET_TOKEN", "")
             req = urllib.request.Request(url, headers={"Authorization": "Bearer " + tok} if tok else {})
-            with urllib.request.urlopen(req, timeout=PROBE_TIMEOUT) as r:
-                return _nodes_of(json.loads(r.read(PROBE_MAX_BYTES + 1)[:PROBE_MAX_BYTES]))
+            deadline = time.monotonic() + PROBE_TIMEOUT
+            with _OPENER.open(req, timeout=PROBE_TIMEOUT) as r:   # no-redirect, http/https only
+                return _nodes_of(json.loads(_read_capped(r, deadline)))
         except Exception:
-            return []          # a flaky topology provider must not break the local plane
+            return []          # a flaky/hostile topology provider must not break the local plane
     path = os.environ.get("FLEETD_FLEET") or (cfg.get("fleet") or {}).get("roster")
     if path and os.path.isfile(path):
         try:
-            return _nodes_of(json.load(open(path)))
+            with open(path) as fh:
+                return _nodes_of(json.load(fh))
         except Exception:
             return []
     return []
@@ -67,10 +126,11 @@ def load_roster(cfg) -> list:
 
 def _nodes_of(d) -> list:
     nodes = d.get("nodes") if isinstance(d, dict) else d
-    return [n for n in (nodes or []) if isinstance(n, dict) and n.get("url")]
+    return [n for n in (nodes or []) if isinstance(n, dict) and _safe_url(n.get("url"))]
 
 
 def _roster_source(cfg) -> str:
+    """The roster ORIGIN category (network-free — only inspects env + cfg, never fetches)."""
     if os.environ.get("FLEETD_FLEET_URL"):
         return "url"
     if os.environ.get("FLEETD_FLEET") or (cfg.get("fleet") or {}).get("roster"):
@@ -88,7 +148,8 @@ def _src(prov) -> str:
 
 def _self_descriptor(cfg, self_url) -> dict:
     """This node's row — built in-process from govd's own helpers (ZERO network)."""
-    skills, chip, prov, exec_mode, exod = [], None, {}, cfg.get("exec_mode", "cooperative"), False
+    skills, chip, prov = [], None, {}
+    exec_mode = cfg.get("exec_mode", "cooperative")
     try:
         from infra.govern import govd            # lazy: govd is loaded by the time a request lands
         cat = govd.catalog_snapshot()
@@ -101,29 +162,17 @@ def _self_descriptor(cfg, self_url) -> dict:
     exod = bool(ex.get("socket") and ex.get("grant_key") and ex.get("pub"))
     f = cfg.get("fleet") or {}
     return {"node_id": f.get("node_id") or socket.gethostname(), "url": self_url,
-            "role": f.get("role", "node"), "arch": f.get("arch"),
-            "chip_sha": chip, "chip_source": _src(prov), "skills": skills, "tier": f.get("tier"),
+            "role": f.get("role", "node"), "arch": (f.get("arch") or None),
+            "chip_sha": chip, "chip_source": _src(prov), "skills": skills, "tier": (f.get("tier") or None),
             "exec_mode": exec_mode, "exod_attached": exod,
             "healthy": True, "last_seen": int(time.time())}
-
-
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """A peer must not be able to redirect our probe somewhere else (SSRF/loop guard)."""
-    def redirect_request(self, *a, **k):
-        return None
-
-
-def _get_json(url: str) -> dict:
-    op = urllib.request.build_opener(_NoRedirect())
-    with op.open(urllib.request.Request(url, method="GET"), timeout=PROBE_TIMEOUT) as r:
-        return json.loads(r.read(PROBE_MAX_BYTES + 1)[:PROBE_MAX_BYTES])
 
 
 def _probe(node: dict) -> dict:
     """Live-probe one peer's UNGATED :5773 /health + /catalog. A dead/unreachable peer is KEPT (never silently
     dropped) but marked healthy:false with last_seen=None. Bounded by PROBE_TIMEOUT — never hangs the handler."""
     base = {"node_id": node.get("name") or node.get("node_id"), "url": node["url"],
-            "role": node.get("role"), "arch": node.get("arch"), "tier": node.get("tier")}
+            "role": node.get("role"), "arch": node.get("arch"), "tier": (node.get("tier") or None)}
     u = node["url"].rstrip("/")
     try:
         h = _get_json(u + "/health")
@@ -158,17 +207,18 @@ def fleet_roster(cfg, self_url) -> list:
     if peers:
         with ThreadPoolExecutor(max_workers=min(8, len(peers))) as ex:
             nodes.extend(ex.map(_probe, peers))
-    _CACHE["roster"] = (now, nodes)
+    _CACHE["roster"] = (time.time(), nodes)            # stamp AFTER the build — a slow build is not born-expired
     return nodes
 
 
 def _tier_ok(node_tier, want) -> bool:
     """Trust-ceiling filter: node is AT LEAST as trusted as `want` (core>verified>community). An unrecognized
-    `want` imposes no constraint; a node with no/unknown tier cannot satisfy a tier filter."""
+    `want` imposes no constraint. A node with no/unknown tier is treated as the LEAST-trusted (community) — it
+    satisfies only loose filters and can NEVER win a `tier=core`/`tier=verified` query (no unearned trust)."""
     if want not in _TIER_RANK:
         return True
-    nt = _TIER_RANK.get(node_tier)
-    return nt is not None and nt <= _TIER_RANK[want]
+    nt = _TIER_RANK.get(node_tier, _TIER_RANK["community"])   # unknown/untiered -> least trusted, never elevated
+    return nt <= _TIER_RANK[want]
 
 
 # ───────────────────────── the :8773 handler ─────────────────────────
@@ -190,10 +240,11 @@ class FleetHandler(BaseHTTPRequestHandler):
 
     def _auth(self):
         """Reuse govd's EXACT trust root — the SHARED principals registry. Returns the principal id, or None
-        (-> 401). With no registry (lone dev / loopback) auth is disabled, identical to govd's contract."""
+        (-> 401). With NO registry, auth is disabled and returns the sentinel "local"; govd.serve() refuses to
+        start this plane on a non-loopback bind without a registry, so that open path is loopback-only."""
         reg = self.server.cfg.get("principals") or {}
         if not reg:
-            return "local"               # no registry -> auth disabled (same as govd; require_closed_auth fences remote)
+            return "local"
         return principals.authenticate(principals.bearer_of(self.headers.get("Authorization", "")), reg)
 
     def _rate_ok(self, pid) -> bool:
@@ -206,15 +257,16 @@ class FleetHandler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         cfg, self_url = self.server.cfg, self.server.self_url
 
-        if path == "/fleet/health":          # UNGATED — own liveness only (container HEALTHCHECK); not the roster
-            return self._json(200, {"status": "ok", "service": "cyberware-fleetd", "self_url": self_url,
-                                    "roster_source": _roster_source(cfg), "peers_configured": len(load_roster(cfg))})
+        if path == "/fleet/health":          # UNGATED — own liveness ONLY; NO roster I/O on the anon path
+            return self._json(200, {"status": "ok", "service": "cyberware-fleetd",
+                                    "self_url": self_url, "roster_source": _roster_source(cfg)})
 
         # everything below is Bearer-gated — the AGGREGATE roster discloses the whole fleet, never to anon
+        reg = cfg.get("principals") or {}
         pid = self._auth()
         if pid is None:
             return self._json(401, {"error": "missing/invalid Authorization: Bearer token"})
-        if pid != "local" and not self._rate_ok(pid):
+        if reg and not self._rate_ok(pid):           # rate-limit gates on REGISTRY presence, not the pid string
             return self._json(429, {"error": "rate limited"})
 
         if path == "/fleet/nodes":

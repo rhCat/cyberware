@@ -133,9 +133,12 @@ def test_tier_ceiling():
     assert fleetd._tier_ok("core", "verified") is True        # core is at least as trusted as verified
     assert fleetd._tier_ok("community", "verified") is False
     assert fleetd._tier_ok("verified", "verified") is True
-    assert fleetd._tier_ok(None, "core") is False             # unknown node tier cannot satisfy a filter
     assert fleetd._tier_ok("core", None) is True              # no filter -> no constraint
     assert fleetd._tier_ok("core", "garbage") is True         # unrecognized filter -> no constraint
+    # an untiered node is treated as the LEAST-trusted (community): matches a loose filter, never an elevated one
+    assert fleetd._tier_ok(None, "community") is True
+    assert fleetd._tier_ok(None, "verified") is False
+    assert fleetd._tier_ok(None, "core") is False             # never wins a tier=core query (no unearned trust)
 
 
 def test_load_roster_empty_not_throw(tmp_path, monkeypatch):
@@ -145,3 +148,32 @@ def test_load_roster_empty_not_throw(tmp_path, monkeypatch):
     bad = tmp_path / "bad.json"; bad.write_text("{ not json")
     monkeypatch.setenv("FLEETD_FLEET", str(bad))
     assert fleetd.load_roster({}) == []                       # unreadable -> [] (never raises)
+
+
+# ── hardening regressions (from the adversarial review) ──
+def test_health_does_not_disclose_roster_size(gated_server):
+    # M1: the ungated health path must NOT fetch the roster or leak fleet size — bare liveness only
+    code, d = _get(gated_server, "/fleet/health")
+    assert code == 200 and "peers_configured" not in d
+    assert set(d) == {"status", "service", "self_url", "roster_source"}
+
+
+def test_ssrf_only_http_schemes_are_dereferenced(monkeypatch):
+    # L2: file:// / ftp:// roster sources are rejected before any dereference
+    monkeypatch.setenv("FLEETD_FLEET_URL", "file:///etc/passwd")
+    assert fleetd.load_roster({}) == []
+    monkeypatch.delenv("FLEETD_FLEET_URL")
+    assert fleetd._safe_url("http://x:5773") and fleetd._safe_url("https://x:5773")
+    assert not fleetd._safe_url("file:///etc/passwd") and not fleetd._safe_url("ftp://x/")
+    assert fleetd._nodes_of({"nodes": [{"url": "file:///x"}, {"url": "http://ok:5773"}]}) == [{"url": "http://ok:5773"}]
+
+
+def test_named_local_principal_is_still_rate_limited():
+    # L4: a registry principal literally named "local" must NOT bypass the throttle (gate on registry, not pid)
+    reg = {"local": {"token_sha": P.token_sha("T"), "rate": 0.0, "burst": 1.0}}
+    srv, base = _start({"mode": "remote", "exec_mode": "cooperative", "principals": reg})
+    try:
+        assert _get(base, "/fleet/nodes", token="T")[0] == 200    # first: the one burst token
+        assert _get(base, "/fleet/nodes", token="T")[0] == 429    # second: throttled, despite pid == "local"
+    finally:
+        srv.shutdown(); srv.server_close()
