@@ -125,11 +125,14 @@ const STAGES = [
 ];
 
 // ── markdown: fenced code, tables, links, headings, lists, blockquote, bold, inline code ──
-function md(src) {
+function md(src, base) {
+  base = base || "";
   src = src.replace(/^---[\s\S]*?---\s*/, "");
   const L = src.split("\n"), out = []; let i = 0;
+  // a relative *.md link is a repo doc → resolve it (against this doc's own dir) to its GitHub source
+  const repoHref = (u) => { let f = "", h = u.search(/[#?]/); if (h >= 0) { f = u.slice(h); u = u.slice(0, h); } const p = base ? base.split("/") : []; u.split("/").forEach(s => { if (s === "..") p.pop(); else if (s && s !== ".") p.push(s); }); return "https://github.com/rhCat/cyberware/blob/main/" + p.join("/") + f; };
   const inline = (t) => esc(t)
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, x, u) => `<a href="${!/^https?:\/\//.test(u) && /\.md([#?]|$)/.test(u) ? repoHref(u) : u}" target="_blank" rel="noopener">${x}</a>`)
     .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
     .replace(/`([^`]+)`/g, "<code>$1</code>");
   const cells = (l) => l.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map(c => c.trim());
@@ -183,7 +186,7 @@ function setMode(id) {
       <div class="card" id="bp">${d.pipeline.svg}</div>
       <details class="bp" style="margin:10px 0 24px"><summary>pipeline blueprint — L++ source (infra/document/pipeline.blueprint.json)</summary><pre class="tall">${esc(JSON.stringify(d.pipeline.blueprint, null, 2))}</pre></details>`;
   }
-  docview.innerHTML = `<div class="doc md">${pre}${md(d ? d.body : "")}</div>`;
+  docview.innerHTML = `<div class="doc md">${pre}${md(d ? d.body : "", d ? d.base : "")}</div>`;
   window.scrollTo(0, 0);
 }
 
@@ -229,7 +232,7 @@ function overviewHtml(s) {
     <div class="card">${((s.blueprint||{}).safety_invariants||[]).map(inv =>
       `<div class="inv"><b>${esc(inv.name)}</b><span>${esc((inv.description||"").replace(/^GUARDRAIL:\s*/,""))}</span></div>`).join("") || '<span class="muted">none</span>'}</div>
     <h3>Context — SKILL.md</h3>
-    <div class="card md">${md(s.skill_md || "")}</div>`;
+    <div class="card md">${md(s.skill_md || "", s.mdbase || "")}</div>`;
 }
 
 function blueprintHtml(s) {
@@ -318,7 +321,7 @@ async function loadSkill(entry) {
   }));
   return { id: bp.id, name: bp.name || bp.id, description: bp.description || "",
     group: String(bp.id).startsWith("cws") ? "cws internals" : "skills",
-    blueprint: bp, svg: svg || "", skill_md: smd || "", index: idx, ledger: led || null, perks };
+    blueprint: bp, svg: svg || "", skill_md: smd || "", mdbase: "skillChip/" + dir, index: idx, ledger: led || null, perks };
 }
 
 const DOCSET = [["operate", "Operate", "cyberware.md"], ["architecture", "Architecture", "docs/architecture.md"],
@@ -331,7 +334,7 @@ async function boot() {
   S = (await Promise.all(names.map(loadSkill))).filter(Boolean)
     .sort((a, b) => a.group === b.group ? a.id.localeCompare(b.id) : (a.group === "skills" ? -1 : 1));
   DOCS = (await Promise.all(DOCSET.map(async ([id, label, path]) => {
-    const body = await getText(path); return body != null ? { id, label, body } : null;
+    const body = await getText(path); return body != null ? { id, label, body, base: path.split("/").slice(0, -1).join("/") } : null;
   }))).filter(Boolean);
   const arch = DOCS.find(d => d.id === "architecture");           // the ouroboros: the infra's OWN L++ blueprint
   if (arch) {
