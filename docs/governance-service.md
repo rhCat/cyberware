@@ -51,6 +51,11 @@ GET  /monitor/stream                  -> Server-Sent-Events push of the snapshot
 GET  /monitor/run/<run_id>            -> one run's value-free detail for the dashboard (monitor-token gated)
 GET  /trace/<run_id>                  -> the run's cross-plane trace: claim→grant→step spans (monitor-token gated)
 GET  /intoto/<run_id>                 -> the run's in-toto provenance statement (monitor-token gated)
+
+# fleet discovery plane — a SECOND listener on :8773 (default-on; see "Fleet discovery" below)
+GET  :8773/fleet/health               -> the fleet plane's own liveness (ungated; for the container healthcheck)
+GET  :8773/fleet/nodes                -> live fleet roster: each node's url · arch · chip_sha · skills · tier · healthy (Bearer-gated)
+GET  :8773/fleet/find?skill=…[&tier=…&all=1] -> WHERE to run skill X: a healthy node's :5773 url (Bearer-gated; 404 if none)
 ```
 (`/oversight` is a **WebSocket**, not HTTP — see the WebSocket section below.)
 
@@ -83,6 +88,28 @@ So a skill the agent just authored is **visible but not yet governable** (a clai
 catalog and the agent's local view are built by the **same** `skill_index.catalog()` over their
 respective registries, so the two can only differ by a real hash difference — never by drift in the
 catalog code itself.
+
+## Fleet discovery — the roster (`:8773/fleet/*`)
+
+Where `/catalog` answers *what this node governs*, the **fleet plane** on `:8773` answers *which node to
+ask*. It is a **default-on core service** (`infra/govern/fleetd.py`) that runs as a second listener beside
+govd's `:5773`; with no fleet configured it reports just **itself** (graceful standalone), and a fleet-plane
+failure never blocks `:5773`.
+
+- `GET /fleet/find?skill=X` returns a **healthy node's `:5773` URL** that offers skill X — you then claim,
+  govern, and execute on *that* node. The fleet plane indexes govd instances; it **never** governs or executes
+  (a wrong routing answer costs only a retry, never an unauthorized action — govd stays the syscall boundary).
+- `GET /fleet/nodes` is the full roster: each node's `url · arch · chip_sha · skills · exec_mode ·
+  exod_attached · tier · healthy · last_seen`. A dead peer stays listed as `healthy:false` (never dropped).
+- `GET /fleet/health` is the plane's own liveness only (**ungated**). `/fleet/nodes` and `/fleet/find` are
+  **Bearer-gated against the same principals registry** as `/govern` — the aggregate roster discloses the whole
+  fleet, so it is never served to an unauthenticated caller.
+
+Each node builds the roster by **live-probing** its peers' ungated `:5773` `/health` + `/catalog`. There is no
+registration or gossip write surface, so a node can only ever report what it itself scraped — no
+roster-poisoning. The peer roster is supplied like `GOVD_PRINCIPALS`, never hardcoded and never in the repo:
+`FLEETD_FLEET_URL` (a remote provider) > `FLEETD_FLEET` (a mounted file) > self-only. The plane binds the same
+interface as govd — map it tailnet-only with `-p <tailnet-ip>:8773:8773`.
 
 ## Authenticity — the chip manifest + the per-skill index
 

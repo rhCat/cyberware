@@ -13,6 +13,16 @@ resolution on the govern + WS step paths, plus per-org ledger read isolation —
 step. Today the per-actor ACL bounds a **token**; org isolation bounds a **tenant**, and is a deliberate
 Phase-2 (it carries the usual review-before-merge discipline for a kernel change).
 
+## Fleet discovery — pull shipped, gossip deferred
+
+`infra/govern/fleetd.py` ships the `:8773` discovery plane (default-on, beside govd's `:5773`): each node
+live-probes its roster peers' `:5773` and answers *which node runs skill X* (`GET /fleet/find`). This is the
+**stateless pull** design — smallest correct surface, no shared written state, no roster-poisoning, graceful
+self-only when there is no fleet. The **gossip/registry** tier (each node converges a local roster and answers
+routing from memory with no per-query fan-out) is deferred until the fleet outgrows the pull design's
+`N × probe` cost — and it deliberately adds a node-identity signing step, so it is a reviewed kernel change,
+not a drop-in.
+
 ## Per-actor ACL — the Phase B flip
 
 The ACL ships in **Phase A**: scoped principals are enforced deny-by-default; unscoped principals are

@@ -93,6 +93,7 @@ Restart=always
 ExecStartPre=-/usr/bin/docker rm -f cyberware-govd
 ExecStart=/usr/bin/docker run --rm --name cyberware-govd \\
   -p 127.0.0.1:${GOVD_PORT}:5773 \\
+  -p 127.0.0.1:${GOVD_FLEET_PORT:-8773}:8773 \\
   -v cyberware-govd:/data/govd \\
   -v ${CW_ETC}/principals.json:/run/principals.json:ro \\
   -v ${CW_ETC}/monitor.token:/run/monitor.token:ro \\

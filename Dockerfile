@@ -52,8 +52,8 @@ ENV GOVD_CONFIG=/app/infra/govern/govd_config.json \
 #   docker run -v cyberware-govd:/data/govd ...   (or  -v "$PWD/govd-ledger:/data/govd")
 VOLUME ["/data/govd"]
 
-# remote mode binds 0.0.0.0; map the port on `docker run`
-EXPOSE 5773
+# remote mode binds 0.0.0.0; map the ports on `docker run` (:5773 govd · :8773 fleet discovery)
+EXPOSE 5773 8773
 
 # drop to the non-root principal for runtime — every step the engine runs inherits this uid, never root
 USER cyberware
