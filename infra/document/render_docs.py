@@ -96,11 +96,15 @@ h1{font-size:22px;letter-spacing:.4px} .gsig{color:var(--green)}
 
 MD_JS = r"""
 const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-function md(src){
+const REPO="https://github.com/rhCat/cyberware/blob/main/";
+function md(src,base){
+  base=base||"";
   src=src.replace(/^---[\s\S]*?---\s*/,"");
   const L=src.split("\n"),out=[];let i=0;
+  // a relative *.md link is a repo doc → resolve it (against this page's own dir) to its GitHub source
+  const repoHref=u=>{var f="",h=u.search(/[#?]/);if(h>=0){f=u.slice(h);u=u.slice(0,h);}var p=base?base.split("/"):[];u.split("/").forEach(s=>{if(s==="..")p.pop();else if(s&&s!==".")p.push(s);});return REPO+p.join("/")+f;};
   const inline=t=>esc(t)
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2">$1</a>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,(m,x,u)=>'<a href="'+(!/^https?:\/\//.test(u)&&/\.md([#?]|$)/.test(u)?repoHref(u):u)+'">'+x+'</a>')
     .replace(/\*\*(.+?)\*\*/g,"<b>$1</b>")
     .replace(/`([^`]+)`/g,"<code>$1</code>");
   const cells=l=>l.replace(/^\s*\|/,"").replace(/\|\s*$/,"").split("|").map(c=>c.trim());
@@ -133,8 +137,9 @@ DOC_TMPL = """<!doctype html><html lang="en"><head>
 <div class="foot">Source: <a href="https://github.com/rhCat/cyberware/blob/main/__SRC__">__SRC__</a> ·
 <a href="/explore.html">← all topics</a></div></div>
 <script>__MDJS__
+var __BASE="__SRC__".split("/").slice(0,-1).join("/");
 fetch("__MDURL__").then(r=>r.ok?r.text():Promise.reject(r.status))
- .then(t=>{document.getElementById("doc").innerHTML=md(t);})
+ .then(t=>{document.getElementById("doc").innerHTML=md(t,__BASE);})
  .catch(e=>{document.getElementById("doc").innerHTML='<p class="loading">could not load __SRC__ ('+e+')</p>';});
 </script>
 <script src="/toolbar.js" defer></script></body></html>
