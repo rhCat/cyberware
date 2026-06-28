@@ -30,6 +30,7 @@ jobs:
         env:                                         # PAT scoped read-only to skillChip; falls back for a public chip
           TOKEN: ${{ secrets.SUBMODULE_PAT || github.token }}
         run: |
+          rm -rf skillChip          # self-hosted workspace persists across runs — clear any stale submodule dir before the clone
           AUTH="https://x-access-token:${TOKEN}@github.com/"
           git -c "url.${AUTH}.insteadOf=git@github.com:" \
               -c "url.${AUTH}.insteadOf=https://github.com/" \
@@ -69,6 +70,7 @@ jobs:
         env:
           TOKEN: ${{ secrets.SUBMODULE_PAT || github.token }}
         run: |
+          rm -rf skillChip          # self-hosted workspace persists across runs — clear any stale submodule dir before the clone
           AUTH="https://x-access-token:${TOKEN}@github.com/"
           git -c "url.${AUTH}.insteadOf=git@github.com:" \
               -c "url.${AUTH}.insteadOf=https://github.com/" \
