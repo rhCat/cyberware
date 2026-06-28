@@ -14,7 +14,7 @@ env:
   CYBERWARE_ALLOW_ROOT: "1"
 jobs:
   codeqc:
-    runs-on: [self-hosted]          # dev: private repo → self-hosted (free Actions minutes). Revert to ubuntu-latest when cyberware goes public.
+    runs-on: [self-hosted]          # static split: codeqc (the heavier ~9-min job) stays self-hosted = free. selfmonitor runs hosted so the two never serialize on the single runner. Revert both to ubuntu-latest at go-public.
     container:                      # run on the pinned, reproducible compute env (compute-image.yml -> ghcr):
       image: ghcr.io/rhcat/cyberware-compute:latest   # python 3.12 · openssl 3.5 · go · java+TLA, so
       credentials:                  # cws-conform/interop (ed25519ph) + cws-modelcheck (TLC) RUN, not skip
@@ -53,7 +53,7 @@ jobs:
     # "building is running"): every blueprint deadlock-free, the chip authentic, and the enforcement
     # surface mutation-tested against its ratchet floor. Its own job so the slow mutation pass is
     # isolated from the fast suite and reads as a distinct gate.
-    runs-on: [self-hosted]          # dev: private repo → self-hosted (free Actions minutes). Revert to ubuntu-latest when cyberware goes public.
+    runs-on: ubuntu-latest          # static split: selfmonitor runs hosted so it never queues behind codeqc on the single self-hosted runner (and is immune to that runner's comms-drops). ~6 billable min/run (≈$0 within free monthly minutes). codeqc stays self-hosted (free).
     container:
       image: ghcr.io/rhcat/cyberware-compute:latest
       credentials:
