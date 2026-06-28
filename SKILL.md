@@ -22,6 +22,16 @@ plan from your **own** registry under live oversight and read back a verdict. Th
 
 Set `GOVD_URL` to the server (e.g. `export GOVD_URL=http://127.0.0.1:5773`). The repo ships `./govd-client`.
 
+**In a fleet?** Any node's discovery plane (`:8773`) tells you *which* node to use — then point `GOVD_URL` there:
+
+```sh
+curl -H "Authorization: Bearer $GOVD_TOKEN" "$ANY_NODE:8773/fleet/find?skill=<skill>"
+# -> {"url": "http://<node>:5773", ...}   then: export GOVD_URL=<that url>
+```
+
+A lone node answers with itself, so the same call works whether or not there's a fleet. The fleet plane only
+points; you still claim + govern on the node's `:5773`.
+
 ## The loop — five steps
 
 **1 · Load this skill.** Done. It is the only cyberware doc you need to start.

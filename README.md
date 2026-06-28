@@ -42,6 +42,10 @@ docker run --rm -p 5773:5773 ghcr.io/rhcat/cyberware:latest    # boots govd; pri
 docker run -p 5773:5773 -v cyberware-govd:/data/govd ghcr.io/rhcat/cyberware:latest   # persist the provenance ledger
 ```
 
+The same server runs the **fleet discovery plane** on `:8773` (default-on): `GET /fleet/find?skill=X` locates a
+healthy node across a fleet — and answers with *itself* when there's no fleet. Map it tailnet-only beside govd
+(`-p <tailnet-ip>:5773:5773 -p <tailnet-ip>:8773:8773`); see [`docs/governance-service.md`](docs/governance-service.md).
+
 Verify the image's signature (keyless cosign via GitHub OIDC — no key to manage):
 
 ```sh
