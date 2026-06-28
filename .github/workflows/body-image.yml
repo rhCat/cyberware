@@ -48,6 +48,7 @@ jobs:
           rm -rf skillChip/.git                                 # don't bake the clone's git metadata into the image
           python3 -c "import json;d=json.load(open('skillChip/index.json'));print('baked skillChip@${SKILLCHIP_REF}:',d['count'],'skills · chip_sha',d['chip_sha'][:16])"
 
+      - uses: docker/setup-qemu-action@v3          # register QEMU so the amd64 runner can cross-build the arm64 leg
       - uses: docker/setup-buildx-action@v3
 
       - name: log in to ghcr
@@ -68,13 +69,13 @@ jobs:
             type=raw,value=latest
             type=sha,format=long
 
-      - name: build + push (amd64) — the Dockerfile.body gates (skill_index --check + body import chain) fail the build on drift
+      - name: build + push (amd64+arm64) — the Dockerfile.body gates (skill_index --check + body import chain) fail the build on drift
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile.body
-          platforms: linux/amd64          # amd64-only (dev): the runner + target nodes are x86; no arm64/QEMU. Restore arm64 when publishing broadly.
+          platforms: linux/amd64,linux/arm64    # multi-arch: native pull on x86 (acer/runner1/edge) AND arm64 (mac/dgx). The arm64 leg cross-builds under QEMU on the amd64 runner.
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
