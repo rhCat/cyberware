@@ -42,7 +42,7 @@ ENV GOVD_CONFIG=/app/infra/govern/govd_config.json \
     GOVD_RECORD_ROOT=/data/govd \
     PYTHONUNBUFFERED=1
 VOLUME ["/data/govd"]
-EXPOSE 5773
+EXPOSE 5773 8773
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s \
   CMD python3 -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5773/health').getcode()==200 else 1)"
 CMD ["python3", "-m", "infra.govern.chipfetch", "--exec", \

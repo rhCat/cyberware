@@ -67,7 +67,11 @@ PY
   fi
 fi
 
-# 3. govd config — DELEGATED to exod over the in-container UDS
+# 3. govd config — DELEGATED to exod over the in-container UDS. The "fleet" block (the :8773 discovery plane)
+#    is DEPLOYMENT-CONFIGURABLE: node annotations come from FLEETD_* env; the peer ROSTER comes from
+#    FLEETD_FLEET (a mounted file) or FLEETD_FLEET_URL (a remote provider), read by fleetd at request time —
+#    never hardcoded here. With no roster the plane serves just [self] (graceful standalone). The fleet plane
+#    binds the same interface as govd; map it with `-p <tailnet-ip>:8773:8773` alongside :$PORT.
 cat > "$ETC/govd.json" <<JSON
 {
   "mode": "remote",
@@ -75,7 +79,8 @@ cat > "$ETC/govd.json" <<JSON
   "record_root": "$DATA",
   "principals_path": "$PRINCIPALS",
   "exec_mode": "delegated",
-  "exod": {"socket": "$SOCK", "grant_key": "$KEYS/grant.key", "pub": "$KEYS/exod.pub"}
+  "exod": {"socket": "$SOCK", "grant_key": "$KEYS/grant.key", "pub": "$KEYS/exod.pub"},
+  "fleet": {"enabled": ${GOVD_FLEET_ENABLED:-true}, "port": ${GOVD_FLEET_PORT:-8773}, "node_id": "${FLEETD_NODE_ID:-}", "role": "${FLEETD_ROLE:-node}", "arch": "${FLEETD_ARCH:-}", "tier": "${FLEETD_TIER:-}", "advertise_host": "${FLEETD_ADVERTISE_HOST:-}"}
 }
 JSON
 
