@@ -1197,6 +1197,21 @@ def serve(cfg):
                              daemon=True).start()
         except Exception as e:
             sys.stderr.write(f"[govd] reconciler not started: {e}\n")
+    # P6: fleet discovery plane (:8773) — a SECOND listener on a daemon thread (dies with the process).
+    # Default-on + graceful-standalone: with no roster it serves just [self]; a failure here NEVER blocks
+    # :5773. Reuses cfg['principals'] in-process as the trust root (no new credential); binds the same
+    # interface as govd (the host -p <tailnet-ip>:8773:8773 mapping fences it to the tailnet).
+    try:
+        from infra.govern import fleetd
+        fcfg = cfg.get("fleet") or {}
+        if fcfg.get("enabled", True):
+            fhost = fcfg.get("host") or host
+            fport = int(fcfg.get("port", fleetd.FLEET_PORT))
+            fsrv = fleetd.start(cfg, fhost, fport)
+            threading.Thread(target=fsrv.serve_forever, daemon=True).start()
+            print(f"  fleet:      http://{fhost}:{fport}/fleet/nodes   (Bearer-gated · roster={fleetd._roster_source(cfg)} · tailnet-only)")
+    except Exception as e:
+        sys.stderr.write(f"[govd] fleet plane not started: {e}\n")   # a fleet-plane failure must never block :5773
     _mt = cfg["monitor_token"]
     if _mt == "admin":                                   # the well-known default is not a secret — keep the click-through
         print(f"  dashboard:  http://{dash_host}:{port}/?token=admin   (default local token — set GOVD_MONITOR_TOKEN to change)")

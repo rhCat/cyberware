@@ -113,7 +113,7 @@ sibling of `./Dockerfile` (govd-only) plus bwrap + exod + `deploy/body-entrypoin
 the host's unprivileged-userns sysctl (this sidesteps the Ubuntu hardening that breaks bwrap):
 ```
 docker run -d --name cyberware-body --runtime=runsc \
-  -p <tailnet-ip>:5773:5773 -v cyberware-body:/data/body \
+  -p <tailnet-ip>:5773:5773 -p <tailnet-ip>:8773:8773 -v cyberware-body:/data/body \
   -e CLOUD_MODE=1 \                       # chip-at-boot: clone + validate the live chip (drift-refused)
   ghcr.io/rhCat/cyberware-body:latest
 ```
@@ -121,10 +121,12 @@ docker run -d --name cyberware-body --runtime=runsc \
 least-privilege `--cap-add SYS_ADMIN --cap-add SYS_CHROOT --security-opt seccomp=unconfined`). Either way the
 step itself always runs as `nobody`.
 
-> **Bind the overlay IP, never the host's `0.0.0.0`.** govd inside the container binds `0.0.0.0`, so the `-p`
-> mapping is what scopes it — always `-p <tailnet-ip>:5773:5773`. A bare `-p 5773:5773` publishes the
-> governance plane on EVERY host interface (LAN/public). Auth is on (the plane refuses without a token), but
-> the overlay-only binding is the first fence — keep it.
+> **Bind the overlay IP, never the host's `0.0.0.0`.** govd (`:5773`) and the fleet-discovery plane (`:8773`)
+> inside the container both bind `0.0.0.0`, so the `-p` mapping is what scopes them — always
+> `-p <tailnet-ip>:5773:5773 -p <tailnet-ip>:8773:8773`. A bare `-p 5773:5773` (or `8773:8773`) publishes the
+> plane on EVERY host interface (LAN/public). Auth is on (both refuse without a token; `:8773/fleet/*` is
+> Bearer-gated against the same principals registry — only its own `/fleet/health` liveness is open), but the
+> overlay-only binding is the first fence — keep it.
 
 The entrypoint mints, ONCE, into the `/data/body` volume: the grant + exod keypairs (dual-control), a monitor
 token, and an `agent-1` principal. Wire them:
