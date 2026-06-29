@@ -54,7 +54,11 @@ def build_index(skill, skills_dir=None):
     skills_dir = skills_dir or SKILLS
     files = {rel: sha256_file(ap) for rel, ap in sorted(skill_files(_sd(skill, skills_dir)).items())}
     roll = canonical.digest(files)
-    return {"skill": skill, "skill_sha": roll, "file_count": len(files), "files": files}
+    # the per-skill index records the BARE leaf name; skill_sha is canonical.digest(file CONTENTS), so it is
+    # placement-invariant — a skill keeps its sha whether addressed bare or as `ns:name`. Namespacing lives in
+    # the ROOT manifest, never here, so compose can copy a skill verbatim across chips.
+    return {"skill": registry.parse_skill_id(skill)[1] or skill,
+            "skill_sha": roll, "file_count": len(files), "files": files}
 
 
 def write_index(skill, skills_dir=None):
@@ -92,12 +96,12 @@ def scan_skills(skills_dir=None):
         dp = os.path.join(skills_dir, d)
         if not os.path.isdir(dp):
             continue
-        if os.path.isfile(os.path.join(dp, "perks.json")):          # a flat skill at the chip root
+        if os.path.isfile(os.path.join(dp, "perks.json")):          # a flat skill at the chip root (compiled cartridge)
             found.add(d)
-        else:                                                        # maybe a SOURCE group — scan one level in
+        else:                                                        # a SOURCE group `d` — its skills are namespaced `d:s`
             for s in os.listdir(dp):
                 if os.path.isfile(os.path.join(dp, s, "perks.json")):
-                    found.add(s)
+                    found.add(f"{d}:{s}")                            # NAMESPACED id (general:search != magnumopus:search)
     return sorted(found)
 
 
@@ -184,15 +188,16 @@ def chip_manifest(skills_dir=None, roster=None):
     skills_dir = skills_dir or SKILLS
     members = sorted(roster) if roster is not None else all_skills(skills_dir)
     entries = []
-    for s in members:
+    for s in members:                                    # `s` is the canonical id: `ns:name` (dev/composed) or bare (flat cartridge)
         sip = os.path.join(_sd(s, skills_dir), INDEX)
         idx = json.load(open(sip)) if os.path.isfile(sip) else {}
-        entries.append({"skill": s, "skill_sha": idx.get("skill_sha"), "file_count": idx.get("file_count")})
-    roll = canonical.digest({e["skill"]: e["skill_sha"] for e in entries})
-    # version + cartridge marker: the manifest is the authoritative roster (cartridge model). The dev chip is
-    # the full feedstock (cartridge:false); a single-skill/roster cut by `cartridge.compile` sets cartridge:true.
-    # chip_sha is the roll-up over skill_shas ONLY, so these descriptive fields never shift the chip identity.
-    return {"chip": "skillChip", "version": 1, "cartridge": False,
+        entries.append({"skill": s, "namespace": registry.parse_skill_id(s)[0],
+                        "skill_sha": idx.get("skill_sha"), "file_count": idx.get("file_count")})
+    roll = canonical.digest({e["skill"]: e["skill_sha"] for e in entries})   # roll-up KEYED ON THE NAMESPACED id
+    # version 2 marks the namespaced generation (`ns:name` manifest keys); v1 was bare. cartridge:false = the
+    # full dev feedstock; a single-skill cut by `cartridge.compile` sets cartridge:true. chip_sha is the roll-up
+    # over skill_shas ONLY, keyed by the namespaced id — descriptive fields (version/namespace/count) never shift it.
+    return {"chip": "skillChip", "version": 2, "cartridge": False,
             "count": len(entries), "skills": entries, "chip_sha": roll}
 
 
