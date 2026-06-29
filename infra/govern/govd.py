@@ -284,8 +284,9 @@ def govern(ledger, cfg, *, scope=None, strict=False, now=None):
         needs_approve = [perk]
     decision = "reject" if problems else ("push_back" if needs_approve else "allow")
     return {"decision": decision, "problems": problems, "destructive": destructive,
-            "approved": [a for a in approve if a in (perk, "destructive")],
-            "plan": plan, "plan_sha": psha, "seq": plan["sequence"],
+            "skill": skill,                              # the CANONICAL ns:name govern() resolved + gated on —
+            "approved": [a for a in approve if a in (perk, "destructive")],  # the record persists THIS, so every
+            "plan": plan, "plan_sha": psha, "seq": plan["sequence"],         # downstream re-check keys off it too
             "tlc": tlc_msg, "tlc_tla": tlc_tla, "tlc_log": tlc_out,   # the model-check spec + full log
             "needs_approve": needs_approve}
 
@@ -937,7 +938,10 @@ class Handler(BaseHTTPRequestHandler):
         # govd derives a child span per plane hop so the claim→grant→step trace is retrievable by run_id.
         traceparent = (ledger.get("traceparent") if tracing.parse_traceparent(ledger.get("traceparent") or "")
                        else tracing.new_traceparent())
-        record = {"run_id": run_id, "ts": now(), "skill": ledger.get("skill"), "perk": ledger.get("perk"),
+        # persist the CANONICAL id govern() decided on (not the raw bare claim): step-time ACL re-check, the
+        # signed exod grant, sandbox materialization, and the in-toto subject ALL re-read record["skill"], so a
+        # bare here would re-resolve independently (TOCTOU) and never carry the ':' the ns:* wildcard needs.
+        record = {"run_id": run_id, "ts": now(), "skill": v.get("skill") or ledger.get("skill"), "perk": ledger.get("perk"),
                   "principal": pid, "token": token, "var_keys": var_keys, "decision": v["decision"],
                   "traceparent": traceparent,
                   "destructive": v.get("destructive", False), "approved": v.get("approved", []),

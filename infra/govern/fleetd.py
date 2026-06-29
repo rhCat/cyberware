@@ -221,6 +221,24 @@ def _tier_ok(node_tier, want) -> bool:
     return nt <= _TIER_RANK[want]
 
 
+def _leaf(skill_id: str) -> str:
+    return skill_id.split(":", 1)[1] if ":" in skill_id else skill_id
+
+
+def _skill_matches(query: str, rid: str) -> bool:
+    """Does discovery query `query` match a roster skill id `rid`? fleetd is chip-AGNOSTIC (it aggregates peer
+    catalogs and cannot canonicalize), so the match is leaf-tolerant across the v1(bare)->v2(ns:name) cutover:
+      - a BARE query (`fs`) matches any namespace's same leaf (`general:fs`) or a flat node (`fs`) — discovery
+        by leaf, the pre-cutover behaviour preserved AND extended over namespaced rosters;
+      - a NAMESPACED query (`general:fs`) matches that exact id or a legacy FLAT advertisement of the leaf
+        (`fs`), but NOT a different namespace (`magnumopus:fs`) — namespaced queries stay precise."""
+    if query == rid:
+        return True
+    if ":" in query:
+        return rid == _leaf(query)                            # ns query: exact, or a flat node's bare leaf
+    return _leaf(rid) == query                                # bare query: any namespace's same leaf
+
+
 # ───────────────────────── the :8773 handler ─────────────────────────
 class FleetHandler(BaseHTTPRequestHandler):
     server_version = "cyberware-fleetd/1.0"
@@ -280,7 +298,8 @@ class FleetHandler(BaseHTTPRequestHandler):
             if not skill:
                 return self._json(400, {"error": "skill query param required", "usage": "/fleet/find?skill=<id>&tier=<core|verified|community>&all=1"})
             matches = [n for n in fleet_roster(cfg, self_url)
-                       if n.get("healthy") and skill in (n.get("skills") or []) and _tier_ok(n.get("tier"), tier)]
+                       if n.get("healthy") and any(_skill_matches(skill, rid) for rid in (n.get("skills") or []))
+                       and _tier_ok(n.get("tier"), tier)]
             if want_all:
                 return self._json(200, {"skill": skill, "count": len(matches), "nodes": matches})
             if not matches:

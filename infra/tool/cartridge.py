@@ -45,7 +45,7 @@ def compile(skills, out_dir: str, source=None) -> dict:
         ok, drift = skill_index.verify(sk, source)
         if not ok:
             raise ValueError(f"refusing to compile an unauthentic skill {sk}: {str(drift)[:80]}")
-        dst = registry.skill_dir(sk, out_dir)            # namespaced id -> <out>/<ns>/<name>; bare -> flat <out>/<name>
+        dst = registry.compiled_skill_dst(sk, out_dir)   # WRITE path: ns:name -> <out>/<ns>/<name>; bare -> flat
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         if os.path.exists(dst):
             shutil.rmtree(dst)
@@ -53,7 +53,7 @@ def compile(skills, out_dir: str, source=None) -> dict:
     # write the cartridge's authoritative root manifest over EXACTLY the declared skills
     entries = []
     for sk in sorted(skills):
-        idx_p = os.path.join(registry.skill_dir(sk, out_dir), INDEX)
+        idx_p = os.path.join(registry.compiled_skill_dst(sk, out_dir), INDEX)
         idx = json.load(open(idx_p)) if os.path.isfile(idx_p) else {}
         entries.append({"skill": sk, "skill_sha": idx.get("skill_sha"), "file_count": idx.get("file_count")})
     roll = canonical.digest({e["skill"]: e["skill_sha"] for e in entries})
@@ -83,7 +83,7 @@ def verify(cartridge_dir: str) -> dict:
     problems = []
     for e in declared:
         sk = e["skill"]
-        if not os.path.isfile(os.path.join(registry.skill_dir(sk, cartridge_dir), "perks.json")):
+        if not os.path.isfile(os.path.join(registry.compiled_skill_dst(sk, cartridge_dir), "perks.json")):
             problems.append(f"{sk}: declared but absent")
             continue
         ok, drift = skill_index.verify(sk, cartridge_dir)
@@ -94,7 +94,7 @@ def verify(cartridge_dir: str) -> dict:
         # would pass skill_index.verify (files match the rewritten index) while the root chip_sha — the load
         # set's identity — silently diverges. The per-skill manifest must not drift from the root.
         try:
-            on_disk_sha = json.load(open(os.path.join(registry.skill_dir(sk, cartridge_dir), INDEX))).get("skill_sha")
+            on_disk_sha = json.load(open(os.path.join(registry.compiled_skill_dst(sk, cartridge_dir), INDEX))).get("skill_sha")
         except Exception:
             on_disk_sha = None
         if on_disk_sha != e.get("skill_sha"):
@@ -126,7 +126,7 @@ def cartridge_selftest() -> dict:
 
     # seal check: tamper a file inside the cartridge skill → root verification must fail
     import glob
-    victim = next(iter(glob.glob(os.path.join(registry.skill_dir(target, cart), "perks", "*", "src", "*"))), None)
+    victim = next(iter(glob.glob(os.path.join(registry.compiled_skill_dst(target, cart), "perks", "*", "src", "*"))), None)
     tamper_caught = True
     if victim and os.path.isfile(victim):
         open(victim, "a").write("\n# tamper\n")

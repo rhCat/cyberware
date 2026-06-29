@@ -146,6 +146,18 @@ def test_govern_returns_a_value_free_plan(server):
     assert rec["var_keys"] == ["SEARCH_DIR"] and "vars" not in rec
 
 
+def test_record_persists_the_canonical_skill(server):
+    """FIX B (review): a BARE claim is governed + RECORDED under its canonical ns:name. The step-time ACL
+    re-check, the signed exod grant, sandbox staging, and the in-toto subject all re-read record["skill"], so
+    persisting bare here would re-resolve independently (TOCTOU) and the ns:* wildcard (needs a ':') would
+    never fire at step time."""
+    base, store, _ = server
+    _, v = claim(base, "fs", "find_large", var_keys=["SEARCH_DIR"])     # bare "fs"
+    assert v["decision"] == "allow", v
+    rec = store.get(v["run_id"])
+    assert rec["skill"] == "general:fs"                                 # the CANONICAL id, not the bare claim
+
+
 def test_govern_never_receives_values_even_if_sent(server):
     """Defense: even a client that posts var VALUES gets ledgered by name only — values are ignored."""
     base, store, _ = server

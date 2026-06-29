@@ -78,14 +78,15 @@ def canonicalize(skill_id, chip: str = None) -> str:
         return AMBIGUOUS
     if ns is not None:
         return f"{ns}:{name}"
-    if os.path.isfile(os.path.join(chip, name, "perks.json")):       # flat cartridge -> stays bare
-        return name
+    has_flat = os.path.isfile(os.path.join(chip, name, "perks.json"))
     owners = [src for src in source_groups(chip)
               if os.path.isfile(os.path.join(chip, src, name, "perks.json"))]
-    if len(owners) == 1:
-        return f"{owners[0]}:{name}"
-    if len(owners) >= 2:
-        return AMBIGUOUS                                             # never first-source-wins (fail-closed)
+    if has_flat and not owners:
+        return name                                                 # a pure flat compiled-cartridge skill -> bare
+    if (1 if has_flat else 0) + len(owners) >= 2:
+        return AMBIGUOUS                                            # flat+grouped OR >=2 groups: never pick one
+    if owners:
+        return f"{owners[0]}:{name}"                                # exactly one source-group owner
     return name                                                     # unknown -> unchanged
 
 
@@ -104,14 +105,14 @@ def skill_dir(skill: str, chip: str = None) -> str:
         return os.path.join(chip, ".__invalid_skill_id__")          # cannot exist; cannot escape
     if ns is not None:
         return os.path.join(chip, ns, name)                         # namespaced -> direct
-    flat = os.path.join(chip, name)
-    if os.path.isfile(os.path.join(flat, "perks.json")):
-        return flat                                                 # flat compiled cartridge
+    has_flat = os.path.isfile(os.path.join(chip, name, "perks.json"))
     owners = [src for src in source_groups(chip)
               if os.path.isfile(os.path.join(chip, src, name, "perks.json"))]
-    if len(owners) == 1:
-        return os.path.join(chip, owners[0], name)
-    return os.path.join(chip, ".__ambiguous_or_absent__")           # 0 (unknown) or >=2 (ambiguous): fail-closed
+    if has_flat and not owners:
+        return os.path.join(chip, name)                             # a pure flat compiled cartridge
+    if not has_flat and len(owners) == 1:
+        return os.path.join(chip, owners[0], name)                  # exactly one source-group owner
+    return os.path.join(chip, ".__ambiguous_or_absent__")           # 0 (unknown), >=2, or flat+grouped: fail-closed
 
 
 def source_for(skill: str) -> str:
@@ -136,6 +137,21 @@ def new_skill_dir(skill: str, chip: str = None, namespace: str = None) -> str:
     if not (valid_skill_name(ns) and valid_skill_name(name)):
         raise ValueError(f"invalid namespace/name {ns!r}/{name!r}: each must be a single path segment")
     return os.path.join(chip, ns, name)
+
+
+def compiled_skill_dst(skill: str, out_dir: str) -> str:
+    """The WRITE-path directory for a skill being COMPILED into a cartridge. It PRESERVES the id's shape so the
+    cartridge mirrors how the skill will be ADDRESSED: a namespaced `ns:name` lands at `<out>/<ns>/<name>`; a
+    BARE `name` lands FLAT at `<out>/<name>` (the legacy flat-cartridge form). Unlike `skill_dir` — the
+    read-path RESOLVER, which consults the fs and returns the fail-closed `.__ambiguous_or_absent__` sentinel
+    for a bare id whose body is not on disk YET — this is purely structural, so compiling a bare id into a fresh
+    out_dir cannot collapse every skill onto the sentinel (the cartridge data-loss / fail-open class). Validates
+    BOTH segments (the same gate as skill_dir); RAISES on a bad id — the write path must never escape `out_dir`,
+    and compiling a malformed id is never intended."""
+    ns, name = parse_skill_id(skill)
+    if name is None or not valid_skill_name(name) or (ns is not None and not valid_skill_name(ns)):
+        raise ValueError(f"unsafe skill id for a cartridge: {skill!r}")
+    return os.path.join(out_dir, ns, name) if ns is not None else os.path.join(out_dir, name)
 
 
 def manifest_path() -> str:
