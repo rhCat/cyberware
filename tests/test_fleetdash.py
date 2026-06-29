@@ -342,3 +342,43 @@ def test_safe_runid_blocks_path_traversal():
         joined = os.path.realpath(os.path.join("/m/node/runs", s + ".json"))
         assert joined.startswith(os.path.realpath("/m/node/runs") + os.sep)
     assert F._safe("a/b\\c") == "a_b_c"
+
+
+# ── the hierarchical, searchable side-nav (the home page node nav) ──
+_NODES = [
+    {"name": "mini", "role": "anchor", "fleet_tier": "mothership", "reachable": True, "health": {"runs": 5}, "count": 12},
+    {"name": "edge-1", "role": "body", "fleet_tier": "edge", "reachable": False, "health": {}, "count": 3},
+    {"name": "scribe", "role": "body", "fleet_tier": "subagent", "reachable": True, "health": {}, "count": 24},
+    {"name": "legacy", "role": "node", "fleet_tier": None, "reachable": None, "health": {}, "count": 0},
+]
+_FEED = [{"node": "mini", "role": "anchor", "run_id": "r", "ts": "2026-06-29T10:00:00",
+          "skill": "fs", "perk": "find", "principal": "mini", "decision": "allow", "authority": "blessed"}]
+
+
+def test_node_groups_orders_hierarchy_then_untiered_last():
+    order = [ft for ft, _ in F._node_groups(_NODES)]
+    assert order == ["mothership", "edge", "subagent", None]      # rank 1<2<3, untiered (None) last
+
+
+def test_sidebar_groups_nodes_by_fleet_tier():
+    html = F.render_html(_NODES, _FEED, F.risk_summary(_FEED))
+    assert '<aside class="sidebar">' in html and 'class="layout"' in html and 'class="chips"' not in html
+    pos = [html.index(f'data-tier="{t}"') for t in ("mothership", "edge", "subagent", "untiered")]
+    assert pos == sorted(pos)                                # tiers in hierarchy order, untiered last
+    assert 'class="dot up"' in html and 'class="dot down"' in html and 'class="dot stale"' in html
+    for n in ("mini", "edge-1", "scribe", "legacy"):
+        assert f'/node/{n}"' in html
+    assert 'class="main"' in html and "fs/find" in html      # the runs table is still in the main column
+
+
+def test_sidebar_search_and_collapse_are_client_side_and_persisted():
+    html = F.render_html(_NODES, _FEED, F.risk_summary(_FEED))
+    assert 'class="navsearch"' in html                       # a filter box
+    assert 'data-search="scribe body subagent"' in html      # each node carries a lowercased search haystack
+    assert "cw-nav" in html and "localStorage" in html       # state persists like the tz selector (survives refresh)
+    assert "navhdr" in html and "collapsed" in html          # per-tier collapse
+
+
+def test_sidebar_handles_empty_roster():
+    html = F.render_html([], [], F.risk_summary([]))
+    assert "no nodes in the roster" in html and '<aside class="sidebar">' in html

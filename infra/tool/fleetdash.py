@@ -432,10 +432,23 @@ _STYLE = """
  a{color:#58a6ff;text-decoration:none} a:hover{text-decoration:underline}
  h1{font-size:15px;color:#58a6ff;margin:0 0 12px} h2{font-size:13px;color:#8b949e;margin:18px 0 8px}
  .muted{color:#6e7681;text-align:center;padding:18px} .back{font-size:12px;color:#6e7681}
- .chips{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 16px}
- .chip{display:block;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:8px 12px;min-width:170px;color:#c9d1d9}
- .chip.up{border-left:3px solid #2ea043} .chip.down{border-left:3px solid #f85149} .chip.stale{border-left:3px solid #6e7681}
- .chip .role{color:#6e7681;margin-left:6px} .chip .sub{color:#8b949e;margin-top:3px;font-size:11px}
+ .layout{display:flex;gap:18px;align-items:flex-start}
+ .sidebar{flex:0 0 240px;position:sticky;top:0} .main{flex:1 1 auto;min-width:0}
+ .navsearch{width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;padding:6px 8px;margin:0 0 10px;font:12px ui-monospace,Menlo,monospace}
+ .navsearch:focus{outline:none;border-color:#58a6ff}
+ .navtier{margin-bottom:8px}
+ .navhdr{cursor:pointer;color:#8b949e;text-transform:uppercase;font-size:11px;font-weight:600;padding:4px 2px;user-select:none}
+ .navhdr .caret{display:inline-block;width:12px;color:#6e7681}
+ .navtier.collapsed .navlist{display:none} .navtier.collapsed .caret{transform:rotate(-90deg)}
+ .tcount,.navnode .cnt{color:#6e7681}
+ .navlist{display:flex;flex-direction:column;gap:4px;margin-top:4px}
+ .navnode{display:flex;align-items:center;gap:6px;background:#161b22;border:1px solid #30363d;border-radius:6px;padding:5px 8px;color:#c9d1d9}
+ .navnode:hover{background:#1c2230;text-decoration:none}
+ .navnode .role{margin-left:0} .navnode .cnt{margin-left:auto}
+ .dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+ .dot.up{background:#2ea043} .dot.down{background:#f85149} .dot.stale{background:#6e7681}
+ .navempty{color:#6e7681;font-size:11px;padding:6px 2px}
+ @media(max-width:760px){.layout{flex-direction:column}.sidebar{flex:none;width:100%;position:static}}
  table{width:100%;border-collapse:collapse} th,td{text-align:left;padding:5px 8px;border-bottom:1px solid #21262d}
  th{color:#6e7681;font-weight:600;text-transform:uppercase;font-size:11px} td.t{color:#8b949e}
  tr.run{cursor:pointer} tr.run:hover td{background:#161b22}
@@ -491,18 +504,78 @@ def _risk_pill(d):
     return f'<span class="pill {c}">{c}</span>' if c else ""
 
 
-def render_html(results, feed, risk, refresh=5):
-    chips = []
+def _node_groups(results):
+    """Group node summaries by fleet_tier, ordered mothership -> edge -> subagent -> deeper -> untiered (last)."""
+    from infra.govern.fleetd import _fleet_rank        # single source of truth for the hierarchy rank
+    groups = {}
     for r in results:
-        h = r.get("health") or {}
-        reach = r.get("reachable")
-        cls = "up" if reach else ("down" if reach is False else "stale")
-        flag = "" if reach is None else ('' if reach else ' <span class="off">offline</span>')
-        sub = (f"{h.get('exec_mode','?')} · exod {h.get('exod_attached','?')} · runs {h.get('runs','?')}"
-               if h else '<span class="stalez">no data yet</span>') + flag
-        chips.append(f'<a class="chip {cls}" href="/node/{_esc(r["name"])}"><b>{_esc(r["name"])}</b>'
-                     f'<span class="role">{_esc(r["role"])}</span> <span class="role">[{r.get("count",0)}]</span>'
-                     f'<div class="sub">{sub}</div></a>')
+        groups.setdefault(r.get("fleet_tier"), []).append(r)
+
+    def key(ft):
+        rk = _fleet_rank(ft)
+        return (rk is None, rk if rk is not None else 0, str(ft if ft is not None else "~"))
+    return [(ft, groups[ft]) for ft in sorted(groups, key=key)]
+
+
+def _sidebar(results):
+    """The hierarchical, searchable node nav: a filter box + nodes grouped under collapsible fleet-tiers."""
+    parts = ['<input class="navsearch" id="navsearch" placeholder="filter nodes…" autocomplete="off">']
+    if not results:
+        parts.append('<div class="navempty">no nodes in the roster</div>')
+    for ft, nodes in _node_groups(results):
+        label = _esc(ft if ft is not None else "untiered")
+        items = []
+        for r in nodes:
+            reach = r.get("reachable")
+            dot = "up" if reach else ("down" if reach is False else "stale")
+            name, role = _esc(r.get("name", "?")), _esc(r.get("role") or "")
+            search = _esc(" ".join(str(x) for x in (r.get("name"), r.get("role"), ft) if x).lower())
+            items.append(f'<a class="navnode" data-search="{search}" href="/node/{name}">'
+                         f'<span class="dot {dot}"></span><b>{name}</b>'
+                         f'<span class="role">{role}</span><span class="cnt">{r.get("count", 0)}</span></a>')
+        parts.append(f'<div class="navtier" data-tier="{label}">'
+                     f'<div class="navhdr" data-tier="{label}"><span class="caret">▾</span>{label} '
+                     f'<span class="tcount">{len(nodes)}</span></div>'
+                     f'<div class="navlist">{"".join(items)}</div></div>')
+    return '<aside class="sidebar">' + "".join(parts) + '</aside>'
+
+
+# Client-side nav: search-filter + per-tier collapse, persisted in localStorage so they survive the 5s
+# meta-refresh (the same pattern the display-timezone selector uses). No new server round-trips.
+_NAVJS = """
+(function(){
+  var KEY='cw-nav', box=document.getElementById('navsearch'), s={};
+  try{s=JSON.parse(localStorage.getItem(KEY))||{}}catch(e){}
+  function save(){ try{localStorage.setItem(KEY,JSON.stringify(s))}catch(e){} }
+  if(box && s.q) box.value=s.q;
+  document.querySelectorAll('.navtier').forEach(function(t){
+    if(s.collapsed && s.collapsed[t.getAttribute('data-tier')]) t.classList.add('collapsed');
+  });
+  function filter(){
+    var q=(box?box.value:'').trim().toLowerCase();
+    document.querySelectorAll('.navtier').forEach(function(t){
+      var any=false;
+      t.querySelectorAll('.navnode').forEach(function(n){
+        var hit=!q||(n.getAttribute('data-search')||'').indexOf(q)>=0;
+        n.style.display=hit?'':'none'; if(hit) any=true;
+      });
+      t.style.display=(!q||any)?'':'none';
+    });
+  }
+  if(box) box.addEventListener('input',function(){ s.q=box.value; save(); filter(); });
+  document.querySelectorAll('.navhdr').forEach(function(h){
+    h.addEventListener('click',function(){
+      var t=h.parentNode;
+      t.classList.toggle('collapsed');
+      s.collapsed=s.collapsed||{}; s.collapsed[h.getAttribute('data-tier')]=t.classList.contains('collapsed'); save();
+    });
+  });
+  filter();
+})();
+"""
+
+
+def render_html(results, feed, risk, refresh=5):
     rows = []
     for x in feed[:300]:
         cls = {"allow": "ok", "reject": "no", "push_back": "warn"}.get(x.get("decision"), "")
@@ -515,12 +588,14 @@ def render_html(results, feed, risk, refresh=5):
                     f'<td class="{cls}">{_esc(x.get("decision"))} {_risk_pill(x)}</td></tr>')
     body = "".join(rows) or '<tr><td colspan="6" class="muted">no runs mirrored yet — they appear as nodes run governed work</td></tr>'
     up = sum(1 for r in results if r.get("reachable"))
-    content = (f'<h1>cyberware · fleet control — who fired what, where</h1>{_banner(risk)}'
-               f'<div class="chips">{"".join(chips)}</div>'
+    content = (f'<h1>cyberware · fleet control — who fired what, where</h1>'
+               f'<div class="layout">{_sidebar(results)}'
+               f'<section class="main">{_banner(risk)}'
                f'<table><thead><tr><th>when (utc)</th><th>where (node)</th><th>who (principal)</th>'
                f'<th>what (skill/perk)</th><th>exec</th><th>outcome</th></tr></thead><tbody>{body}</tbody></table>'
                f'<p class="muted">click a node or a run for detail · central mirror of {len(feed)} runs · '
-               f'{up}/{len(results)} nodes live · auto-refresh {refresh}s</p>')
+               f'{up}/{len(results)} nodes live · auto-refresh {refresh}s</p>'
+               f'</section></div><script>{_NAVJS}</script>')
     return _page("cyberware — fleet control", content, refresh)
 
 
