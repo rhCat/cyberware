@@ -35,7 +35,8 @@ def compile(skills, out_dir: str, source=None) -> dict:
     source = source or skill_index.SKILLS
     if isinstance(skills, str):
         skills = [skills]
-    if not skills:
+    skills = list(dict.fromkeys(skills))                 # dedup, order-preserving: the manifest declares each
+    if not skills:                                       # skill ONCE (a doubled id must not inflate count/rows)
         raise ValueError("a cartridge must declare at least one skill")
     os.makedirs(out_dir, exist_ok=True)
     for sk in skills:

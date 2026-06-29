@@ -125,6 +125,28 @@ def test_destructive_denied_under_a_bare_skills_grant():
     assert not _allows(acl, "general:fs", "find_large", destructive=True)  # a bare-skill grant never admits destructive
 
 
+# ───────────────────────── re-review residuals (the pricing rail + cartridge hygiene) ─────────────────────────
+def test_pricing_leaf_fallback_for_a_legacy_bare_fee_table():
+    """Re-review residual: /price canonicalizes BEFORE pricing, so tool_fee sees `general:fs` — a legacy
+    pre-namespace pricing.json keyed `fs`/`fs/perk` must still price it (the same leaf back-compat as FIX C),
+    or the cutover silently fee-MISSES and under-charges."""
+    from infra.settle.price import Money, tool_fee
+    pr = {"tool_fees": {"_default": "0", "fs/find_large": "0.4200", "fs": "0.1000"}, "currency": "USD"}
+    assert tool_fee("general:fs", "find_large", pr) == Money("0.4200")     # legacy perk-specific bare key
+    assert tool_fee("general:fs", "archive", pr) == Money("0.1000")        # legacy skill-level bare key
+    assert tool_fee("general:fs", "find_large", {"tool_fees": {"general:fs/find_large": "0.9"}}) == Money("0.9")  # canonical wins
+
+
+def test_compile_dedups_a_doubled_roster():
+    """Re-review residual (cosmetic): a literal-duplicate roster must declare the skill ONCE, not inflate the
+    manifest count + emit phantom rows."""
+    cart = os.path.join(tempfile.mkdtemp(), "c")
+    info = cartridge.compile(["alchemy", "alchemy"], cart, source=skill_index.SKILLS)
+    assert info["count"] == 1 and info["skills"] == ["alchemy"]
+    assert len(json.load(open(os.path.join(cart, "index.json")))["skills"]) == 1
+    assert cartridge.verify(cart)["ok"]
+
+
 # ───────────────────────── FIX D — fleetd discovery matches across the cutover ─────────────────────────
 def test_fleet_find_skill_match_is_leaf_tolerant():
     assert fleetd._skill_matches("fs", "general:fs")                       # bare query -> namespaced roster
