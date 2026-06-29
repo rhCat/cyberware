@@ -49,6 +49,7 @@ from infra.govern import delegate    # P2-T12: server-side execution delegated t
 from infra.govern import feed        # P5-T02: SSE framing + pagination + change-digest (prose-clean core)
 from infra.govern import lease as _lease  # P5-T04: active-passive single-writer advisory-lock lease (off by default)
 from infra.govern import principals  # P1-T08: Bearer-principal auth + token-bucket rate-limit at /govern
+from infra.govern import skillacl     # ACCESS-1: the skill's intrinsic access policy (access.json), gate 2 of 3
 from infra.govern import tracing     # P5-T05: W3C traceparent across planes + in-toto run provenance
 from infra.tool import skill_index   # verify the registry matches its committed per-skill authenticity index
 import difflib             # the inconsistency path is a plain text diff — never execute a submitted plan
@@ -183,7 +184,7 @@ def tlc_check(bp):
     return _TLC_CACHE[key]
 
 
-def govern(ledger, cfg, *, scope=None, strict=False, now=None):
+def govern(ledger, cfg, *, scope=None, principal=None, local_dev=False, principal_tier=None, strict=False, now=None):
     """Govern a CLAIM — never payload. The agent sends skill, perk, and var KEYS (names only, no values,
     no file contents, no secrets); govd checks the claim against its OWN trusted registry and blesses a
     value-free execution PLAN (sequence + snippet hashes + wrapper), pinning its sha256. Destructiveness
@@ -277,6 +278,17 @@ def govern(ledger, cfg, *, scope=None, strict=False, now=None):
                                                 now=now, strict=strict)
     if not acl_ok:
         problems.append(acl_problem)
+
+    # ACCESS-1 (skill-intrinsic): the skill's OWN access policy (access.json), independent of WHO claims it —
+    # an independent fail-closed AND beside the per-actor ACL, a pure restriction that only APPENDS a problem.
+    # Local govd mode / a local_dev principal is open; otherwise a declared policy governs, and an undeclared
+    # skill is remote-closed only once the `skillacl_enforce` rollout flag is on (back-compat until then).
+    sa_ok, sa_problem = skillacl.access_allows(
+        skillacl.load_access(skill), mode=(cfg.get("mode") or "local"), is_local_dev=local_dev,
+        principal=principal, principal_tier=principal_tier, perk=perk,
+        enforce_default_closed=bool(cfg.get("skillacl_enforce")))
+    if not sa_ok:
+        problems.append(sa_problem)
 
     # 5. decide on the CLAIM: structural problems reject; a destructive perk needs explicit approval
     needs_approve = []
@@ -918,14 +930,21 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(400, {"error": "request body must be a JSON object (task-ledger)"})
 
         scope = principals.resolve_scope(reg, pid) if reg else None
+        pspec = (reg or {}).get(pid) or {}               # ACCESS-1 inputs: the principal's dev-override + trust tier
         try:
-            v = govern(ledger, cfg, scope=scope, strict=bool(cfg.get("acl_strict")), now=time.time())
+            v = govern(ledger, cfg, scope=scope, principal=pid,
+                       local_dev=bool(pspec.get("local_dev")), principal_tier=pspec.get("tier"),
+                       strict=bool(cfg.get("acl_strict")), now=time.time())
         except Exception as e:                           # never leak a stack trace; never 500 the thread
             return self._json(400, {"error": f"govern failed: {type(e).__name__}: {e}"})
         # ACL M1: recompute the actor's acl_sha from the LIVE registry fields (never an operator-supplied field)
         # and stamp it on the record, so delegate can bind it into the grant for exod's join.
         acl_sha = (principals.acl_sha(pid, (reg.get(pid) or {}).get("token_sha"), scope)
                    if scope is not None else None)
+        if cfg.get("skillacl_fold") and acl_sha is not None:   # rollout flag: fold the ACCESS-1 policy into the
+            acl_sha = hashlib.sha256((acl_sha + ":" +          # acl_sha so the signed grant carries it and exod
+                skillacl.access_policy_sha(skillacl.load_access(v.get("skill") or ledger.get("skill")))
+                ).encode()).hexdigest()                        # re-checks the skill policy off-node (exod side = Step 7)
         run_id = uuid.uuid4().hex[:16]
         # a per-run session token — the run's private credential (like a bank session). Issued once, here,
         # only to the caller; required to open the WS or read the ledger for this run.
