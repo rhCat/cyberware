@@ -333,7 +333,8 @@ def fleet_from_mirror(nodes, mirror_dir, live_health=True):
                 health, reachable = _get(node["url"].rstrip("/") + "/health"), True
             except Exception:
                 reachable = False
-        return {"name": name, "role": node.get("role", "-"), "url": node["url"].rstrip("/"),
+        return {"name": name, "role": node.get("role", "-"), "fleet_tier": node.get("fleet_tier"),
+                "url": node["url"].rstrip("/"),
                 "reachable": reachable, "health": health, "index": m["index"], "count": len(m["index"])}
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, max(1, len(nodes)))) as ex:
@@ -376,7 +377,8 @@ def risk_summary(feed):
 # ============================ live one-shot poll (CLI text view; also used when no mirror) ============================
 def poll(node):
     name, url = node.get("name", "?"), node["url"].rstrip("/")
-    out = {"name": name, "role": node.get("role", "-"), "url": url, "ok": False, "health": None,
+    out = {"name": name, "role": node.get("role", "-"), "fleet_tier": node.get("fleet_tier"),
+           "url": url, "ok": False, "health": None,
            "decisions": [], "feed": []}
     try:
         out["health"] = _get(url + "/health")
@@ -828,7 +830,8 @@ def main():
             results, feed = fleet_from_mirror(nodes, mirror_dir)
         else:
             live = [poll(n) for n in nodes]
-            results = [{"name": r["name"], "role": r["role"], "url": r["url"], "reachable": r["ok"],
+            results = [{"name": r["name"], "role": r["role"], "fleet_tier": r.get("fleet_tier"),
+                        "url": r["url"], "reachable": r["ok"],
                         "health": r.get("health"), "index": {}, "count": 0} for r in live]
             feed = []
             for r in live:
