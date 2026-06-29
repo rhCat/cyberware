@@ -48,25 +48,70 @@ def valid_skill_name(skill) -> bool:
             and (os.altsep is None or os.altsep not in skill))
 
 
-def skill_dir(skill: str, chip: str = None) -> str:
-    """Resolve a skill NAME to its directory — whether the chip is FLAT (`<chip>/<skill>`, e.g. a compiled
-    single-skill cartridge) or SOURCE-grouped (`<chip>/<source>/<skill>`, the dev feed-stock). Skill names
-    are unique across sources. Returns the flat path if not found (the caller handles absence).
+#: a non-id sentinel canonicalize() returns when a bare name is owned by >=2 namespaces (or is invalid) —
+#: distinct from any real id (it contains a NUL), so callers fail CLOSED instead of guessing a winner.
+AMBIGUOUS = "\x00AMBIGUOUS"
 
-    An INVALID name (containing `/`, `..`, an absolute path, …) never reaches `os.path.join` — it resolves to
-    a deterministically-absent path *inside* the chip, so a `..`/`/etc` name can't traverse out and every
-    `is_present`/`isdir`/`isfile` check on the result simply reports absence (fail-closed, no exception)."""
+
+def parse_skill_id(skill_id):
+    """Split a skill id into (namespace, name). EXACTLY one ':' -> (ns, name); ZERO ':' -> (None, name) [bare];
+    TWO OR MORE ':' (or a non-str) -> (None, None) [invalid]. Segments are NOT validated here — callers gate
+    each via valid_skill_name (the split happens BEFORE that gate, never loosening it to admit ':')."""
+    if not isinstance(skill_id, str):
+        return (None, None)
+    parts = skill_id.split(":")
+    if len(parts) == 1:
+        return (None, parts[0])
+    if len(parts) == 2:
+        return (parts[0], parts[1])
+    return (None, None)
+
+
+def canonicalize(skill_id, chip: str = None) -> str:
+    """The CANONICAL `ns:name` for a skill id — the back-compat shim govd uses to rewrite a BARE claim before
+    governing. A namespaced id (both segments valid) passes through; a bare name -> `ns:name` iff EXACTLY ONE
+    namespace owns it; -> AMBIGUOUS if >=2 own it (or the id is invalid); -> the bare name UNCHANGED if it is a
+    flat compiled-cartridge skill or unknown (absence is reported downstream). Never raises."""
     chip = chip or SKILLCHIP
-    if not valid_skill_name(skill):
-        return os.path.join(chip, ".__invalid_skill_name__")    # cannot exist; cannot escape the chip
-    flat = os.path.join(chip, skill)
+    ns, name = parse_skill_id(skill_id)
+    if name is None or not valid_skill_name(name) or (ns is not None and not valid_skill_name(ns)):
+        return AMBIGUOUS
+    if ns is not None:
+        return f"{ns}:{name}"
+    if os.path.isfile(os.path.join(chip, name, "perks.json")):       # flat cartridge -> stays bare
+        return name
+    owners = [src for src in source_groups(chip)
+              if os.path.isfile(os.path.join(chip, src, name, "perks.json"))]
+    if len(owners) == 1:
+        return f"{owners[0]}:{name}"
+    if len(owners) >= 2:
+        return AMBIGUOUS                                             # never first-source-wins (fail-closed)
+    return name                                                     # unknown -> unchanged
+
+
+def skill_dir(skill: str, chip: str = None) -> str:
+    """Resolve a skill id to its directory. NAMESPACED (`ns:name`) resolves DIRECTLY to `<chip>/<ns>/<name>`.
+    BARE (`name`) resolves FLAT (`<chip>/<name>`, a compiled cartridge) or to its source-group iff EXACTLY ONE
+    namespace owns it; an AMBIGUOUS bare name (>=2 owners — the prior silent first-wins behaviour) or an
+    UNKNOWN one resolves to a deterministically-absent path so every is_present check fails CLOSED.
+
+    Path-safety: each segment is gated by the UNCHANGED valid_skill_name (split on ':' BEFORE the gate), so a
+    `..`/`/etc`/absolute segment in either the namespace or the name resolves to a sentinel INSIDE the chip — it
+    can neither escape nor exist. Never raises."""
+    chip = chip or SKILLCHIP
+    ns, name = parse_skill_id(skill)
+    if name is None or not valid_skill_name(name) or (ns is not None and not valid_skill_name(ns)):
+        return os.path.join(chip, ".__invalid_skill_id__")          # cannot exist; cannot escape
+    if ns is not None:
+        return os.path.join(chip, ns, name)                         # namespaced -> direct
+    flat = os.path.join(chip, name)
     if os.path.isfile(os.path.join(flat, "perks.json")):
-        return flat
-    for src in source_groups(chip):
-        cand = os.path.join(chip, src, skill)
-        if os.path.isfile(os.path.join(cand, "perks.json")):
-            return cand
-    return flat
+        return flat                                                 # flat compiled cartridge
+    owners = [src for src in source_groups(chip)
+              if os.path.isfile(os.path.join(chip, src, name, "perks.json"))]
+    if len(owners) == 1:
+        return os.path.join(chip, owners[0], name)
+    return os.path.join(chip, ".__ambiguous_or_absent__")           # 0 (unknown) or >=2 (ambiguous): fail-closed
 
 
 def source_for(skill: str) -> str:
@@ -76,16 +121,21 @@ def source_for(skill: str) -> str:
     return "cws" if skill.startswith("cws-") else "general"
 
 
-def new_skill_dir(skill: str, chip: str = None) -> str:
-    """Where a freshly-scaffolded skill of this NAME belongs on the dev feed-stock: its source-grouped dir
-    (`<chip>/cws/<skill>` or `<chip>/general/<skill>`). The scaffolder creates the source dir as needed.
-    Validates the name (same gate as `skill_dir`) — the WRITE path must not let a `..`/absolute name escape
-    the chip and have files written outside it; raises rather than returning a sentinel, since creating a
-    skill with a bad name is never intended."""
+def new_skill_dir(skill: str, chip: str = None, namespace: str = None) -> str:
+    """Where a freshly-scaffolded skill belongs on the dev feed-stock: its source-grouped dir
+    (`<chip>/<namespace>/<name>`). The namespace is taken from (1) an explicit `namespace=`, else (2) a
+    namespaced `ns:name` id, else (3) the `source_for` convention (`cws-*` -> `cws/`, otherwise `general/`).
+    Validates BOTH the namespace and the name (same gate as `skill_dir`) — the WRITE path must not let a
+    `..`/absolute segment escape the chip; raises rather than returning a sentinel, since creating a skill
+    with a bad id is never intended."""
     chip = chip or SKILLCHIP
-    if not valid_skill_name(skill):
-        raise ValueError(f"invalid skill name {skill!r}: must be a single path segment")
-    return os.path.join(chip, source_for(skill), skill)
+    ns, name = parse_skill_id(skill)
+    if name is None:
+        raise ValueError(f"invalid skill id {skill!r}: at most one ':' (namespace:name)")
+    ns = namespace or ns or source_for(name)
+    if not (valid_skill_name(ns) and valid_skill_name(name)):
+        raise ValueError(f"invalid namespace/name {ns!r}/{name!r}: each must be a single path segment")
+    return os.path.join(chip, ns, name)
 
 
 def manifest_path() -> str:
