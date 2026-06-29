@@ -32,6 +32,11 @@ curl -H "Authorization: Bearer $GOVD_TOKEN" "$ANY_NODE:8773/fleet/find?skill=<sk
 A lone node answers with itself, so the same call works whether or not there's a fleet. The fleet plane only
 points; you still claim + govern on the node's `:5773`.
 
+Nodes carry a **`fleet_tier`** (mothership > edge > subagent > … — the topology hierarchy, *orthogonal* to the
+trust `tier`); narrow discovery with `&fleet_tier=<edge|subagent|…>`, and the fleet dashboard groups nodes by
+it. To give a *subagent* its own scoped, strictly-lower-tier governed node — its claims bounded to a
+least-privilege chip + ACL (a content-identity subset of yours) — claim **`cws-fleet:deploy`**.
+
 ## The loop — five steps
 
 **1 · Load this skill.** Done. It is the only cyberware doc you need to start.
