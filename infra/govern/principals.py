@@ -100,6 +100,19 @@ def acl_sha(pid: str, tok_sha: str, acl) -> str:
     return hashlib.sha256(acl_canonical(pid, tok_sha, acl).encode()).hexdigest()
 
 
+def _skill_listed(skill, skills) -> bool:
+    """Is a canonical `skill` (bare or `ns:name`) present in an ACL `skills` list — by EXACT id, OR by the
+    per-namespace wildcard `ns:*` (every skill in that namespace)? The bare `*` super-wildcard is handled by
+    the caller. Fail-closed on a non-list."""
+    if not isinstance(skills, list):
+        return False
+    if skill in skills:
+        return True
+    if ":" in skill:
+        return (skill.split(":", 1)[0] + ":*") in skills
+    return False
+
+
 def acl_allows(acl, skill, perk, perk_tier, destructive, credentialed, *, now=None, strict=False):
     """(ok, problem|None) for a CANONICAL (skill, perk) claim under an actor scope `acl`. Deny-by-default
     when an acl is present; under `strict` an absent acl denies too (the Phase-B end-state). Every branch
@@ -116,7 +129,7 @@ def acl_allows(acl, skill, perk, perk_tier, destructive, credentialed, *, now=No
         return False, {"id": "acl_expired", "detail": exp}
     skills = acl.get("skills")
     pmap = acl.get("perks") or {}
-    allowed_skill = (skills == ["*"]) or (skills is not None and skill in skills) or (skill in pmap)
+    allowed_skill = (skills == ["*"]) or _skill_listed(skill, skills) or (skill in pmap)
     if not allowed_skill:
         return False, {"id": "acl_skill_denied", "detail": f"{skill}/{perk}"}
     if skill in pmap and perk not in pmap[skill]:                 # perks[skill] is AUTHORITATIVE for that skill
