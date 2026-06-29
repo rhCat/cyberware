@@ -146,6 +146,20 @@ def test_govern_returns_a_value_free_plan(server):
     assert rec["var_keys"] == ["SEARCH_DIR"] and "vars" not in rec
 
 
+def test_node_name_attributes_unauthenticated_local_runs(server):
+    """GOVD_NODE_NAME / cfg.node_name: an unauthenticated local-mode run is attributed to the node's fleet name
+    (so the fleet control's WHO is the node), instead of the generic 'local'."""
+    base, store, cfg = server
+    cfg["node_name"] = "ruis-mac-mini"
+    try:
+        _, v = claim(base, "fs", "find_large", var_keys=["SEARCH_DIR"])
+        assert store.get(v["run_id"])["principal"] == "ruis-mac-mini"     # the node's fleet name, not "local"
+    finally:
+        cfg["node_name"] = None
+    _, v2 = claim(base, "fs", "find_large", var_keys=["SEARCH_DIR"])
+    assert store.get(v2["run_id"])["principal"] == "local"               # default when no node_name is set
+
+
 def test_record_persists_the_canonical_skill(server):
     """FIX B (review): a BARE claim is governed + RECORDED under its canonical ns:name. The step-time ACL
     re-check, the signed exod grant, sandbox staging, and the in-toto subject all re-read record["skill"], so

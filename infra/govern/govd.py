@@ -93,6 +93,7 @@ def load_config(path=None):
     cfg.setdefault("remote", {}).setdefault("host", "0.0.0.0")
     cfg["remote"].setdefault("port", 5773)
     cfg["record_root"] = os.environ.get("GOVD_RECORD_ROOT") or cfg.get("record_root") or "~/cyberware_govd"
+    cfg["node_name"] = os.environ.get("GOVD_NODE_NAME") or cfg.get("node_name")   # local-mode runs attribute HERE
     # the monitor (dashboard) token — gates the dashboard. env > config; the default is filled by
     # ensure_monitor_token() once the FINAL mode is known (after any --mode override).
     cfg["monitor_token"] = os.environ.get("GOVD_MONITOR_TOKEN") or cfg.get("monitor_token") or None
@@ -940,8 +941,8 @@ class Handler(BaseHTTPRequestHandler):
         # registry — an empty/absent registry under strict is a hard refusal, never an allow-all 'local'.
         if cfg.get("acl_strict") and not reg:
             return self._json(503, {"error": "acl_strict requires a configured principals registry"})
-        pid = "local"
-        if reg:
+        pid = cfg.get("node_name") or "local"            # unauthenticated local-mode runs attribute to the
+        if reg:                                          # node's fleet name (GOVD_NODE_NAME), else generic "local"
             pid = principals.authenticate(principals.bearer_of(self.headers.get("Authorization", "")), reg)
             if pid is None:
                 return self._json(401, {"error": "missing/invalid Authorization: Bearer token"})
