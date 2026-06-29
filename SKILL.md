@@ -67,9 +67,13 @@ status for *your* copy of each:
 | `unverified` | a **new** skill govd's image has never seen | no — add it, rebuild the image |
 | `server_drift` | govd's **own** copy of the skill fails its authenticity index — its blessing is untrustworthy | no — wait for a govd image rebuild |
 
-Pick a **`verified`** skill + perk, then read its `skillChip/<skill>/SKILL.md` and the perk's
-`perks/<perk>/metadata.json` (rules · usage · limitation · example) for the inputs. **Discovery + the
-sub-skill is the only reading you do.**
+Pick a **`verified`** skill + perk — its **required/optional var-KEYS are already in the `/catalog` output
+above** (e.g. `search/grep` → `PATTERN`, `SEARCH_DIR`). That *is* the claim contract; build the ledger straight
+from it — you do **not** need any on-disk skill file to claim. The perk's `skillChip/<skill>/SKILL.md` +
+`perks/<perk>/metadata.json` add only human prose (rules · usage · limitation · example) and live **where the
+skill is installed** — on disk for a source checkout, in the **container** for a body node
+(`docker exec <ct> cat /app/.cyberware/skillChip-cloud/magnumopus/<skill>/SKILL.md`), never a host mirror.
+**The `/catalog` contract is the only reading you need to claim.**
 
 **3 · Emit the claim — that is your only output.** Your entire contribution is a small JSON form (the
 task-ledger) naming the skill, the perk, and your var **values** (which stay on your side), plus one
