@@ -22,15 +22,30 @@ plan from your **own** registry under live oversight and read back a verdict. Th
 
 Set `GOVD_URL` to the server (e.g. `export GOVD_URL=http://127.0.0.1:5773`). The repo ships `./govd-client`.
 
+> **No source tree on disk?** On a **body** node — cyberware runs only as a container, no host checkout —
+> `./govd-client` and `infra/` aren't on the host; the client lives **inside the container**. Run it there,
+> staging your token + ledger in (so ledger path-vars are *container* paths, e.g. `/app/...`):
+> ```sh
+> docker exec -i cyberware sh -c 'cat >/tmp/t'      < ~/agent.token
+> docker exec -i cyberware sh -c 'cat >/tmp/l.json'  < task-ledger.json
+> docker exec -e GOVD_URL=http://127.0.0.1:5773 cyberware \
+>   python3 -m infra.govern.govd_client --token-file /tmp/t --ledger /tmp/l.json
+> ```
+> Targeting the node you're *on*? Use its **in-container `127.0.0.1:5773`** — the node's own tailnet IP would
+> hairpin (container → host overlay IP → back) and stall the WS. A small `govd-client` shim wrapping this is
+> the clean drop-in.
+
 **In a fleet?** Any node's discovery plane (`:8773`) tells you *which* node to use — then point `GOVD_URL` there:
 
 ```sh
-curl -H "Authorization: Bearer $GOVD_TOKEN" "$ANY_NODE:8773/fleet/find?skill=<skill>"
-# -> {"url": "http://<node>:5773", ...}   then: export GOVD_URL=<that url>
+curl -H "Authorization: Bearer $GOVD_TOKEN" "$ANY_NODE:8773/fleet/find?skill=<skill>"   # -> one node's :5773 url
+curl -H "Authorization: Bearer $GOVD_TOKEN" "$ANY_NODE:8773/fleet/nodes"                # -> the full roster
+# then: export GOVD_URL=<the url it returned>
 ```
 
-A lone node answers with itself, so the same call works whether or not there's a fleet. The fleet plane only
-points; you still claim + govern on the node's `:5773`.
+`/fleet/nodes` + `/fleet/find` are **Bearer-gated** (the roster discloses the fleet — pass your token or get
+`401`; only `/fleet/health` is open). A lone/unwired node answers with just itself, so the same call works
+fleet or no fleet. The plane only **points** — you still claim + govern on the node's `:5773`.
 
 ## The loop — five steps
 
