@@ -599,6 +599,37 @@ def authorize_step(store, run_id, step, plan_sha):
     return True, "granted"
 
 
+def step_reauthorize(cfg, rec0, *, now=None):
+    """Re-bind authority on an IN-FLIGHT step to the LIVE registry + skill policy — mirroring the two claim-time
+    gates so revocation, a tightened scope, a tightened access.json, or a flipped rollout flag binds a running
+    multi-step run (not only the claim). Returns (True, None) or (False, '<gate>:<problem id>').
+
+    The two gates have different dependencies: ACCESS-2 (the per-actor ACL) NEEDS the live principals registry;
+    ACCESS-1 (the skill-intrinsic gate) is registry-INDEPENDENT and runs even when no registry is configured
+    (claim-time runs it unconditionally too) — so it is NOT gated on a non-empty registry."""
+    if not rec0:
+        return True, None
+    reg0 = cfg.get("principals") or {}
+    skill, perk = rec0.get("skill"), rec0.get("perk")
+    if reg0:                                                  # ACCESS-2: the per-actor ACL on the live principal
+        sc = principals.resolve_scope(reg0, rec0.get("principal"))
+        strict = bool(cfg.get("acl_strict"))
+        if sc is not None or strict:
+            okv, pv = principals.acl_allows(sc, skill, perk, delegate.perk_sandbox_tier(skill, perk),
+                                            rec0.get("destructive", False), bool(rec0.get("credential_ids")),
+                                            now=now, strict=strict)
+            if not okv:
+                return False, "acl:" + pv["id"]
+    ps0 = reg0.get(rec0.get("principal")) or {}              # ACCESS-1: skill-intrinsic — registry-independent
+    saok, sap = skillacl.access_allows(skillacl.load_access(skill), mode=(cfg.get("mode") or "local"),
+                                       is_local_dev=bool(ps0.get("local_dev")), principal=rec0.get("principal"),
+                                       principal_tier=ps0.get("tier"), perk=perk,
+                                       enforce_default_closed=bool(cfg.get("skillacl_enforce")))
+    if not saok:
+        return False, "access:" + sap["id"]
+    return True, None
+
+
 def result_acceptable(store, run_id, step, plan_sha):
     """A step_result (status only — never output) is recorded only if it follows a grant for that exact
     step with the blessed plan_sha and has not already been recorded — so the provenance/upstream ledger
@@ -1051,27 +1082,10 @@ class Handler(BaseHTTPRequestHandler):
                     # expiry, or a tightened scope bind an IN-FLIGHT multi-step run (not just the claim) and
                     # execution authority re-binds to the live principal rather than mere session-token
                     # possession. Runs before both the delegated and cooperative branches (a deny refuses).
-                    if ok and rec0 and reg0:
-                        _sc = principals.resolve_scope(reg0, rec0.get("principal"))
-                        _strict = bool(self.server.cfg.get("acl_strict"))
-                        if _sc is not None or _strict:
-                            _okv, _pv = principals.acl_allows(
-                                _sc, rec0.get("skill"), rec0.get("perk"),
-                                delegate.perk_sandbox_tier(rec0.get("skill"), rec0.get("perk")),
-                                rec0.get("destructive", False), bool(rec0.get("credential_ids")),
-                                now=time.time(), strict=_strict)
-                            if not _okv:
-                                ok, reason = False, "acl:" + _pv["id"]
-                        if ok:                               # ACCESS-1 re-bind, symmetric with the per-actor ACL
-                            _ps0 = reg0.get(rec0.get("principal")) or {}   # above: a tightened access.json or a
-                            _saok, _sap = skillacl.access_allows(          # flipped skillacl_enforce binds an
-                                skillacl.load_access(rec0.get("skill")),   # IN-FLIGHT run, not only the claim
-                                mode=(self.server.cfg.get("mode") or "local"),
-                                is_local_dev=bool(_ps0.get("local_dev")), principal=rec0.get("principal"),
-                                principal_tier=_ps0.get("tier"), perk=rec0.get("perk"),
-                                enforce_default_closed=bool(self.server.cfg.get("skillacl_enforce")))
-                            if not _saok:
-                                ok, reason = False, "access:" + _sap["id"]
+                    if ok:                                   # re-bind authority on the live registry + skill policy
+                        _rok, _rreason = step_reauthorize(self.server.cfg, rec0, now=time.time())
+                        if not _rok:
+                            ok, reason = False, _rreason
                     delegated = ((reg0.get((rec0 or {}).get("principal")) or {}).get("exec_mode")
                                  or getattr(self.server, "exec_mode", "cooperative")) == "delegated"
                     if ok and delegated:

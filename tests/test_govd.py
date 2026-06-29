@@ -174,6 +174,25 @@ def test_skillacl_fold_records_separately_without_touching_acl_sha(server):
         cfg["skillacl_fold"] = False
 
 
+def test_skillacl_fold_scoped_principal_acl_sha_stays_unfolded(tmp_path):
+    """Re-review fix-4 gap: on the SCOPED path (where the original exod-break manifested), skillacl_fold must
+    leave acl_sha as the PLAIN actor-ACL sha (so exod's acl_join still matches) and record skillacl_sha apart."""
+    from infra.govern import principals
+    tok_sha = principals.token_sha("S")
+    reg = {"agent-a": {"token_sha": tok_sha, "rate": 5.0, "burst": 5, "acl": {"skills": ["general:fs", "fs"]}}}
+    base, store, httpd = _auth_server(tmp_path, reg)
+    httpd.cfg["skillacl_fold"] = True
+    try:
+        _, v = _post(base, {"skill": "fs", "perk": "find_large", "var_keys": ["SEARCH_DIR"]},
+                     headers={"Authorization": "Bearer S"})
+        assert v and v["decision"] == "allow", v
+        rec = store.get(v["run_id"])
+        assert rec["acl_sha"] == principals.acl_sha("agent-a", tok_sha, reg["agent-a"]["acl"])  # PLAIN, not folded
+        assert rec.get("skillacl_sha") and len(rec["skillacl_sha"]) == 64                       # recorded apart
+    finally:
+        httpd.shutdown(); httpd.server_close()
+
+
 def test_govern_never_receives_values_even_if_sent(server):
     """Defense: even a client that posts var VALUES gets ledgered by name only — values are ignored."""
     base, store, _ = server
@@ -269,6 +288,22 @@ def test_unsolicited_step_result_is_rejected(server):
     assert not ok and "never granted" in why
     store.append("r2", {"type": "granted", "ts": "t", "step": "1", "plan_sha": "PSHA"})
     assert govd.result_acceptable(store, "r2", "1", "PSHA")[0] is True
+
+
+def test_step_reauthorize_rebinds_both_gates():
+    """Re-review fix: the step-time re-bind re-runs BOTH gates. ACCESS-1 is skill-INTRINSIC and must fire even
+    with NO principals registry (the prior bug gated the whole block on a non-empty registry)."""
+    from infra.govern import principals
+    rec = {"skill": "fs", "perk": "find_large", "principal": "x"}
+    # ACCESS-1, registry-INDEPENDENT: remote + enforce + no access.json -> denied EVEN with an empty registry
+    ok, why = govd.step_reauthorize({"mode": "remote", "skillacl_enforce": True}, rec)
+    assert not ok and why == "access:skill_remote_closed"
+    assert govd.step_reauthorize({"mode": "local"}, rec) == (True, None)         # local -> both gates open
+    assert govd.step_reauthorize({}, None) == (True, None)                       # no record -> trivially ok
+    # ACCESS-2: a scoped ACL that does not list the skill refuses at step time too
+    reg = {"x": {"token_sha": principals.token_sha("S"), "acl": {"skills": ["other"]}}}
+    ok, why = govd.step_reauthorize({"principals": reg, "mode": "local"}, rec)
+    assert not ok and why.startswith("acl:")
 
 
 # ── bank-session privacy ──

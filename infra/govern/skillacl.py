@@ -74,9 +74,10 @@ def access_allows(access, *, mode, is_local_dev=False, principal=None, principal
 
 
 def access_policy_sha(access) -> str:
-    """A stable sha of the EFFECTIVE access policy — folded into the run's acl_sha (behind the `skillacl_fold`
-    rollout flag) so the signed grant + exod's off-node re-check incorporate the ACCESS-1 decision. A skill
-    with no policy hashes as the CLOSED sentinel, so adopting a policy changes the bound hash."""
+    """A stable sha of the EFFECTIVE access policy. Behind the `skillacl_fold` rollout flag it is RECORDED on
+    the run as `skillacl_sha` — a field SEPARATE from the grant-bound acl_sha (folding it INTO acl_sha breaks
+    exod's acl_join) — so the run's provenance carries the ACCESS-1 decision, ready for exod's off-node re-check
+    in Step 7. A skill with no policy hashes as the CLOSED sentinel, so adopting a policy changes it."""
     return canonical.digest(access if isinstance(access, dict) else _CLOSED)
 
 

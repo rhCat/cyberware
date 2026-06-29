@@ -142,7 +142,9 @@ def compose(sources, out_dir, *, validate_sources=True):
     except BaseException:
         shutil.rmtree(tmp, ignore_errors=True)                # out_dir untouched; nothing partial survives
         raise
-    if os.path.exists(out_dir):                               # swap in the finished chip (idempotent re-register)
+    if os.path.islink(out_dir) or os.path.isfile(out_dir):    # swap in the finished chip (idempotent re-register);
+        os.unlink(out_dir)                                    # a symlink/file out_dir is unlinked (rmtree would raise)
+    elif os.path.isdir(out_dir):
         shutil.rmtree(out_dir)
     os.rename(tmp, out_dir)
     return {"chip_sha": manifest["chip_sha"], "count": manifest["count"],

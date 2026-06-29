@@ -123,6 +123,19 @@ def test_out_dir_untouched_on_a_build_phase_failure(tmp_path):
     assert not os.path.exists(out + ".composing")                          # the temp build dir is cleaned up
 
 
+def test_compose_into_a_symlinked_out_dir(tmp_path):
+    """Re-review #2: out_dir may be a symlink (or file) — the swap must unlink it, not rmtree (which raises)."""
+    a = _mk_source(str(tmp_path / "a"), "general", "alpha")
+    real = tmp_path / "real"
+    real.mkdir()
+    link = str(tmp_path / "out")
+    os.symlink(str(real), link)                                            # out_dir is a symlink to a dir
+    r = compose.compose([a], link)
+    assert r["count"] == 1
+    assert os.path.isfile(os.path.join(link, "general", "alpha", "perks.json"))   # composed AT the out_dir path
+    assert not os.listdir(real)                                            # the symlink target was left untouched
+
+
 def test_compose_real_skillchip_roundtrips(tmp_path):
     """Integration: composing the live skillChip (preserving its source-groups) reproduces its load set."""
     out = str(tmp_path / "composed")
