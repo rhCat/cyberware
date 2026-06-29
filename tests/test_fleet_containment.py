@@ -1,6 +1,9 @@
 """Unit tests for the cws-fleet `deploy` containment core — the anti-rogue security logic, exercised
 independently of docker. The core lives in the skillChip submodule; we load it by path so the security
 decision is reviewable as a pure function (mirrors how principals.acl_allows is unit-tested apart from govd).
+
+Subset is by CONTENT (skill_sha), not leaf name — the adversarial review showed a leaf-only check let a
+mounted child carry a TROJANED same-leaf skill (different sha) past the gate. These tests pin the fix.
 """
 from __future__ import annotations
 import importlib.util
@@ -27,7 +30,13 @@ def _load(path, name):
 fd = _load(_CORE, "fleet_deploy_core") if os.path.isfile(_CORE) else None
 fdown = _load(_DOWN, "fleet_down_core") if os.path.isfile(_DOWN) else None
 
-PARENT = {"fs", "http", "git_ops"}        # the parent chip's catalog (skill leaves)
+
+def _sk(*pairs):
+    """Build a skills list [{leaf, sha}, ...] from (leaf, sha) pairs."""
+    return [{"leaf": leaf, "sha": sha} for leaf, sha in pairs]
+
+
+PARENT = _sk(("fs", "SHA_fs"), ("http", "SHA_http"), ("git_ops", "SHA_git"))   # the parent chip's catalog
 
 
 # ── fleet_rank: named / numeric ('and so on') / unknown ──
@@ -42,43 +51,55 @@ def test_fleet_rank():
     assert fd.fleet_rank(True) is None                  # a bool is not a tier (int-subclass guard)
 
 
-# ── check_containment: the fail-closed decision, full reason table ──
-@pytest.mark.parametrize("parent_ft,child_ft,acl,child_set,ok,reason", [
-    ("mothership", "subagent", {"fs"}, {"fs"}, True, None),
-    ("edge", "subagent", {"fs", "http"}, {"fs", "http"}, True, None),
-    ("mothership", 9, {"fs"}, {"fs"}, True, None),                                          # deeper int child
-    ("mothership", "mothership", {"fs"}, {"fs"}, False, "fleet_tier_not_strictly_lower"),   # sideways
-    ("edge", "mothership", {"fs"}, {"fs"}, False, "fleet_tier_not_strictly_lower"),         # upward
-    ("subagent", "edge", {"fs"}, {"fs"}, False, "fleet_tier_not_strictly_lower"),           # upward
-    ("garbage", "subagent", {"fs"}, {"fs"}, False, "fleet_tier_unknown"),
-    ("mothership", None, {"fs"}, {"fs"}, False, "fleet_tier_unknown"),
-    ("mothership", "subagent", {"fs", "s3"}, {"fs"}, False, "acl_not_subset"),              # acl beyond parent
-    ("mothership", "subagent", {"fs"}, {"fs", "s3"}, False, "chip_not_subset"),             # child smuggles a skill
-    ("mothership", "subagent", {"http"}, {"fs"}, False, "acl_exceeds_chip"),                # acl not on the child chip
+# ── check_containment: the fail-closed decision, full reason table (CONTENT-identity subset) ──
+@pytest.mark.parametrize("parent_ft,child_ft,acl,child,ok,reason", [
+    ("mothership", "subagent", {"fs"}, _sk(("fs", "SHA_fs")), True, None),
+    ("edge", "subagent", {"fs", "http"}, _sk(("fs", "SHA_fs"), ("http", "SHA_http")), True, None),
+    ("mothership", 9, {"fs"}, _sk(("fs", "SHA_fs")), True, None),                            # deeper int child
+    ("mothership", "mothership", {"fs"}, _sk(("fs", "SHA_fs")), False, "fleet_tier_not_strictly_lower"),  # sideways
+    ("edge", "mothership", {"fs"}, _sk(("fs", "SHA_fs")), False, "fleet_tier_not_strictly_lower"),        # upward
+    ("subagent", "edge", {"fs"}, _sk(("fs", "SHA_fs")), False, "fleet_tier_not_strictly_lower"),          # upward
+    ("garbage", "subagent", {"fs"}, _sk(("fs", "SHA_fs")), False, "fleet_tier_unknown"),
+    ("mothership", None, {"fs"}, _sk(("fs", "SHA_fs")), False, "fleet_tier_unknown"),
+    ("mothership", "subagent", {"fs", "s3"}, _sk(("fs", "SHA_fs")), False, "acl_not_subset"),             # acl beyond parent
+    ("mothership", "subagent", {"fs"}, _sk(("fs", "SHA_fs"), ("s3", "SHA_s3")), False, "chip_not_subset"),  # child smuggles s3
+    ("mothership", "subagent", {"http"}, _sk(("fs", "SHA_fs")), False, "acl_exceeds_chip"),               # acl not on child
+    # THE BLOCKER: a TROJANED same-leaf skill (leaf 'fs' but a DIFFERENT skill_sha) must be rejected
+    ("mothership", "subagent", {"fs"}, _sk(("fs", "TROJAN_sha")), False, "chip_not_subset"),
+    # an empty child chip is degenerate -> rejected (a body must carry >=1 verbatim parent skill)
+    ("mothership", "subagent", set(), [], False, "chip_not_subset"),
 ])
-def test_check_containment(parent_ft, child_ft, acl, child_set, ok, reason):
-    assert fd.check_containment(parent_ft, child_ft, acl, PARENT, child_set) == (ok, reason)
+def test_check_containment(parent_ft, child_ft, acl, child, ok, reason):
+    assert fd.check_containment(parent_ft, child_ft, acl, PARENT, child) == (ok, reason)
+
+
+def test_trojaned_skill_with_no_sha_is_rejected():
+    # a child skill missing a skill_sha entirely can never match a parent by content -> fail-closed
+    assert fd.check_containment("mothership", "subagent", {"fs"}, PARENT,
+                                [{"leaf": "fs", "sha": None}]) == (False, "chip_not_subset")
 
 
 def test_empty_acl_is_a_vacuous_subset_and_allowed():
-    # a body granted nothing is the minimal contained body — allowed when the tiers descend
-    assert fd.check_containment("mothership", "subagent", set(), PARENT, {"fs"}) == (True, None)
+    # a body granted nothing is the minimal contained body — allowed when tiers descend + the chip is verbatim
+    assert fd.check_containment("mothership", "subagent", set(), PARENT, _sk(("fs", "SHA_fs"))) == (True, None)
 
 
 def test_tier_gate_precedes_subset_gates():
-    # the cheap tier gate is reported BEFORE any subset failure (no spawn ever reaches the subset check)
-    assert fd.check_containment("subagent", "subagent", {"s3"}, PARENT, {"s3"}) == (False, "fleet_tier_not_strictly_lower")
+    assert fd.check_containment("subagent", "subagent", {"git_ops"}, PARENT,
+                                _sk(("git_ops", "SHA_git"))) == (False, "fleet_tier_not_strictly_lower")
 
 
-# ── _chip_leaves: manifest read, fail-closed on absence ──
-def test_chip_leaves_reads_namespaced_and_bare(tmp_path):
+# ── _chip_skills: manifest read (id/leaf/sha), fail-closed on absence ──
+def test_chip_skills_reads_id_leaf_sha(tmp_path):
     (tmp_path / "index.json").write_text(json.dumps({"skills": [
-        {"skill": "cws:cws-deploy"}, {"skill": "general:fs"}, {"skill": "markdown"}]}))
-    assert fd._chip_leaves(str(tmp_path)) == {"cws-deploy", "fs", "markdown"}
+        {"skill": "cws:cws-deploy", "skill_sha": "a"}, {"skill": "general:fs", "skill_sha": "b"},
+        {"skill": "markdown", "skill_sha": "c"}]}))
+    got = {s["leaf"]: s["sha"] for s in fd._chip_skills(str(tmp_path))}
+    assert got == {"cws-deploy": "a", "fs": "b", "markdown": "c"}
 
 
-def test_chip_leaves_no_manifest_is_empty_failclosed(tmp_path):
-    assert fd._chip_leaves(str(tmp_path)) == set()      # no manifest -> empty -> no subset check can pass
+def test_chip_skills_no_manifest_is_empty_failclosed(tmp_path):
+    assert fd._chip_skills(str(tmp_path)) == []          # no manifest -> [] -> no subset check can pass
 
 
 # ── _register: atomic append/replace by name, drops None fields, creates parent dir ──
@@ -107,7 +128,7 @@ def test_deregister_absent_row_and_missing_file_are_noops(tmp_path):
     assert fdown._deregister(str(tmp_path / "nope.json"), "x") is False
 
 
-# ── cartridge subset: the real least-privilege compile (MODE=compose) is within the parent ──
+# ── cartridge subset: the real least-privilege compile (MODE=compose) is content-identical to the parent ──
 def _chip_root():
     chip = os.path.normpath(os.path.join(_HERE, "..", "skillChip"))
     if not os.path.isfile(os.path.join(chip, "index.json")):
@@ -115,20 +136,22 @@ def _chip_root():
     return os.path.normpath(os.path.join(_HERE, "..")), chip
 
 
-def test_cartridge_subset_is_within_parent(tmp_path):
+def test_cartridge_subset_is_content_identical_to_parent(tmp_path):
     import subprocess
     import sys
     root, chip = _chip_root()
-    parent_leaves = fd._chip_leaves(chip)
-    if "fs" not in parent_leaves:
+    parent = {s["leaf"]: s["sha"] for s in fd._chip_skills(chip)}
+    if "fs" not in parent:
         pytest.skip("parent chip has no 'fs' skill")
     out = str(tmp_path / "child")
     r = subprocess.run([sys.executable, "-m", "infra.tool.cartridge", "--compile", "fs", "--out", out],
                        cwd=root, capture_output=True, text=True,
                        env={**os.environ, "CYBERWARE_SKILLCHIP": chip})
     assert r.returncode == 0, r.stderr
-    child_leaves = fd._chip_leaves(out)
-    assert child_leaves and child_leaves <= parent_leaves            # least-privilege subset ⊆ parent
+    child = fd._chip_skills(out)
+    assert child and all(s["sha"] == parent.get(s["leaf"]) for s in child)   # verbatim copy: sha matches the parent
+    # and the full containment gate accepts it
+    assert fd.check_containment("mothership", "subagent", ["fs"], fd._chip_skills(chip), child) == (True, None)
 
 
 def test_cartridge_rejects_a_skill_outside_the_parent(tmp_path):
