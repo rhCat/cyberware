@@ -97,6 +97,32 @@ def test_unauthentic_source_is_refused(tmp_path):
         compose.compose([a], str(tmp_path / "composed"))
 
 
+def test_case_fold_collision_is_a_conflict_not_a_crash(tmp_path):
+    """Review #1: two ids differing only by CASE (`nvidia:fs` vs `Nvidia:fs`) collide on a case-insensitive FS.
+    plan() must catch this as a ComposeConflict, not pass the string check and crash mid-copy."""
+    a = _mk_source(str(tmp_path / "a"), "nvidia", "fs")
+    b = _mk_source(str(tmp_path / "b"), "Nvidia", "fs")
+    out = str(tmp_path / "composed")
+    with pytest.raises(compose.ComposeConflict):
+        compose.compose([a, b], out)
+    assert not os.path.exists(out)                                          # out_dir untouched (no half-built crash)
+
+
+def test_out_dir_untouched_on_a_build_phase_failure(tmp_path):
+    """Review #2: 'out_dir untouched on error' must hold for ANY failure, not only a detected conflict — the
+    temp-dir-then-swap build leaves a pre-existing out_dir intact when the composed authenticity check fails."""
+    a = _mk_source(str(tmp_path / "a"), "general", "alpha")
+    with open(os.path.join(a, "general", "alpha", "tool.sh"), "a") as f:
+        f.write("\n# tamper after pinning\n")                               # files no longer match the pinned index
+    out = str(tmp_path / "composed")
+    os.makedirs(out)
+    open(os.path.join(out, "SENTINEL"), "w").write("keep")                 # a pre-existing out_dir
+    with pytest.raises(ValueError):
+        compose.compose([a], out, validate_sources=False)                  # skip source gate -> fails the COMPOSED verify
+    assert os.path.isfile(os.path.join(out, "SENTINEL"))                    # untouched despite the build-phase failure
+    assert not os.path.exists(out + ".composing")                          # the temp build dir is cleaned up
+
+
 def test_compose_real_skillchip_roundtrips(tmp_path):
     """Integration: composing the live skillChip (preserving its source-groups) reproduces its load set."""
     out = str(tmp_path / "composed")

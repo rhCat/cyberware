@@ -22,20 +22,30 @@ import json
 import os
 import shutil
 import sys
+import unicodedata
 
 from infra import registry
 from infra.tool import skill_index
 
 
 class ComposeConflict(Exception):
-    """Two sources declare the SAME ns:name — manual reconciliation required (the engine never silently
-    picks one). `.conflicts` maps the duplicated id to the source labels that each claim it."""
+    """Two sources declare the SAME composed id — or two ids that COLLIDE on a case-insensitive / Unicode-
+    normalizing filesystem (macOS, many CI volumes), landing on the same directory. Manual reconciliation
+    required; the engine never silently picks one. `.conflicts` maps the fs-fold key to the [(id, source
+    label), ...] that collide on it."""
 
     def __init__(self, conflicts):
         self.conflicts = conflicts
-        body = "\n".join(f"  {nsn}: claimed by " + " AND ".join(srcs)
-                         for nsn, srcs in sorted(conflicts.items()))
-        super().__init__("exact-duplicate skill ids across sources — manual reconciliation required:\n" + body)
+        body = "\n".join("  " + " AND ".join(f"{tid} (from {lbl})" for tid, lbl in sorted(conflicts[k]))
+                         for k in sorted(conflicts))
+        super().__init__("colliding skill ids across sources — manual reconciliation required:\n" + body)
+
+
+def _fold(tid):
+    """The filesystem-equivalence key for a composed id (NFC + casefold), so two ids differing only by case or
+    Unicode form — which collide on a case-insensitive / normalizing FS — are detected as ONE destination, not
+    silently treated as two skills (then crashing mid-copy)."""
+    return unicodedata.normalize("NFC", tid).casefold()
 
 
 def _norm(sources):
@@ -77,11 +87,11 @@ def plan(sources):
                 flat.append((spec["label"], sid))
                 continue
             placements.append((tid, registry.skill_dir(sid, spec["path"]), spec["label"]))
-            owners.setdefault(tid, []).append(spec["label"])
+            owners.setdefault(_fold(tid), []).append((tid, spec["label"]))    # key on the FS-fold, not the raw id
     if flat:
         raise ValueError("flat source skill(s) need an explicit namespace to compose (use path:namespace): "
                          + ", ".join(f"{lbl}/{sid}" for lbl, sid in flat))
-    conflicts = {tid: labels for tid, labels in owners.items() if len(labels) > 1}
+    conflicts = {fk: entries for fk, entries in owners.items() if len(entries) > 1}
     return placements, conflicts
 
 
@@ -111,21 +121,30 @@ def compose(sources, out_dir, *, validate_sources=True):
                 raise ValueError(f"refusing to compose an unauthentic source {spec['label']}: {detail}")
     placements, conflicts = plan(sources)
     if conflicts:
-        raise ComposeConflict(conflicts)                      # HARD ERROR — before any write; out_dir untouched
+        raise ComposeConflict(conflicts)                      # HARD ERROR — before any write
 
-    # clean build so a re-register is idempotent and nothing partial from a prior run survives
-    if os.path.exists(out_dir):
+    # Build into a SIBLING temp dir and swap on success, so out_dir is left UNTOUCHED on ANY failure (a copy
+    # error, an fs collision plan() could not foresee, a failed authenticity check) — not only a detected dup.
+    tmp = out_dir.rstrip("/\\") + ".composing"
+    shutil.rmtree(tmp, ignore_errors=True)
+    try:
+        os.makedirs(tmp)
+        for tid, src_dir, _ in placements:
+            dst = registry.compiled_skill_dst(tid, tmp)       # structural write-path: <tmp>/<ns>/<name>
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            if os.path.exists(dst):                           # belt: a residual fs-fold collision -> hard error
+                raise ComposeConflict({_fold(tid): [(tid, "source"), (tid, "filesystem-colliding sibling")]})
+            shutil.copytree(src_dir, dst, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".git"))
+        manifest = skill_index.write_manifest(tmp)            # re-pin the composed v2 manifest
+        ok, detail = _full_verify(tmp)
+        if not ok:
+            raise ValueError(f"composed chip failed its own authenticity check: {detail}")
+    except BaseException:
+        shutil.rmtree(tmp, ignore_errors=True)                # out_dir untouched; nothing partial survives
+        raise
+    if os.path.exists(out_dir):                               # swap in the finished chip (idempotent re-register)
         shutil.rmtree(out_dir)
-    os.makedirs(out_dir)
-    for tid, src_dir, _ in placements:
-        dst = registry.compiled_skill_dst(tid, out_dir)       # structural write-path: <out>/<ns>/<name>
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        shutil.copytree(src_dir, dst, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".git"))
-
-    manifest = skill_index.write_manifest(out_dir)            # re-pin the composed v2 manifest
-    ok, detail = _full_verify(out_dir)
-    if not ok:
-        raise ValueError(f"composed chip failed its own authenticity check: {detail}")
+    os.rename(tmp, out_dir)
     return {"chip_sha": manifest["chip_sha"], "count": manifest["count"],
             "skills": [e["skill"] for e in manifest["skills"]],
             "sources": [s["label"] for s in specs]}
@@ -145,7 +164,7 @@ def main():
     except ComposeConflict as e:
         print(str(e), file=sys.stderr)
         sys.exit(2)                                           # distinct code: manual reconciliation required
-    except ValueError as e:
+    except (ValueError, OSError) as e:                        # unauthentic/flat source, or any filesystem error
         print(f"compose error: {e}", file=sys.stderr)
         sys.exit(1)
     print(json.dumps(r, indent=2))

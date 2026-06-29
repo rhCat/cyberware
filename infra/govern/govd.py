@@ -941,10 +941,12 @@ class Handler(BaseHTTPRequestHandler):
         # and stamp it on the record, so delegate can bind it into the grant for exod's join.
         acl_sha = (principals.acl_sha(pid, (reg.get(pid) or {}).get("token_sha"), scope)
                    if scope is not None else None)
-        if cfg.get("skillacl_fold") and acl_sha is not None:   # rollout flag: fold the ACCESS-1 policy into the
-            acl_sha = hashlib.sha256((acl_sha + ":" +          # acl_sha so the signed grant carries it and exod
-                skillacl.access_policy_sha(skillacl.load_access(v.get("skill") or ledger.get("skill")))
-                ).encode()).hexdigest()                        # re-checks the skill policy off-node (exod side = Step 7)
+        # ACCESS-1 fold (rollout flag): RECORD the skill-access policy sha as part of the run's provenance,
+        # ready for exod to re-check off-node in Step 7. It is kept SEPARATE from the grant-bound acl_sha on
+        # purpose — folding it INTO acl_sha breaks exod's acl_join (exod re-derives acl_sha from the operator-
+        # attested ACTOR ACL, which knows nothing of the skill policy) and fail-closes every delegated run.
+        skillacl_sha = (skillacl.access_policy_sha(skillacl.load_access(v.get("skill") or ledger.get("skill")))
+                        if cfg.get("skillacl_fold") else None)
         run_id = uuid.uuid4().hex[:16]
         # a per-run session token — the run's private credential (like a bank session). Issued once, here,
         # only to the caller; required to open the WS or read the ledger for this run.
@@ -965,6 +967,7 @@ class Handler(BaseHTTPRequestHandler):
                   "traceparent": traceparent,
                   "destructive": v.get("destructive", False), "approved": v.get("approved", []),
                   "acl_sha": acl_sha,                       # ACL M1: bound into the delegated grant (None = unscoped)
+                  "skillacl_sha": skillacl_sha,             # ACCESS-1 provenance (skillacl_fold flag); exod-side = Step 7
                   "plan_sha": v.get("plan_sha"), "snippet_shas": (plan or {}).get("snippet_shas", {}),
                   "credential_ids": (plan or {}).get("credential_ids", []),   # server-authorized vault IDs (names only)
                   "seq": v.get("seq", []), "wrapper": (plan or {}).get("wrapper", ""), "tlc": v.get("tlc"),
@@ -1059,6 +1062,16 @@ class Handler(BaseHTTPRequestHandler):
                                 now=time.time(), strict=_strict)
                             if not _okv:
                                 ok, reason = False, "acl:" + _pv["id"]
+                        if ok:                               # ACCESS-1 re-bind, symmetric with the per-actor ACL
+                            _ps0 = reg0.get(rec0.get("principal")) or {}   # above: a tightened access.json or a
+                            _saok, _sap = skillacl.access_allows(          # flipped skillacl_enforce binds an
+                                skillacl.load_access(rec0.get("skill")),   # IN-FLIGHT run, not only the claim
+                                mode=(self.server.cfg.get("mode") or "local"),
+                                is_local_dev=bool(_ps0.get("local_dev")), principal=rec0.get("principal"),
+                                principal_tier=_ps0.get("tier"), perk=rec0.get("perk"),
+                                enforce_default_closed=bool(self.server.cfg.get("skillacl_enforce")))
+                            if not _saok:
+                                ok, reason = False, "access:" + _sap["id"]
                     delegated = ((reg0.get((rec0 or {}).get("principal")) or {}).get("exec_mode")
                                  or getattr(self.server, "exec_mode", "cooperative")) == "delegated"
                     if ok and delegated:

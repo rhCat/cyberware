@@ -158,6 +158,22 @@ def test_record_persists_the_canonical_skill(server):
     assert rec["skill"] == "general:fs"                                 # the CANONICAL id, not the bare claim
 
 
+def test_skillacl_fold_records_separately_without_touching_acl_sha(server):
+    """Step 6 review-fix: the skillacl_fold flag RECORDS the ACCESS-1 policy sha (skillacl_sha) but must NOT
+    fold it into the grant-bound acl_sha — folding it there breaks exod's acl_join (it re-derives acl_sha from
+    the attested ACTOR ACL) and fail-closes every delegated run. With the flag on, skillacl_sha is recorded and
+    acl_sha is untouched (None here, unscoped principal)."""
+    base, store, cfg = server
+    cfg["skillacl_fold"] = True
+    try:
+        _, v = claim(base, "fs", "find_large", var_keys=["SEARCH_DIR"])
+        rec = store.get(v["run_id"])
+        assert rec.get("skillacl_sha") and len(rec["skillacl_sha"]) == 64   # the policy sha is recorded
+        assert rec.get("acl_sha") is None                                   # unscoped -> acl_sha untouched by the fold
+    finally:
+        cfg["skillacl_fold"] = False
+
+
 def test_govern_never_receives_values_even_if_sent(server):
     """Defense: even a client that posts var VALUES gets ledgered by name only — values are ignored."""
     base, store, _ = server
