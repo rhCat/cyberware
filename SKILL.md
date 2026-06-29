@@ -52,7 +52,13 @@ status for *your* copy of each:
 | `unverified` | a **new** skill govd's image has never seen | no — add it, rebuild the image |
 | `server_drift` | govd's **own** copy of the skill fails its authenticity index — its blessing is untrustworthy | no — wait for a govd image rebuild |
 
-Pick a **`verified`** skill + perk, then read its `skillChip/<skill>/SKILL.md` and the perk's
+Skill ids are **namespaced** — `<namespace>:<name>` (e.g. `general:fs`, `cws:cws-create`), the namespace
+being the source group a skill ships under (one chip can be **composed** from several sources, so
+`general:search` and `magnumopus:search` coexist). `/catalog` returns the canonical `ns:name`. A **bare**
+name still works when exactly one namespace owns it — govd canonicalizes it — but a name two namespaces own
+is **rejected** (`ambiguous_skill_id`); namespace the claim to disambiguate.
+
+Pick a **`verified`** skill + perk, then read its `skillChip/<ns>/<skill>/SKILL.md` and the perk's
 `perks/<perk>/metadata.json` (rules · usage · limitation · example) for the inputs. **Discovery + the
 sub-skill is the only reading you do.**
 
@@ -88,10 +94,13 @@ the composition + TLA⁺/TLC model check, and returns one of:
   with no `--fetch-only` does all of this.)
 - **`push_back`** → a **destructive** perk needs explicit approval. Re-claim with `--approve <perk>` only
   if the destruction is intended.
-- **`reject`** → bad var key, a plaintext secret, a missing input, registry drift, a deadlock, or a claim
-  **outside your token's ACL scope** (a skill or tier you may not run, or a destructive/credentialed perk
-  your token isn't granted — an ACL denial is *not* clearable by `--approve`). Fix the *claim* — never
-  route around the refusal.
+- **`reject`** → the claim fails one of govd's **three independent gates** (each fail-closed): **VALIDATE**
+  (registry drift — your copy doesn't match the blessed hash), **ACCESS-1** (the skill's *own* `access.json`
+  policy closes it to you — `skill_remote_closed` when govd serves others and the skill hasn't opted in), or
+  **ACCESS-2** (the claim is outside your token's per-actor ACL scope — a skill/tier you may not run, or a
+  destructive/credentialed perk your token isn't granted). Plus the structural rejects — bad var key, a
+  plaintext secret, a missing input, a deadlock, or an **ambiguous** skill id (`ambiguous_skill_id` —
+  namespace it). None is clearable by `--approve`; fix the *claim* — never route around the refusal.
 
 The loop above is **cooperative** mode (the default): you run the porters+cores from your registry and
 report status only. Against a Linux **body** you can run **delegated** instead — add `--delegated`:

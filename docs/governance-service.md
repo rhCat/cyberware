@@ -44,7 +44,7 @@ GET  /flow/<skill>                     -> the skill's generic lifecycle blueprin
 POST /govern  {skill, perk, var_keys, approve?}
        -> 200 allow      {run_id, decision, plan, plan_sha, session_token, ws}     plan = sequence+wrapper+hashes
           409 push_back  {run_id, decision, needs_approve, ...}                    destructive perk → approve
-          403 reject     {run_id, decision, problems, ...}                         (bad key / secret key / missing input)
+          403 reject     {run_id, decision, problems, ...}   fails a gate (see "Claim gates" below) or is structural (ambiguous_skill_id, bad key, secret key, missing input, deadlock)
 GET  /ledger/<run_id>?token=…          -> the server-side provenance chain (requires the run's SESSION token — not the agent Bearer, not the monitor token)
 GET  /monitor/state                   -> dashboard snapshot: runs · decisions · live feed (value-free; monitor-token gated)
 GET  /monitor/stream                  -> Server-Sent-Events push of the snapshot on change (monitor-token gated)
@@ -119,7 +119,7 @@ with `$CYBERWARE_SKILLCHIP`). The chip is **self-describing**: `skillChip/index.
 manifest** — every skill with its `skill_sha`, plus a roll-up `chip_sha` — which cyberware retrieves to
 discover + verify the whole chip as a unit before trusting any one skill.
 
-Within it, each skill carries `skillChip/<skill>/index.json`: the sha256 of every file + a roll-up
+Within it, each skill carries `skillChip/<ns>/<skill>/index.json`: the sha256 of every file + a roll-up
 `skill_sha` (`python3 -m infra.tool.skill_index --all` to generate, `--check` to verify; CI gates on it).
 It is the file-level authenticity reference both sides check against:
 
@@ -131,6 +131,26 @@ It is the file-level authenticity reference both sides check against:
 - **the image build** runs `skill_index --check --all` right after copying the registry, so a drifted index
   (a stripped file, an un-regenerated hash) **fails the build** — the container can never ship a registry
   that would reject every claim at runtime.
+
+## Claim gates — VALIDATE / ACCESS-1 / ACCESS-2
+
+`govern()` first **canonicalizes** the skill id — a bare claim becomes its `ns:name` when exactly one
+namespace owns the leaf, and is rejected `ambiguous_skill_id` when two do (never first-source-wins). It then
+runs **three independent, fail-closed gates** (each an AND; none self-approvable):
+
+| gate | question | engine | reject ids |
+|---|---|---|---|
+| **VALIDATE** | do the skill's files match its committed index? | `verify_skill` | `registry_drift` |
+| **ACCESS-1** | may this skill be reached *here at all*? | `skillacl.access_allows` (`access.json`) | `skill_remote_closed`, `skill_principal_denied`, `skill_tier_below_floor` |
+| **ACCESS-2** | may *this principal* run this skill/perk/tier? | `principals.acl_allows` | `acl_skill_denied`, `acl_perk_denied`, `acl_tier_denied`, `acl_*` |
+
+**ACCESS-1** is the skill's *own* policy (`skillChip/<ns>/<skill>/access.json`: `{remote, principals[],
+min_tier}`), independent of who claims — **local-open / remote-closed**: a govd run for the local developer
+(`--mode local`) or a principal flagged `local_dev` is always open, but when govd serves **others** a skill
+must opt in (`"remote": true`). An undeclared skill stays remote-open until the operator flips
+`skillacl_enforce`, then the secure default holds. **ACCESS-2** is the per-actor token ACL (`ns:name`, the
+`ns:*` wildcard, the `*` super-wildcard, or a legacy bare leaf). All three gates re-run on every in-flight
+step (`step_reauthorize`), so a revocation or a tightened policy binds a running multi-step run.
 
 ## WebSocket  `/oversight`  (per-run session, status only)
 

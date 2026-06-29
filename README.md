@@ -124,7 +124,7 @@ cyberware is the **engine**; the skills are the **cartridge** — the [**skillCh
 
 ```
 THE CARTRIDGE — the skillChip (submodule)   THE ENGINE — the governance infrastructure
-  skillChip/<skill>/                          infra/
+  skillChip/<ns>/<skill>/                     infra/
     SKILL.md      context for intelligence      govern/   validator · composer · compiler · oversight
     perks.json    the proven pathways                     executor · runlog · govd · govd_client
     blueprint.json  the action CFG (L++)                  OVERSIGHT_RULE.json · EXECUTOR_RULE.json

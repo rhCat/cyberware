@@ -1,23 +1,23 @@
 {
   "_meta": {
-    "generated": "2026-06-27",
-    "repo_commit": "853a3cf",
+    "generated": "2026-06-29",
+    "repo_commit": "6cf67a9",
     "method": "citrinitas intent-alignment + putrefactio/alembic structural layer; 6 module extractors + 4 doc extractors + 1 gap synth (workflow)",
     "scope": "core governance kernel: infra/{govern,exec,cwp,store,settle,tool} vs SKILL.md/README.md/index.html/docs/*",
     "counts": {
-      "functions": 319,
-      "flows": 53,
+      "functions": 331,
+      "flows": 55,
       "documents": 14,
       "documented": 74,
       "partial": 1,
       "undocumented": 0
     },
-    "note": "intent atlas of CODE + DOCS; coverage re-judged after the doc-gap fill (settlement.md + architecture.md sections + acl/backend doc fixes)"
+    "note": "intent atlas of CODE + DOCS; updated for the namespaced multi-chip registry + compose + the three govern gates (VALIDATE / ACCESS-1 access.json / ACCESS-2 per-actor ACL)."
   },
   "module_summaries": [
     {
       "module": "infra/govern",
-      "summary": "The cyberware governance control/audit plane: govern a value-free CLAIM, bless a hashed execution plan, gate each WS step (plan-hash + upstream + per-actor ACL), delegate confined execution to exod, and record server-owned provenance \u2014 never seeing data, never executing.",
+      "summary": "The cyberware governance control/audit plane: govern a value-free CLAIM through THREE independent fail-closed gates — VALIDATE (authenticity) / ACCESS-1 (the skill's own access.json policy, skillacl.py) / ACCESS-2 (the per-actor token ACL, principals.py, with an ns:* wildcard) — bless a value-free plan, monitor it over a per-run WS, and re-bind authority on every in-flight step (step_reauthorize). It never sees data and never runs code.",
       "n_functions": 61,
       "n_flows": 9
     },
@@ -47,7 +47,7 @@
     },
     {
       "module": "infra/tool (tool)",
-      "summary": "Chip tooling: pins skills to sha256 indexes + a roll-up chip_sha (authenticity gate), resolves the manifest-authoritative load set, builds the value-free discovery catalog, compiles/verifies standalone cartridges, runs in-skill governed tests, scaffolds new skills, and self-monitors the engine against redeemable evidence.",
+      "summary": "Chip tooling: pins skills to sha256 indexes + a roll-up chip_sha (authenticity gate), resolves the manifest-authoritative load set, builds the value-free discovery catalog, compiles/verifies standalone cartridges, runs in-skill governed tests, scaffolds new skills, and self-monitors the engine against redeemable evidence. compose.py merges multiple source chips into one namespaced composed chip (hard-error reconciliation on an exact ns:name duplicate); skill_index pins the v2 namespaced manifest (ns:name keys, placement-invariant skill_sha).",
       "n_functions": 41,
       "n_flows": 7
     }
@@ -334,7 +334,7 @@
         "verify_ph",
         "ph_verify"
       ],
-      "intent": "Bridge to sigstore/cosign: Ed25519ph over the identical PAE via the OpenSSL CLI, so cwp envelopes verify in cosign and vice versa \u2014 the base of all publisher signing."
+      "intent": "Bridge to sigstore/cosign: Ed25519ph over the identical PAE via the OpenSSL CLI, so cwp envelopes verify in cosign and vice versa — the base of all publisher signing."
     },
     {
       "module": "infra/cwp (cwp)",
@@ -480,7 +480,7 @@
         "reconcile_all",
         "continuous_reconcile"
       ],
-      "intent": "Each cycle re-verifies the chain, re-asserts the out-of-band expected origin (set_origin/get_origin) to defeat forged genesis, recomputes digests, and set-diffs vs the index \u2014 alarming on gap_below_head/index_ahead/digest_mismatch/chain_broken/origin_missing while treating index_behind as benign lag (optionally repaired)."
+      "intent": "Each cycle re-verifies the chain, re-asserts the out-of-band expected origin (set_origin/get_origin) to defeat forged genesis, recomputes digests, and set-diffs vs the index — alarming on gap_below_head/index_ahead/digest_mismatch/chain_broken/origin_missing while treating index_behind as benign lag (optionally repaired)."
     },
     {
       "module": "infra/store",
@@ -503,7 +503,7 @@
         "PsycopgBackend.open",
         "SqliteWalBackend.open"
       ],
-      "intent": "Operator config picks Postgres iff a dsn_file/dsn is wired (else local sqlite-WAL); the Postgres tier stays INERT \u2014 every op returns 'unconfigured' \u2014 and the DSN is read lazily server-side and never echoed."
+      "intent": "Operator config picks Postgres iff a dsn_file/dsn is wired (else local sqlite-WAL); the Postgres tier stays INERT — every op returns 'unconfigured' — and the DSN is read lazily server-side and never echoed."
     },
     {
       "module": "infra/settle",
@@ -719,6 +719,34 @@
         "check_mutation"
       ],
       "intent": "Grade the engine against redeemable evidence: deadlock-free blueprints, hash authenticity, no scaffold stubs, relocatable porters, and a mutation-coverage ratchet that may only rise."
+    },
+    {
+      "module": "infra/tool (tool)",
+      "name": "compose->reconcile->verify->serve",
+      "sequence": [
+        "scan_skills",
+        "plan",
+        "ComposeConflict?",
+        "compiled_skill_dst",
+        "copytree",
+        "write_manifest",
+        "_full_verify",
+        "atomic_swap"
+      ],
+      "intent": "Multi-source compose: place each source's skills by namespace, HARD-ERROR on an exact ns:name dup (manual reconciliation), re-pin + full-verify the composed v2 chip, atomic-swap into place."
+    },
+    {
+      "module": "infra/govern",
+      "name": "three-gate govern",
+      "sequence": [
+        "canonicalize",
+        "VALIDATE:verify_skill",
+        "build_plan",
+        "ACCESS-2:acl_allows",
+        "ACCESS-1:access_allows",
+        "decide"
+      ],
+      "intent": "The claim is gated by THREE independent fail-closed ANDs: VALIDATE (the skill's files match its committed index), ACCESS-1 (the skill's own access.json policy), ACCESS-2 (the per-actor token ACL). Re-bound at step time by step_reauthorize."
     }
   ],
   "functions": [
@@ -726,9 +754,9 @@
       "module": "infra/govern",
       "name": "govern",
       "file": "infra/govern/govd.py",
-      "line": 186,
-      "signature": "govern(ledger, cfg, *, scope=None, strict=False, now=None) -> dict",
-      "intent": "Govern a CLAIM (keys only); bless a value-free plan; gate destructive+ACL",
+      "line": 187,
+      "signature": "govern(ledger, cfg, *, scope=None, principal=None, local_dev=False, principal_tier=None, strict=False, now=None) -> dict",
+      "intent": "Govern a CLAIM (keys only): canonicalize the skill id, then THREE independent fail-closed gates — VALIDATE (authenticity) / ACCESS-1 (skill access.json) / ACCESS-2 (per-actor ACL) — bless a value-free plan",
       "flow_role": "step 2 of claim->govern->grant->exec->sign",
       "public": true
     },
@@ -1188,7 +1216,7 @@
       "file": "infra/govern/lease.py",
       "line": 70,
       "signature": "LeaseManager.held(self, now=None) -> bool",
-      "intent": "True iff we hold the lease \u2014 the single-writer mirror gate predicate",
+      "intent": "True iff we hold the lease — the single-writer mirror gate predicate",
       "flow_role": "HA failover",
       "public": true
     },
@@ -3568,7 +3596,7 @@
       "file": "infra/tool/skill_index.py",
       "line": 104,
       "signature": "permitted_skills(skills_dir=None) -> list[str]",
-      "intent": "The root manifest's permit list \u2014 the authority for what may load",
+      "intent": "The root manifest's permit list — the authority for what may load",
       "flow_role": "step 1 of manifest-authoritative load set",
       "public": true
     },
@@ -3911,12 +3939,132 @@
       "intent": "CLI: run all self-monitor checks and enforce policy (exit 1 on fail)",
       "flow_role": "CLI entry to self-monitor gate",
       "public": true
+    },
+    {
+      "module": "infra",
+      "name": "parse_skill_id",
+      "file": "infra/registry.py",
+      "line": 56,
+      "signature": "parse_skill_id(skill_id) -> (namespace|None, name|None)",
+      "intent": "Split a skill id into (ns, name): one ':' -> (ns,name); zero -> (None,name); >=2/non-str -> (None,None)",
+      "flow_role": "namespace addressing — split before the per-segment gate",
+      "public": true
+    },
+    {
+      "module": "infra",
+      "name": "canonicalize",
+      "file": "infra/registry.py",
+      "line": 70,
+      "signature": "canonicalize(skill_id, chip=None) -> str",
+      "intent": "Bare claim -> ns:name iff EXACTLY ONE namespace owns it; >=2 -> AMBIGUOUS (never first-source-wins); flat/unknown -> unchanged",
+      "flow_role": "the back-compat shim govd applies before governing a bare claim",
+      "public": true
+    },
+    {
+      "module": "infra",
+      "name": "skill_dir",
+      "file": "infra/registry.py",
+      "line": 93,
+      "signature": "skill_dir(skill, chip=None) -> str",
+      "intent": "Resolve a skill id to its dir: namespaced -> <chip>/<ns>/<name>; bare -> flat or unique-owner; ambiguous/unknown -> fail-closed sentinel",
+      "flow_role": "path resolution (read), fail-closed",
+      "public": true
+    },
+    {
+      "module": "infra",
+      "name": "compiled_skill_dst",
+      "file": "infra/registry.py",
+      "line": 142,
+      "signature": "compiled_skill_dst(skill, out_dir) -> str",
+      "intent": "WRITE-path dir for a skill being compiled/composed: ns:name -> <out>/<ns>/<name>, bare -> flat; structural, never the fail-closed resolver",
+      "flow_role": "compose/cartridge placement (write)",
+      "public": true
+    },
+    {
+      "module": "infra",
+      "name": "source_groups",
+      "file": "infra/registry.py",
+      "line": 25,
+      "signature": "source_groups(chip=None) -> list",
+      "intent": "The chip's namespace dirs — immediate subdirs that themselves hold skills (cws/, general/, llm/, nvidia/, ...)",
+      "flow_role": "namespace enumeration",
+      "public": true
+    },
+    {
+      "module": "infra/tool (tool)",
+      "name": "compose",
+      "file": "infra/tool/compose.py",
+      "line": 113,
+      "signature": "compose(sources, out_dir, *, validate_sources=True) -> dict",
+      "intent": "Merge N source chips into one composed chip, each skill placed by namespace; exact ns:name dup -> HARD ERROR; temp-dir build + atomic swap; re-pins the v2 manifest",
+      "flow_role": "multi-chip compose — step 1 of compose->verify->serve",
+      "public": true
+    },
+    {
+      "module": "infra/tool (tool)",
+      "name": "plan",
+      "file": "infra/tool/compose.py",
+      "line": 77,
+      "signature": "plan(sources) -> (placements, conflicts)",
+      "intent": "Resolve every source skill to its composed id + DETECT exact-dup conflicts (FS-fold keyed) BEFORE any write",
+      "flow_role": "compose conflict detection (fail-closed, pre-write)",
+      "public": true
+    },
+    {
+      "module": "infra/govern",
+      "name": "access_allows",
+      "file": "infra/govern/skillacl.py",
+      "line": 53,
+      "signature": "access_allows(access, *, mode, is_local_dev=False, principal=None, principal_tier=None, perk=None, enforce_default_closed=False) -> (ok, problem|None)",
+      "intent": "ACCESS-1: the skill-intrinsic access.json gate — local-open / remote-closed (behind skillacl_enforce); declared policy always enforced; fail-closed",
+      "flow_role": "gate 2 of 3 (VALIDATE / ACCESS-1 / ACCESS-2), in govern() + step_reauthorize",
+      "public": true
+    },
+    {
+      "module": "infra/govern",
+      "name": "load_access",
+      "file": "infra/govern/skillacl.py",
+      "line": 33,
+      "signature": "load_access(skill, chip=None) -> dict|None",
+      "intent": "The skill's access.json policy, or None when absent (the flag-governed default); malformed -> CLOSED sentinel",
+      "flow_role": "ACCESS-1 policy load",
+      "public": true
+    },
+    {
+      "module": "infra/govern",
+      "name": "access_policy_sha",
+      "file": "infra/govern/skillacl.py",
+      "line": 76,
+      "signature": "access_policy_sha(access) -> str",
+      "intent": "Stable sha of the effective access policy; recorded as skillacl_sha (behind skillacl_fold) for exod's off-node re-check (Step 7)",
+      "flow_role": "ACCESS-1 provenance fold",
+      "public": true
+    },
+    {
+      "module": "infra/govern",
+      "name": "step_reauthorize",
+      "file": "infra/govern/govd.py",
+      "line": 602,
+      "signature": "step_reauthorize(cfg, rec0, *, now=None) -> (ok, reason|None)",
+      "intent": "Re-bind authority on an IN-FLIGHT step to the live registry + skill policy: re-run ACCESS-2 (needs the registry) AND ACCESS-1 (skill-intrinsic, registry-independent)",
+      "flow_role": "step-time re-governance — binds revocation / tightened policy mid-run",
+      "public": true
+    },
+    {
+      "module": "infra/govern",
+      "name": "_skill_listed",
+      "file": "infra/govern/principals.py",
+      "line": 103,
+      "signature": "_skill_listed(skill, skills) -> bool",
+      "intent": "ACCESS-2 skill match: exact ns:name, the per-namespace ns:* wildcard, OR a legacy bare leaf (pre-cutover back-compat)",
+      "flow_role": "per-actor ACL skill match",
+      "public": false
     }
   ],
   "documents": [
     {
       "doc": "SKILL.md",
-      "intent": "The agent contract: how an agent runs a real task through cyberware's governed channel by emitting only a claim and running the value-free plan govd blesses \u2014 never authoring or running commands itself.",
+      "intent": "The agent contract: how an agent runs a real task through cyberware's governed channel by emitting only a claim and running the value-free plan govd blesses — never authoring or running commands itself.",
       "concepts": [
         "the five-step loop (load skill -> discover -> emit claim -> govd governs/agent runs blessed plan -> read verdict)",
         "no-data/no-code-crosses-the-boundary principle (govd sees only claim names + var KEYS + status)",
@@ -3955,10 +4103,10 @@
       "intent": "Top-level orientation to cyberware as a governance runtime for AI-agent execution: the value-free claim/bless model, two-phase setup (run the governor, run a task), the engine+cartridge split, the local pipeline, authoring/testing, and the agent economy.",
       "concepts": [
         "governance runtime thesis: governed (policy-checked before run) + verifiable (hash-pinned blessed step) + ledgered (tamper-evident provenance); guardrail is code, not a prompt; enables fleet/swarm scale",
-        "four-plane architecture (thinking / agent / cyberware control layer / execution substrate) with cyberware the sole gateway; value-free \u2014 data + secrets stay in the substrate",
+        "four-plane architecture (thinking / agent / cyberware control layer / execution substrate) with cyberware the sole gateway; value-free — data + secrets stay in the substrate",
         "Setup phase 1: run the signed govd Docker image (ghcr.io/rhcat/cyberware:latest), persist ledger via -v cyberware-govd:/data/govd; verify with keyless cosign (GitHub OIDC)",
         "the four-image catalog: cyberware (governance server, lean govd+TLC), cyberware-body (delegated mode, govd+exod non-root, bwrap/gVisor), cyberware-modelcheck (full prover, Apalache+TLAPS), cyberware-compute (CI compute)",
-        "Setup phase 2: two phases per run \u2014 govern (govd always blesses a value-free plan, any OS) vs run (cooperative = agent executes on own machine, any OS; delegated = exod executes sandboxed on a Linux node)",
+        "Setup phase 2: two phases per run — govern (govd always blesses a value-free plan, any OS) vs run (cooperative = agent executes on own machine, any OS; delegated = exod executes sandboxed on a Linux node)",
         "three independent axes: govd is a server you --url anywhere; the agent is whatever runs govd-client; only delegated phase-2 needs Linux (bwrap/gVisor sandbox)",
         "operator-set exec_mode per node/principal (agent can't force delegated); delegated govd with no exod refuses; GET /health shows exec_mode + exod_attached",
         "engine + cartridge split: engine reads chip from registry.SKILLCHIP ($CYBERWARE_SKILLCHIP or <repo>/skillChip); chip self-describing via index.json (skill_sha + chip_sha); boot validation; CLOUD_MODE=1 live clone of CLOUD_SOURCE@CLOUD_SOURCE_TAG (CLOUD_SOURCE_TOKEN, GIT_ASKPASS-only)",
@@ -3996,7 +4144,7 @@
     },
     {
       "doc": "index.html",
-      "intent": "The public marketing homepage (cyberware.systems) \u2014 a ten-section cyberpunk-styled landing page presenting the 'free up to the gate, accountable past it' thesis and the engine's mechanisms with interactive/animated demos.",
+      "intent": "The public marketing homepage (cyberware.systems) — a ten-section cyberpunk-styled landing page presenting the 'free up to the gate, accountable past it' thesis and the engine's mechanisms with interactive/animated demos.",
       "concepts": [
         "hero thesis: 'the agent proposes, the engine governs, nothing executable crosses the wire'; free up to the gate / accountable past it; governance only at the moment of commitment (money, production, another system)",
         "section 02 gate-not-wall: govern at the single point of commitment, leave imagination free; governance as enablement",
@@ -4040,7 +4188,7 @@
         "Skill registry layout: SKILL.md, perks.json, perks folder, blueprint.json, ledger.json",
         "per-perk metadata.json / manifesto.json (${VAR} template form with tool sequence) / src contracts.json + per-tool scripts",
         "blueprint.json as the L++ action CFG; perks optional in the blueprint",
-        "Infra pipeline roles: Validator, Composer (L++ blueprint \u2192 TLC deadlock check), Compiler (task-ledger \u2192 step-wise bash), Oversight (OVERSIGHT_RULE via ast/regex/subagent), Executor as the governance/enforcement chokepoint",
+        "Infra pipeline roles: Validator, Composer (L++ blueprint → TLC deadlock check), Compiler (task-ledger → step-wise bash), Oversight (OVERSIGHT_RULE via ast/regex/subagent), Executor as the governance/enforcement chokepoint",
         "Executor governance: register run metadata, .bk backup + tamper/drift detection, upstream-step check, EXECUTOR_RULE.json enforcement, rogue-use detection",
         "based on the L++ 4 axioms; Python as the glue language; independent framework, not Athenor",
         "Post-founding evolution: registry became the skillChip cartridge (own repo, submodule, skills/ -> skillChip/) located via infra/registry.py registry.SKILLCHIP / $CYBERWARE_SKILLCHIP",
@@ -4206,7 +4354,7 @@
         "per-run workspace materialization (the blessed wrapper + perk src closure) and exod's own time-of-use re-hash of every staged file against the grant's signed snippet_shas pin via closureverify",
         "closure integrity refusing unpinned siblings and empty-pin staged code (closure:unpinned), with a denylist discriminator (any staged non-contracts.json file refused)",
         "single-use grant minting (tight TTL, nonce, snippet_shas, capabilities=['run'], credentials=authorized) with durable nonce-replay check",
-        "Store.claim_step / release_step atomic at-most-once reservation across the check\u2192dial-exod\u2192record window to prevent double-execute/double-bill, with step_delegation_refused recorded outside the done-set as retryable",
+        "Store.claim_step / release_step atomic at-most-once reservation across the check→dial-exod→record window to prevent double-execute/double-bill, with step_delegation_refused recorded outside the done-set as retryable",
         "vault-injected grant-authorized credentials (--setenv after --clearenv) resolved by exod's own FileVault/SopsAgeVault, never in govd's process env",
         "GET /health exposing exec_mode + exod_attached, fail-closed refusing every step when exod is unreachable",
         "agent self-report rejection in delegated mode (already-recorded path / result_acceptable), forged_status_refused on envelope-verify failure",
@@ -4241,26 +4389,26 @@
         "value-free planning: govd blesses a plan carrying no code and no secrets, agent runs steps from its own verified registry, nothing executable crosses the wire",
         "authenticity chain: content-addressed (sha256) skills/files/chip, name-validated resolver and whole-skill untracked-aware gate closing supply-chain seams",
         "contracts + model-checked blueprints proven deadlock-free by three provers (TLC, Apalache, TLAPS)",
-        "the security ladder SV-1 through SV-6 (protocol/hashing \u2192 hash-chained ledger \u2192 bubblewrap sandbox + separate execution principal \u2192 signed transparency-logged releases & revocation \u2192 model-checking \u2192 settlement)",
+        "the security ladder SV-1 through SV-6 (protocol/hashing → hash-chained ledger → bubblewrap sandbox + separate execution principal → signed transparency-logged releases & revocation → model-checking → settlement)",
         "the ouroboros / self-grading: the engine grades its own engine every build and a caught bug-class becomes a standing gate (building is running)",
-        "multi-source cartridge (cws/, general/, per-upstream dir) enabling ingest of another ecosystem's skills run governed \u2014 'your skills, accountable'",
+        "multi-source cartridge (cws/, general/, per-upstream dir) enabling ingest of another ecosystem's skills run governed — 'your skills, accountable'",
         "the agent-economy argument: model as software consumer not substitute; skillChip as a vendor's third product surface past UI and API; control/monetization/liability incentives",
-        "settlement layer quote\u2192meter\u2192settle billed on the meter the isolated principal signed, never the agent's stopwatch",
+        "settlement layer quote→meter→settle billed on the meter the isolated principal signed, never the agent's stopwatch",
         "go-to-market: per-seat license as transition state vs per-run metered usage as end-state",
-        "counter-arguments answered: capability \u2260 accountability, and overlay durability resting on architectural+cultural discipline",
+        "counter-arguments answered: capability ≠ accountability, and overlay durability resting on architectural+cultural discipline",
         "honest status: v1.1 closed, MIT-licensed chip, dogfoods its own governance, security ladder closed except the /dev/kvm-gated microVM perf brick"
       ],
       "references": [
         "govd (the governor / value-free planner)",
         "architecture.md, SPEC.md, the homepage (cyberware.systems), the registry dashboard",
-        "the SV-1\u2192SV-6 security ladder",
+        "the SV-1→SV-6 security ladder",
         "TLC, Apalache, TLAPS provers",
         "the multi-source cartridge sources cws/, general/, per-upstream dirs"
       ]
     },
     {
       "doc": "docs/per-actor-acl-design.md",
-      "intent": "Design-plus-as-built reference for per-actor (per-token) capability ACLs in govd: the base ACL gate (M0 SHIPPED), and the operator-signed ACL attestation + client token-possession proof layers (M1/M2) that move run\u2194token\u2194ACL enforcement out of a compromised govd's TCB.",
+      "intent": "Design-plus-as-built reference for per-actor (per-token) capability ACLs in govd: the base ACL gate (M0 SHIPPED), and the operator-signed ACL attestation + client token-possession proof layers (M1/M2) that move run↔token↔ACL enforcement out of a compromised govd's TCB.",
       "concepts": [
         "SHIPPED status banner: M0 base ACL gate, M1 operator-signed attestation ceiling, M2 client token-possession proof are live on main; Phase A (scoped deny-by-default, unscoped allowed) default vs Phase B (acl_strict deny-by-default for unscoped) operator flip",
         "per-principal acl sub-object in principals.json (skills allow-list with '*' sentinel, per-skill perks map, max_tier ceiling, secrets gate, issued_at/expires_at/revoked) carrying canonical ids and tier labels only, never the token value",
@@ -4268,12 +4416,12 @@
         "canonicalization at the trust boundary: validate+resolve skill AND perk to byte-identical on-disk index ids, rejecting noncanonical_name (./x, x/, macOS case-variant) so the FS isdir gate is no longer the name authority",
         "destructive coupling (a destructive:true perk admitted only when explicitly perk-listed) and secret-axis gate (acl.secrets gates claiming a credentialed perk) as the MVP's real enforcement weight since the tier ceiling is near-inert",
         "acl_sha recomputed from live acl fields at allow-time (sha256 of canonical {skills,perks,max_tier,secrets}, with pid+token_sha folded in for the attestation preimage), stored acl_sha only a boot self-check (acl_sha_mismatch)",
-        "four-axis tier semantics: catalog/sandbox confinement (backend_for_tier None\u2192runsc), secret tier (plan-derived, exod refuses non-trusted), per-actor catalog-tier ceiling (_TIER_RANK), and destructive coupling",
+        "four-axis tier semantics: catalog/sandbox confinement (backend_for_tier None→runsc), secret tier (plan-derived, exod refuses non-trusted), per-actor catalog-tier ceiling (_TIER_RANK), and destructive coupling",
         "floor-monotone invariant (claim-monotone P1 + confinement-neutral P2): the ACL only adds rejections and never feeds backend selection, machine-checked via TLA+ FloorMonotone/NoUnscopedOpenUnderStrict/CeilingFailsClosed/StepReEnforced under TLC plus a property test",
         "two DSSE envelopes relayed verbatim by govd holding neither key: operator ACL attestation (acl-attestation+json, ceiling) and client token-possession proof (token-proof+json, binding over run_id/plan_sha/step)",
         "three-key/three-issuer separation: off-body operator acl-issuer key, per-node govd grant key, independent client-generated proof key (NOT HKDF-from-bearer)",
-        "exod step-1b verification (signature-first, fail-closed, before grant-nonce spend): attestation authenticity, acl_sha re-derive+join, re-run acl_allows narrowing against the attested ACL, credentials\u2286attestation.secrets, degenerate-pubkey guard, proof verify, per-(token_sha,run_id,step) NonceCache single-use, denylist with monotonic floor off the read-only mount",
-        "three-way dual-control (acl-issuer \u2260 grant-issuer \u2260 exod pairwise) asserted whenever acl_issuer_pub is set in both phases",
+        "exod step-1b verification (signature-first, fail-closed, before grant-nonce spend): attestation authenticity, acl_sha re-derive+join, re-run acl_allows narrowing against the attested ACL, credentials⊆attestation.secrets, degenerate-pubkey guard, proof verify, per-(token_sha,run_id,step) NonceCache single-use, denylist with monotonic floor off the read-only mount",
+        "three-way dual-control (acl-issuer ≠ grant-issuer ≠ exod pairwise) asserted whenever acl_issuer_pub is set in both phases",
         "cooperative-downgrade hole: a compromised govd can mark an ACL run cooperative and skip exod; fix is a client-side delegated-required floor",
         "honest TCB statement and residuals: compromised govd retains DoS, acting within a token it genuinely holds, and lying in its own ledger; single-box confined-body makes dual-control keys-only",
         "13-task cws-pm swarm (acl-01..acl-13) governing the build, and locked decisions / open decisions for both the base and attestation layers"
@@ -4281,7 +4429,7 @@
       "references": [
         "infra/govern/principals.py (acl_allows, acl_sha, resolve_scope, authenticate, rate_ok, principals_selftest)",
         "infra/govern/govd.py (govern() pure at :186/call :886, scope/strict/now args, WS step path :978, hello session-token auth :967-970, _CATALOG_CACHE :128, rec['principal']/acl_sha stamp :902, exec_mode :984/1040)",
-        "infra/govern/issue.py (mint_token, mint_attestation, cws acl-attest / revoke \u2014 operator-side, not run by govd)",
+        "infra/govern/issue.py (mint_token, mint_attestation, cws acl-attest / revoke — operator-side, not run by govd)",
         "infra/exec/grants.py (mint_grant body at :38-41, optional acl_sha/skill/perk/destructive emit-when-set)",
         "infra/exec/grantverify.py (verify_grant at :49/:55-59, DEFAULT_SKEW, grant_body accessor)",
         "infra/exec/aclverify.py (verify_acl_attestation, verify_token_proof, mint_token_proof, _acl_check)",
@@ -4422,7 +4570,7 @@
         "done-ledger-v2 schema 2: 81 pass entries (seq 2->82) atop a genesis superseding v1 done-ledger (schema 1, 10 entries) = 91; chain head done-ledger-v2, every entry signed/chained/re-verifiable",
         "milestone table M0-M7 with rung, closure (transitive dependency cone of gate tasks), gate task(s), status closed",
         "per-phase redemption (P0-P6) with primary validators and redeemed counts (8/10/12/16/9/5/21)",
-        "blocked: none \u2014 prior /dev/kvm and confined-step ceilings cleared on real hardware (P2-T09 microVM bench, fleet live-validated)",
+        "blocked: none — prior /dev/kvm and confined-step ceilings cleared on real hardware (P2-T09 microVM bench, fleet live-validated)",
         "honest status: each property proved in isolation; wiring into one enforced floor is v1.2",
         "self-verification: cws-observe/status re-verifies the prev-hash chain; pm.json is the machine-readable twin asserted by the self-test"
       ],
@@ -4445,7 +4593,7 @@
         "quotes & funded-escrow admission: compute_quote/sign_quote (Ed25519ph DSSE authorization token, quote_sha), verify_quote (type+sig+pinned-key+breakdown_balances), per-quote isolated escrow (escrow_for, is_funded), grant_admits (present/verified/plan-matched/funded; free_perk needs none) with cross-quote isolation",
         "escrow liveness: fund_with_expiry + sweep_expired idempotent auto-refund on injected now; stale_escrow_keys audit",
         "payout engine.settle: pure at-most-once function with ordered checks (not_dual_signed, validation_not_pass, quote_invalid, quote_unbound, quote_already_settled, quote_unfunded); dispute-window holdback (hold:{sha[:16]}, default 10/90); idempotency keyed on quote_sha never run_id; reward_ledger zero-sum (post refuses unbalanced, global_zero, balance_root Merkle); reward_verify bijection money-trail<->work-trail (money_without_work / work_without_money / double_settled)",
-        "TSA time anchor (infra/cwp/tsa.py): offline-verifiable token, settlement_eligible value-threshold gate (default 1000) \u2014 explicitly a standalone primitive with NO caller in engine.settle (not yet wired), though capstone uses tsa.timestamp/verify_token directly",
+        "TSA time anchor (infra/cwp/tsa.py): offline-verifiable token, settlement_eligible value-threshold gate (default 1000) — explicitly a standalone primitive with NO caller in engine.settle (not yet wired), though capstone uses tsa.timestamp/verify_token directly",
         "tax & lineage royalty over pluggable rails: collect-at-settle doctrine (tax is the transparent itemized price), charge_from_price three-line split (substrate/skill_author/marketplace), collect_tax refuses skim, LedgerRail (default) / StripeRail (inert until config.key_file, Idempotency-Key=plan_sha, below_minimum on sub-cent) / CreditRail; collect_run_tax one-call entry idempotent on plan_sha; lineage royalty (royalties.py) keyed on alchemy.publish_gate admission (default 15/85), requires pinned alchemy engine",
         "credit-tier prepaid billing (credits.py): topup / debit_usage (no Stripe, same transparent split) / structural affordability gate insufficient_credits / admits predicate; zero-sum; real disbursement is a separate Connect step",
         "metered usage (metered.py): exod-attested meter settleable (meter_not_attested), provider-receipt reconcile within token tol + cost_tol pass-through clamped [floor,cap] (receipt_meter_mismatch / receipt_cost_exceeds_attested / receipt_cost_not_exact float refusal), attested fallback",
@@ -4942,7 +5090,7 @@
         ]
       },
       {
-        "item": "Settlement SV-6 \u2014 Money/float-ban, funded-escrow admission, dual-signed at-most-once payout, tax/lineage split",
+        "item": "Settlement SV-6 — Money/float-ban, funded-escrow admission, dual-signed at-most-once payout, tax/lineage split",
         "kind": "flow",
         "docs": [
           "docs/settlement.md",
@@ -5093,14 +5241,14 @@
         "kind": "mechanism",
         "docs": [
           "docs/architecture.md (Ledger-v2/SV-2 section: shred.py per-record AES-256-GCM DEK with dek-id AAD, chain covers ciphertext so \"shred the key, not the chain\"; checkpoint.py Merkle root every interval, cold-verify re-links only the tail, O(tail) not O(chain), periodic audit recomputes roots)",
-          "index.html (SV-2 rung now states: a record's payload can be crypto-shredded \u2014 AES-256-GCM key destroyed \u2014 without breaking the chain, and an O(tail) Merkle checkpoint cold-verifies the whole history from its end)"
+          "index.html (SV-2 rung now states: a record's payload can be crypto-shredded — AES-256-GCM key destroyed — without breaking the chain, and an O(tail) Merkle checkpoint cold-verifies the whole history from its end)"
         ]
       },
       {
         "item": "Metered-LLM refund-on-fail / pass-through reimbursement (settleable requires exod-attested meter, reconcile receipt within tol, clamp to [floor,cap], pay-for-work-shape-not-effort, unsettleable verdicts on contradiction)",
         "kind": "mechanism/flow",
         "docs": [
-          "docs/settlement.md (dedicated \"Metered usage \u2014 pay for work-shape, refund on fail\" section: meter[\"by\"]==\"exod\" else meter_not_attested; reconcile default tol=0.05 and cost_tol 0.10; reconciling receipt = pass-through reimbursement of real provider cost clamped to [floor,cap]; receipt_meter_mismatch / receipt_cost_exceeds_attested / float-refusal; attested-token fallback)",
+          "docs/settlement.md (dedicated \"Metered usage — pay for work-shape, refund on fail\" section: meter[\"by\"]==\"exod\" else meter_not_attested; reconcile default tol=0.05 and cost_tol 0.10; reconciling receipt = pass-through reimbursement of real provider cost clamped to [floor,cap]; receipt_meter_mismatch / receipt_cost_exceeds_attested / float-refusal; attested-token fallback)",
           "docs/architecture.md (exod meter_of attested-meter reference)",
           "README.md and index.html (name \"refund-on-fail metering\" within the SV-6 / agent-economy headline)"
         ]
@@ -5119,16 +5267,16 @@
       {
         "item": "Org / tenant isolation (orgs.authorize / can_access, SPIFFE-style per-org read/claim isolation, org-nested resolve_scope)",
         "covered_where": "docs/DEVELOPMENT.md (v1.2 roadmap: \"wiring the built-but-uncalled orgs.py into the request path for per-org isolation\") and docs/per-actor-acl-design.md (resolve_scope handles flat OR org-nested spec at the single govern() call site, but explicitly: \"If do_POST does not currently dispatch to orgs.authorize, org-mode ACL is explicitly Phase-2\"; orgs.py nesting + SPIFFE listed as a follow-on, open decision #7)",
-        "missing": "Still no SHIPPED per-org isolation to describe: confirmed in code that govd.py never imports or dispatches to orgs.authorize (do_POST routes only through principals.resolve_scope / acl_allows for per-token ACL, not per-org). The deferral is documented honestly and correctly as not-yet-wired, but a reader looking for live multi-tenant isolation finds only a v1.2 note \u2014 the gap is real-in-code-but-unwired, not undocumented. Absent entirely from public surfaces."
+        "missing": "Still no SHIPPED per-org isolation to describe: confirmed in code that govd.py never imports or dispatches to orgs.authorize (do_POST routes only through principals.resolve_scope / acl_allows for per-token ACL, not per-org). The deferral is documented honestly and correctly as not-yet-wired, but a reader looking for live multi-tenant isolation finds only a v1.2 note — the gap is real-in-code-but-unwired, not undocumented. Absent entirely from public surfaces."
       }
     ],
     "undocumented": [],
     "headline_gaps": [
-      "README.md and SKILL.md still omit the engine mutual handshake / live-binary re-measurement (engineattest.py: attest_live + mutual_handshake fail-closed engine_unattested, dual-signed release_receipt). index.html SV-4 now states it explicitly, so a homepage reader CAN learn it, but a README/SKILL reader still cannot \u2014 the strongest 'the running engine is the attested engine' guarantee is invisible outside index.html and architecture.md.",
+      "README.md and SKILL.md still omit the engine mutual handshake / live-binary re-measurement (engineattest.py: attest_live + mutual_handshake fail-closed engine_unattested, dual-signed release_receipt). index.html SV-4 now states it explicitly, so a homepage reader CAN learn it, but a README/SKILL reader still cannot — the strongest 'the running engine is the attested engine' guarantee is invisible outside index.html and architecture.md.",
       "README.md and SKILL.md still omit crypto-shredding + Merkle checkpoints (per-record AES-256-GCM DEK shred without breaking the chain; O(tail) Merkle cold-verify). index.html SV-2 now carries both, but README/SKILL still present the SV-2 ledger only as a 'tamper-evident hash chain' with no shred-without-breaking-chain or window-bounded cold-verify property.",
       "Deep settlement breadth on README/index.html is name-only, not mechanism: dispute lifecycle (m-of-n WebAuthn with bond clawback/forfeit), privacy-gated reputation scoring, the manipulation-resistant volume-weighted-median FMV index, bounty/reverse-auction markets, the self-run security bounty, credit-tier prepaid billing, the metered refund-on-fail reconcile/clamp doctrine, group-commit throughput, and the TSA-anchored capstone completion receipt are listed by name (README) or headline (index.html SV-6) but their mechanics live only in docs/settlement.md. SKILL.md carries no settlement detail at all.",
-      "SKILL.md (the agent contract) states no money-correctness floor at all (no exact-decimal / float-ban / conservation-checked double-entry); a reader of the agent contract alone cannot learn that settlement is float-free-by-construction and conservation-checked \u2014 this is covered on README and index.html SV-6 but not on the agent-facing public surface.",
-      "Org / tenant isolation (orgs.py per-org read/claim isolation, SPIFFE/can_access) appears on NO public surface (SKILL.md / README / index.html) \u2014 it is noted only as v1.2 roadmap in DEVELOPMENT.md and per-actor-acl-design.md. A public reader evaluating multi-tenant suitability finds no isolation story, not even a deferral."
+      "SKILL.md (the agent contract) states no money-correctness floor at all (no exact-decimal / float-ban / conservation-checked double-entry); a reader of the agent contract alone cannot learn that settlement is float-free-by-construction and conservation-checked — this is covered on README and index.html SV-6 but not on the agent-facing public surface.",
+      "Org / tenant isolation (orgs.py per-org read/claim isolation, SPIFFE/can_access) appears on NO public surface (SKILL.md / README / index.html) — it is noted only as v1.2 roadmap in DEVELOPMENT.md and per-actor-acl-design.md. A public reader evaluating multi-tenant suitability finds no isolation story, not even a deferral."
     ]
   }
 }
