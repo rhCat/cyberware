@@ -68,7 +68,7 @@ def test_catalog_endpoint_is_ungated_and_matches_the_builder(server):
     from infra.tool import skill_index
     c = json.loads(urllib.request.urlopen(base + "/catalog").read())   # no token — discovery is ungated
     assert c == skill_index.catalog()                                  # server serves the shared builder verbatim
-    fs = next(s for s in c["skills"] if s["skill"] == "fs")
+    fs = next(s for s in c["skills"] if s["skill"] == "general:fs")
     assert fs["verified"] and {"archive", "find_large"} <= {p["id"] for p in fs["perks"]}
 
 
@@ -126,8 +126,8 @@ def test_discover_tags_verified_unverified_and_drift(server, tmp_path):
         f.write("\n# tampered\n")                                      # files no longer match fs's own index
     d2 = govd_client.discover(base, registry=str(reg))
     by = {s["skill"]: s["status"] for s in d2["skills"]}
-    assert by["znew"] == "unverified"     # govd's image has never seen it → not governable
-    assert by["fs"] == "drift"            # local copy diverged from the blessed one
+    assert by["znew"] == "unverified"     # govd's image has never seen it → not governable (flat skill, bare id)
+    assert by["general:fs"] == "drift"    # local copy diverged from the blessed one (namespaced id)
     assert d2["summary"].get("unverified") == 1 and d2["summary"].get("drift") == 1
 
 
@@ -144,6 +144,18 @@ def test_govern_returns_a_value_free_plan(server):
     # the server record holds NO values — only keys + the plan hash
     rec = store.get(v["run_id"])
     assert rec["var_keys"] == ["SEARCH_DIR"] and "vars" not in rec
+
+
+def test_record_persists_the_canonical_skill(server):
+    """FIX B (review): a BARE claim is governed + RECORDED under its canonical ns:name. The step-time ACL
+    re-check, the signed exod grant, sandbox staging, and the in-toto subject all re-read record["skill"], so
+    persisting bare here would re-resolve independently (TOCTOU) and the ns:* wildcard (needs a ':') would
+    never fire at step time."""
+    base, store, _ = server
+    _, v = claim(base, "fs", "find_large", var_keys=["SEARCH_DIR"])     # bare "fs"
+    assert v["decision"] == "allow", v
+    rec = store.get(v["run_id"])
+    assert rec["skill"] == "general:fs"                                 # the CANONICAL id, not the bare claim
 
 
 def test_govern_never_receives_values_even_if_sent(server):
@@ -482,7 +494,7 @@ def test_price_endpoint_returns_a_value_free_quote(server):
     from decimal import Decimal
     base, _, _ = server
     d = json.loads(urllib.request.urlopen(base + "/price?skill=fs&perk=find_large").read())
-    assert d["skill"] == "fs" and d["perk"] == "find_large"
+    assert d["skill"] == "general:fs" and d["perk"] == "find_large"   # bare 'fs' canonicalizes to the quote it priced
     assert d["mode"] == "structured"                       # default mode (no ?mode= -> structured)
     assert "context_tokens" in d["llm"] and "output_tokens" in d["llm"]
     assert Decimal(d["total"]) > 0 and d["currency"] == "USD"

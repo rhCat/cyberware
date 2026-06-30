@@ -70,7 +70,7 @@ def run(skill, perk, root=ROOT):
         if subprocess.run(cmd, shell=True, capture_output=True).returncode != 0:  # skip (not fail) when the
             return "skip", f"capability probe failed: {cmd}"  #   toolchain present can't do what the perk needs
 
-    work = tempfile.mkdtemp(prefix=f"cwtest-{skill}-{perk}-")
+    work = tempfile.mkdtemp(prefix=f"cwtest-{skill.replace(':', '_')}-{perk}-")  # ':' is unsafe in a path segment
     try:
         fixture = os.path.join(work, "fixture")
         os.makedirs(fixture, exist_ok=True)
