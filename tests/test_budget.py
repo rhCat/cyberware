@@ -57,6 +57,11 @@ def test_configured_allowance_resolves_credits_or_budget():
     assert budget.configured_allowance({"credits": "5.0000", "budget": "9"}) == "5.0000"   # credits wins
     assert budget.configured_allowance({"rate": 10.0}) is None                  # no allowance -> unmetered
     assert budget.configured_allowance(None) is None and budget.configured_allowance("x") is None
+    # a key present but NULL must read as unmetered — the gate now uses THIS SAME predicate, so a null-valued
+    # allowance can never be metered-at-the-gate-but-unseeded (the relocated lockout the review caught).
+    assert budget.configured_allowance({"credits": None}) is None
+    assert budget.configured_allowance({"budget": None}) is None
+    assert budget.configured_allowance({"credits": None, "budget": "4.0000"}) == "4.0000"  # null credits -> budget
 
 
 def test_topup_requires_a_unique_ref():

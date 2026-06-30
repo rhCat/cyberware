@@ -1050,11 +1050,13 @@ class Handler(BaseHTTPRequestHandler):
         scope = principals.resolve_scope(reg, pid) if reg else None
         pspec = (reg or {}).get(pid) or {}               # ACCESS-1 inputs: the principal's dev-override + trust tier
         # BUDGET: meter only AUTHENTICATED actors (a registry present) under the rollout flag — local dev (no
-        # registry) stays unmetered. An authenticated actor must carry a `credits`/`budget` allowance, else
-        # budget_unmetered → reject (fail-closed). Read the actor's CREDIT balance (snapshot) for govern's
-        # pre-check; an unreadable balance → None → budget_ok fails closed (budget_unavailable).
+        # registry) stays unmetered. An authenticated actor must carry a NON-NULL `credits`/`budget` allowance,
+        # else budget_unmetered → reject (fail-closed). The gate predicate is the SAME `configured_allowance`
+        # the seeder uses, so "configured" ⟺ "seeded" exactly — a key present but null counts as unmetered at
+        # BOTH (no metered-but-unseeded lockout). Read the CREDIT balance (snapshot) for govern's pre-check; an
+        # unreadable balance → None → budget_ok fails closed (budget_unavailable).
         budget_enforce = bool(cfg.get("budget_enforce")) and bool(reg)
-        budget_configured = budget_enforce and ("credits" in pspec or "budget" in pspec)
+        budget_configured = budget_enforce and budget.configured_allowance(pspec) is not None
         budget_balance = None
         if budget_configured:
             try:
