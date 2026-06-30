@@ -37,7 +37,7 @@ def test_unsigned_and_tampered_are_refused_at_all_layers():
 
 def test_release_manifest_reflects_the_chip():
     m = R.release_manifest("skillChip/index.json")
-    assert m["chip_sha"] and isinstance(m["skills"], dict) and "cws-redteam" in m["skills"]
+    assert m["chip_sha"] and isinstance(m["skills"], dict) and "cws:cws-redteam" in m["skills"]   # v2: namespaced keys
 
 
 def test_verify_release_rejects_wrong_type_and_unsigned():

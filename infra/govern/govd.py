@@ -198,6 +198,12 @@ def govern(ledger, cfg, *, scope=None, strict=False, now=None):
 
     if not skill or not perk:
         return {"decision": "reject", "problems": [{"id": "missing_skill_or_perk"}]}
+    # NAMESPACE shim: canonicalize a BARE claim to its `ns:name` against THIS govd's registry (existing agents
+    # keep working); an AMBIGUOUS bare name (>=2 namespaces own it) is REJECTED here, never silently routed; a
+    # namespaced claim passes through. Everything downstream then sees the ONE canonical id.
+    skill = registry.canonicalize(skill)
+    if skill == registry.AMBIGUOUS:
+        return {"decision": "reject", "problems": [{"id": "ambiguous_skill_id", "detail": ledger.get("skill")}]}
     # canonical-name guard: the perk, like the skill, must be a single safe path segment — never `/`, `..`,
     # `./perk`, or `perk/` (which `os.path.join` would collapse so a DIFFERENT perk runs than the one the
     # ACL/destructive/tier checks see). The byte-exact id match below closes the case-insensitive-FS variant.
@@ -278,8 +284,9 @@ def govern(ledger, cfg, *, scope=None, strict=False, now=None):
         needs_approve = [perk]
     decision = "reject" if problems else ("push_back" if needs_approve else "allow")
     return {"decision": decision, "problems": problems, "destructive": destructive,
-            "approved": [a for a in approve if a in (perk, "destructive")],
-            "plan": plan, "plan_sha": psha, "seq": plan["sequence"],
+            "skill": skill,                              # the CANONICAL ns:name govern() resolved + gated on —
+            "approved": [a for a in approve if a in (perk, "destructive")],  # the record persists THIS, so every
+            "plan": plan, "plan_sha": psha, "seq": plan["sequence"],         # downstream re-check keys off it too
             "tlc": tlc_msg, "tlc_tla": tlc_tla, "tlc_log": tlc_out,   # the model-check spec + full log
             "needs_approve": needs_approve}
 
@@ -706,10 +713,11 @@ class Handler(BaseHTTPRequestHandler):
             # model rate) + the tool's pay-route fee, itemized. Priced from the plan shape — no execution, no
             # generation, no values. The `total` is what a Stripe charge bills (it reconciles to the cent).
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            skill = qs.get("skill", [""])[0]
+            raw = qs.get("skill", [""])[0]
+            skill = registry.canonicalize(raw)               # bare back-compat: the same shim as /govern
             perk = qs.get("perk", [""])[0]
             if skill not in set(skill_index.all_skills()):
-                return self._json(404, {"error": "unknown skill", "skill": skill})
+                return self._json(404, {"error": "unknown skill", "skill": raw})
             mode = "freeform" if qs.get("mode", ["structured"])[0] == "freeform" else "structured"
             try:
                 from infra.settle import price
@@ -732,7 +740,7 @@ class Handler(BaseHTTPRequestHandler):
             # the skill's generic lifecycle diagram (blueprint.svg) — a value-free registry artifact,
             # ungated like /catalog. Path-safe: only an EXACT known skill name is served, so the path can
             # never escape the registry. (The dashboard's Flow tab uses /flow/run/<id>; this is a fallback.)
-            skill = urllib.parse.unquote(path[len("/flow/"):])
+            skill = registry.canonicalize(urllib.parse.unquote(path[len("/flow/"):]))   # bare back-compat
             if skill in set(skill_index.all_skills()):
                 svgp = os.path.join(registry.skill_dir(skill), "blueprint.svg")
                 if os.path.isfile(svgp):
@@ -930,7 +938,10 @@ class Handler(BaseHTTPRequestHandler):
         # govd derives a child span per plane hop so the claim→grant→step trace is retrievable by run_id.
         traceparent = (ledger.get("traceparent") if tracing.parse_traceparent(ledger.get("traceparent") or "")
                        else tracing.new_traceparent())
-        record = {"run_id": run_id, "ts": now(), "skill": ledger.get("skill"), "perk": ledger.get("perk"),
+        # persist the CANONICAL id govern() decided on (not the raw bare claim): step-time ACL re-check, the
+        # signed exod grant, sandbox materialization, and the in-toto subject ALL re-read record["skill"], so a
+        # bare here would re-resolve independently (TOCTOU) and never carry the ':' the ns:* wildcard needs.
+        record = {"run_id": run_id, "ts": now(), "skill": v.get("skill") or ledger.get("skill"), "perk": ledger.get("perk"),
                   "principal": pid, "token": token, "var_keys": var_keys, "decision": v["decision"],
                   "traceparent": traceparent,
                   "destructive": v.get("destructive", False), "approved": v.get("approved", []),

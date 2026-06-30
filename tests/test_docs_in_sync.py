@@ -28,8 +28,11 @@ def _perk_count():
 
 
 def test_skills_catalog_lists_every_chip_skill():
-    """docs/skills.md must name every skill the chip actually serves."""
-    missing = [s for s in si.all_skills() if s not in _read("docs/skills.md")]
+    """docs/skills.md must name every skill the chip actually serves. The human catalog names skills by their
+    bare LEAF (a reader sees `fs`, and govd's canonicalize shim resolves a unique bare claim to its namespace);
+    the `ns:` prefix is a routing detail, surfaced only where a leaf is shared across namespaces."""
+    doc = _read("docs/skills.md")
+    missing = [s for s in si.all_skills() if (registry.parse_skill_id(s)[1] or s) not in doc]
     assert not missing, f"docs/skills.md is missing chip skills: {missing}"
 
 
