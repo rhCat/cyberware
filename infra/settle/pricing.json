@@ -12,6 +12,12 @@
     "http/post": "0.0020",
     "net/healthcheck": "0.0005"
   },
+  "credit_prices": {
+    "_doc": "NEGOTIABLE per-run CREDIT price (the internal per-actor budget unit — a different axis from the USD tool_fees above; no dollars per run). Exact-decimal STRINGS (float-banned). The operator OVERRIDES here, keyed 'skill/perk' > 'skill' > 'namespace' (canonical id, then bare leaf); a SKILL may also declare `credit_price` in its perk metadata.json (used when no override is set); `_default` covers the rest.",
+    "_default": "1.0000",
+    "fs/archive": "2.0000",
+    "http/post": "2.0000"
+  },
   "marketplace_fee_pct": "0.05",
   "rails": {
     "_doc": "How the platform tax is COLLECTED at settle (not by an agent call, not a hidden portal). 'default' picks the rail; the tax is the transparent itemized split above. StripeRail is inert until 'stripe.key_file' points at the OPERATOR's key (server-side; the agent never sees it).",
