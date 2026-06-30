@@ -89,6 +89,15 @@
   .dot.b{background:var(--bless);box-shadow:0 0 6px var(--bless)}
   .pane-title{margin-left:auto;letter-spacing:.06em}
   .pane-body{padding:1.2rem clamp(.9rem,3vw,1.6rem)}
+  /* agent demo videos */
+  .demos{display:grid;grid-template-columns:1fr;gap:1.2rem;margin:1.7rem 0 .4rem}
+  @media(min-width:860px){.demos{grid-template-columns:1fr 1fr}}
+  .demo{background:var(--panel);border:1px solid var(--gate-dim);border-radius:10px;overflow:hidden;margin:0}
+  .demo video{display:block;width:100%;height:auto;background:#000}
+  .demo figcaption{font-family:var(--mono);font-size:.82rem;letter-spacing:.03em;color:var(--readout);
+    padding:.65rem .9rem;border-top:1px solid var(--gate-dim);display:flex;gap:.5em;align-items:baseline}
+  .demo figcaption b{color:var(--bless);font-weight:700}
+  .demo figcaption .ag{margin-left:auto;color:var(--comment);font-size:.74rem}
 
   .ln{color:var(--comment);user-select:none;margin-right:.9em;font-variant-numeric:tabular-nums}
   .prompt{color:var(--bless)}
@@ -310,6 +319,7 @@
   <div class="sidenav-h"><img class="navmark" src="/icon.png" alt="" aria-hidden="true">cyberware<span class="sidenav-sub">// nav</span></div>
   <div class="navlist">
     <a class="navlink" href="#hero"><span class="nx">01</span>the prompt</a>
+    <a class="navlink" href="#agents"><span class="nx">✦</span>any agent</a>
     <a class="navlink" href="#thesis"><span class="nx">02</span>gate, not wall</a>
     <a class="navlink" href="#govern"><span class="nx">03</span>value-free plan</a>
     <a class="navlink" href="#authenticity"><span class="nx">04</span>what runs is blessed</a>
@@ -360,6 +370,28 @@
       <a class="cta ghost" href="atlas.html">inspect the intent atlas <span aria-hidden="true">&#9656;</span></a>
     </div>
     <div class="status-chip"><span class="pulse" aria-hidden="true"></span> v1.1 · building in the open · MIT-licensed chip</div>
+  </section>
+
+  <div class="gate-rule" role="separator" aria-hidden="true"></div>
+
+  <!-- ✦ / WORKS WITH ANY AGENT -->
+  <section id="agents" aria-labelledby="sagh">
+    <div class="eyebrow"><span class="sec-idx">✦</span> new · works with any agent</div>
+    <h2 class="sec-h" id="sagh"><span class="gsig">▸</span>An expansion <span class="gsig">for agents</span> — not another agent.</h2>
+    <p class="lead">Bring whatever runs your agent — Claude, Hermes, OpenClaw, your own loop. cyberware doesn't replace it; it bolts a <strong>governed channel</strong> onto it. The agent keeps imagining freely — the only thing that changes is the moment of commitment, which now runs validate&nbsp;→&nbsp;compose&nbsp;→&nbsp;prove&nbsp;→&nbsp;oversee&nbsp;→&nbsp;execute and lands <strong>ledgered and provable</strong>. No rewrite, no lock-in: the agent emits a claim, cyberware blesses a value-free plan, and the act is accountable. One expansion, every agent.</p>
+
+    <div class="demos">
+      <figure class="demo">
+        <video src="docs/hermeswithcw.mp4" autoplay loop muted playsinline controls aria-label="Hermes agent running through cyberware"></video>
+        <figcaption><b>Hermes</b> through the governed gate <span class="ag">agent · cyberware</span></figcaption>
+      </figure>
+      <figure class="demo">
+        <video src="docs/openclawwithcw.mp4" autoplay loop muted playsinline controls aria-label="OpenClaw agent running through cyberware"></video>
+        <figcaption><b>OpenClaw</b> — same channel, different agent <span class="ag">agent · cyberware</span></figcaption>
+      </figure>
+    </div>
+
+    <p class="one-liner">Whatever drives your agent, cyberware is the layer that makes its actions trustworthy enough to ship.</p>
   </section>
 
   <div class="gate-rule" role="separator" aria-hidden="true"></div>
