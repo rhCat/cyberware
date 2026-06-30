@@ -93,7 +93,7 @@
   .demos{display:grid;grid-template-columns:1fr;gap:1.2rem;margin:1.7rem 0 .4rem}
   @media(min-width:860px){.demos{grid-template-columns:1fr 1fr}}
   .demo{background:var(--panel);border:1px solid var(--gate-dim);border-radius:10px;overflow:hidden;margin:0}
-  .demo video{display:block;width:100%;height:auto;background:#000}
+  .demo video,.demo img{display:block;width:100%;height:auto;background:#000}
   .demo figcaption{font-family:var(--mono);font-size:.82rem;letter-spacing:.03em;color:var(--readout);
     padding:.65rem .9rem;border-top:1px solid var(--gate-dim);display:flex;gap:.5em;align-items:baseline}
   .demo figcaption b{color:var(--bless);font-weight:700}
@@ -330,7 +330,7 @@
     <a class="navlink" href="#economy"><span class="nx">09</span>the agent economy</a>
     <a class="navlink" href="#closing"><span class="nx">10</span>get the engine</a>
   </div>
-  <div class="sidenav-foot"><span class="led" aria-hidden="true"></span>10 sections · v1.1</div>
+  <div class="sidenav-foot"><span class="led" aria-hidden="true"></span>10 sections · v1.2</div>
 </nav>
 
 <main id="main" class="wrap">
@@ -369,7 +369,7 @@
       <a class="cta ghost" href="dashboard.html">explore the registry <span aria-hidden="true">&#9656;</span></a>
       <a class="cta ghost" href="atlas.html">inspect the intent atlas <span aria-hidden="true">&#9656;</span></a>
     </div>
-    <div class="status-chip"><span class="pulse" aria-hidden="true"></span> v1.1 · building in the open · MIT-licensed chip</div>
+    <div class="status-chip"><span class="pulse" aria-hidden="true"></span> v1.2 · building in the open · MIT-licensed chip</div>
   </section>
 
   <div class="gate-rule" role="separator" aria-hidden="true"></div>
@@ -382,11 +382,11 @@
 
     <div class="demos">
       <figure class="demo">
-        <video src="docs/hermeswithcw.mp4" autoplay loop muted playsinline controls aria-label="Hermes agent running through cyberware"></video>
+        <img src="docs/hermeswithcw.png" alt="Hermes agent running through cyberware">
         <figcaption><b>Hermes</b> through the governed gate <span class="ag">agent · cyberware</span></figcaption>
       </figure>
       <figure class="demo">
-        <video src="docs/openclawwithcw.mp4" autoplay loop muted playsinline controls aria-label="OpenClaw agent running through cyberware"></video>
+        <img src="docs/openclawwithcw.png" alt="OpenClaw agent running through cyberware">
         <figcaption><b>OpenClaw</b> — same channel, different agent <span class="ag">agent · cyberware</span></figcaption>
       </figure>
     </div>
@@ -686,7 +686,7 @@
 
 <footer class="wrap">
   <div class="gate-rule" role="separator" aria-hidden="true"></div>
-  cyberware · v1.1 · an open-source governance engine for AI agents · built in the open by dogfooding its own governance · MIT.
+  cyberware · v1.2 · an open-source governance engine for AI agents · built in the open by dogfooding its own governance · MIT.
 </footer>
 
 <script>
@@ -729,7 +729,7 @@
     '~ branch: cache layer? discard.',
     '~ branch: batch the writes — keep',
     '~ draft: notify on completion',
-    '~ touching production → deploy v1.1'
+    '~ touching production → deploy v1.2'
   ];
   function renderFinalHero(){
     streamEl.innerHTML = '';
