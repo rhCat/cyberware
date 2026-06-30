@@ -29,7 +29,7 @@ GOVD_MONITOR_TOKEN_<NODENAME>. fleet.json (tailnet/overlay IPs — never public;
   ]}
 """
 from __future__ import annotations
-import argparse, concurrent.futures, html, json, os, re, secrets, threading, time, urllib.error, urllib.parse, urllib.request
+import argparse, concurrent.futures, html, ipaddress, json, os, re, secrets, threading, time, urllib.error, urllib.parse, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DEFAULT_MIRROR = "~/.cyberware/fleet-ledgers"      # the central durable copy of every node's value-free ledgers
@@ -860,18 +860,60 @@ def load_nodes(path):
     return cfg["nodes"] if isinstance(cfg, dict) else cfg
 
 
-def serve(nodes, port, refresh, mirror_dir, mirror_interval):
-    by_name = {n.get("name"): n for n in nodes}
+def _is_loopback(host):
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host in ("localhost", "")
 
-    def _mirror_loop():                                      # the durable copy is kept fresh in the background
+
+def serve(nodes, port, refresh, mirror_dir, mirror_interval, bind="127.0.0.1"):
+    # FAIL CLOSED on a non-loopback bind — the dashboard has NO app-auth and carries a monitor-token-injecting
+    # read proxy (/proxy, /embed, /flow), so binding a routable/tailnet/0.0.0.0 interface publishes every node's
+    # ledger + that proxy to anyone who reaches :PORT. Mirror govd's require_closed_auth / fleetd's 0.0.0.0 gate:
+    # refuse unless the operator explicitly acknowledges (FLEETDASH_ALLOW_OPEN=1), having gated :PORT with
+    # deny-by-default tailscale ACLs. The default 127.0.0.1 stays open for local use.
+    if not _is_loopback(bind) and os.environ.get("FLEETDASH_ALLOW_OPEN") != "1":
+        raise SystemExit(
+            f"fleetdash: --bind {bind} exposes a NO-app-auth dashboard (every node's value-free ledger + the "
+            f"monitor-token read proxy) on that interface. Bind 127.0.0.1, or — once deny-by-default tailscale "
+            f"ACLs gate :{port} to operator devices — re-run with FLEETDASH_ALLOW_OPEN=1 to acknowledge.")
+    by_name = {n.get("name"): n for n in nodes}
+    # Serve every page from a background-refreshed SNAPSHOT so NO request does live network I/O. The cause of
+    # the dashboard hanging: fleet_from_mirror's live /health overlay probes each node per request, so every
+    # page blocked for the slowest unreachable node (≈one probe timeout), and a synchronous seed did the same
+    # at startup. Now the background sweep owns all node probing; the request path reads a cached snapshot
+    # (instant). The snapshot is seeded once from the DURABLE on-disk mirror with NO live probe, so the first
+    # page is populated immediately (last-known fleet) and the sweep refreshes liveness every mirror_interval.
+    _snap = {"results": [], "feed": []}
+    _snap_lock = threading.Lock()
+
+    def _refresh(live):
+        r, f = fleet_from_mirror(nodes, mirror_dir, live_health=live)
+        with _snap_lock:
+            _snap["results"], _snap["feed"] = r, f
+
+    def _fleet():                                            # the request path: the cached snapshot, never the network
+        if mirror_dir is None:                              # --no-mirror (live proxy-only): keep the live behaviour
+            return fleet_from_mirror(nodes, mirror_dir, live_health=True)
+        with _snap_lock:
+            return list(_snap["results"]), list(_snap["feed"])
+
+    def _mirror_loop():                                      # keep the durable copy + the snapshot fresh in the background
         while True:
             try:
                 mirror_all(nodes, mirror_dir)
+                _refresh(live=True)                         # the slow live /health probe happens HERE, off the hot path
             except Exception:
                 pass
             time.sleep(max(2, mirror_interval))
+
     if mirror_dir:
-        mirror_all(nodes, mirror_dir)                        # seed once so the first page is populated
+        os.makedirs(_expand(mirror_dir), exist_ok=True)      # fail fast on a bad mirror dir (cheap, no network)
+        try:
+            _refresh(live=False)                            # instant seed from the durable mirror (no probe) so page 1 has data
+        except Exception:
+            pass
         threading.Thread(target=_mirror_loop, name="fleet-mirror", daemon=True).start()
 
     class H(BaseHTTPRequestHandler):
@@ -936,32 +978,29 @@ def serve(nodes, port, refresh, mirror_dir, mirror_interval):
             parts = [urllib.parse.unquote(s) for s in up.path.strip("/").split("/") if s]
             try:
                 if not parts:                                       # overview (mirror-backed)
-                    results, feed = fleet_from_mirror(nodes, mirror_dir)
+                    results, feed = _fleet()
                     return self._send(200, render_html(results, feed, risk_summary(feed), refresh))
                 if parts[0] == "risk":                              # fleet-wide risk / approval queue
-                    results, feed = fleet_from_mirror(nodes, mirror_dir)
+                    results, feed = _fleet()
                     return self._send(200, render_risk(feed, risk_summary(feed), refresh))
                 if parts[0] == "accounting":                        # fleet CREDIT accounting (spend by actor)
-                    _, feed = fleet_from_mirror(nodes, mirror_dir)
+                    _, feed = _fleet()
                     return self._send(200, render_accounting(feed, refresh))
                 if parts[0] == "principal" and len(parts) == 2:     # one actor's cross-fleet credit account
-                    _, feed = fleet_from_mirror(nodes, mirror_dir)
+                    _, feed = _fleet()
                     return self._send(200, render_principal(parts[1], feed, refresh))
                 if parts[0] == "node" and len(parts) == 2:          # per-node = the LIVE individual-monitor UI (iframe)
                     node = by_name.get(parts[1])
                     if not node:
                         return self._send(404, _page("404", '<a class="back" href="/">← fleet</a><p class="muted">unknown node</p>'))
-                    try:
-                        _get(node["url"].rstrip("/") + "/health")
-                        reachable = True
-                    except Exception:
-                        reachable = False
+                    res, _ = _fleet()                       # reachability from the cached snapshot, not a live probe
+                    reachable = bool(next((r["reachable"] for r in res if r["name"] == parts[1]), False))
                     return self._send(200, render_node_iframe(node, reachable))
                 if parts[0] == "mnode" and len(parts) == 2:         # the durable central MIRROR board (offline-capable)
                     node = by_name.get(parts[1])
                     if not node:
                         return self._send(404, _page("404", '<a class="back" href="/">← fleet</a><p class="muted">unknown node</p>'))
-                    results, _ = fleet_from_mirror([node], mirror_dir)
+                    results, _ = fleet_from_mirror([node], mirror_dir, live_health=False)   # durable mirror, no live probe
                     return self._send(200, render_node(node, results[0], refresh))
                 if parts[0] == "run" and len(parts) == 3:           # per-run LEDGER INSPECTION (durable mirror)
                     node = by_name.get(parts[1])
@@ -1008,8 +1047,8 @@ def serve(nodes, port, refresh, mirror_dir, mirror_interval):
             except Exception as e:
                 return self._send(500, _page("error", f'<p class="muted">{_esc(e)}</p>'))
 
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), H)
-    print(f"fleet control → http://127.0.0.1:{port}  (central mirror → {_expand(mirror_dir) if mirror_dir else 'OFF'} · "
+    httpd = ThreadingHTTPServer((bind, port), H)
+    print(f"fleet control → http://{bind}:{port}  (central mirror → {_expand(mirror_dir) if mirror_dir else 'OFF'} · "
           f"every {mirror_interval}s · {len(nodes)} nodes)")
     httpd.serve_forever()
 
@@ -1017,7 +1056,11 @@ def serve(nodes, port, refresh, mirror_dir, mirror_interval):
 def main():
     ap = argparse.ArgumentParser(description="cyberware fleet control — central monitor + durable ledger mirror")
     ap.add_argument("--config", required=True, help="fleet.json: {nodes:[{name,role,url,token_file}]}")
-    ap.add_argument("--serve", type=int, metavar="PORT", help="serve the live, click-through HTML dashboard on 127.0.0.1:PORT")
+    ap.add_argument("--serve", type=int, metavar="PORT", help="serve the live, click-through HTML dashboard on BIND:PORT")
+    ap.add_argument("--bind", default="127.0.0.1", metavar="HOST",
+                    help="interface to bind the dashboard (default 127.0.0.1 = local only; pass the node's tailnet "
+                         "IP to reach it across the tailnet — the dashboard has NO app-auth, so gate :PORT with "
+                         "deny-by-default tailscale ACLs)")
     ap.add_argument("--refresh", type=int, default=5, help="dashboard auto-refresh seconds (default 5)")
     ap.add_argument("--mirror-dir", default=DEFAULT_MIRROR, help=f"central durable ledger copy (default {DEFAULT_MIRROR})")
     ap.add_argument("--mirror-interval", type=int, default=10, help="background mirror sweep seconds (default 10)")
@@ -1027,7 +1070,7 @@ def main():
     nodes = load_nodes(a.config)
     mirror_dir = None if a.no_mirror else a.mirror_dir
     if a.serve:
-        serve(nodes, a.serve, a.refresh, mirror_dir, a.mirror_interval)
+        serve(nodes, a.serve, a.refresh, mirror_dir, a.mirror_interval, a.bind)
     else:
         if mirror_dir:
             mirror_all(nodes, mirror_dir)                   # mirror once, then render the durable view

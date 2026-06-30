@@ -454,3 +454,57 @@ def test_home_links_to_accounting():
     html = F.render_html([{"name": "n", "role": "node", "reachable": True, "health": {}, "count": 0,
                            "fleet_tier": "edge"}], _ACCT_FEED, F.risk_summary(_ACCT_FEED))
     assert 'href="/accounting"' in html
+
+
+def test_serve_does_not_block_on_a_slow_node(node_and_mirror, monkeypatch):
+    """REGRESSION: every page serves from the background-refreshed SNAPSHOT, NEVER a live /health probe — so a
+    slow/unreachable node cannot hold the whole dashboard down. The bug: fleet_from_mirror's live_health overlay
+    probed each node PER REQUEST, blocking every page for the slowest node's timeout (and a synchronous seed did
+    the same at startup). With a node whose live probe costs 3s, a request must still return in well under 1s."""
+    import socket
+    import threading
+    import time
+    import urllib.request
+    node, mdir = node_and_mirror
+    F.mirror_all([node], mdir)                                # seed the durable mirror via the fast fake _get
+
+    real_get = F._get
+
+    def slow_get(url, token=None, timeout=6):                # now every LIVE /health probe costs 3s
+        if url.endswith("/health"):
+            time.sleep(3)
+        return real_get(url, token, timeout)
+    monkeypatch.setattr(F, "_get", slow_get)
+
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    threading.Thread(target=lambda: F.serve([node], port, 5, mdir, 10), daemon=True).start()
+    base = f"http://127.0.0.1:{port}"
+    for _ in range(60):                                      # wait for bind+serve (the seed is live_health=False → instant)
+        try:
+            urllib.request.urlopen(base + "/accounting", timeout=1)
+            break
+        except OSError:
+            time.sleep(0.05)
+    t0 = time.time()
+    with urllib.request.urlopen(base + "/", timeout=5) as r:  # the home page reads the cached snapshot
+        assert r.status == 200
+    dt = time.time() - t0
+    assert dt < 1.0, f"home took {dt:.1f}s — the request path is live-probing again (it must read the cache)"
+
+
+def test_non_loopback_bind_fails_closed_without_ack(node_and_mirror, monkeypatch):
+    """The dashboard has NO app-auth + a monitor-token read proxy, so a non-loopback bind must FAIL CLOSED
+    unless the operator acknowledges with FLEETDASH_ALLOW_OPEN=1 (mirrors govd's require_closed_auth). The guard
+    refuses at the TOP of serve(), before any socket bind or background thread — so this is a pure, fast check."""
+    node, mdir = node_and_mirror
+    assert all(F._is_loopback(h) for h in ("127.0.0.1", "::1", "localhost"))           # loopback recognised
+    assert not any(F._is_loopback(h) for h in ("0.0.0.0", "100.64.0.1", "10.0.0.5", "::"))   # routable/any: not
+    monkeypatch.delenv("FLEETDASH_ALLOW_OPEN", raising=False)
+    for host in ("0.0.0.0", "100.64.0.1", "10.0.0.5"):       # a non-loopback bind with no ack -> refuse before bind
+        with pytest.raises(SystemExit):
+            F.serve([node], 0, 5, mdir, 10, bind=host)
+    monkeypatch.setenv("FLEETDASH_ALLOW_OPEN", "1")          # the explicit ack clears the guard (next line raises past it)
+    assert F._is_loopback("127.0.0.1")                       # (loopback never needs the ack)
