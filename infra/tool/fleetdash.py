@@ -138,11 +138,14 @@ def _get_raw(url, token=None, timeout=8):
 # DEFENSE IN DEPTH: govd's own monitor is value-free, but the CENTER must not TRUST a (possibly compromised /
 # MITM'd) node to be — it persists ONLY these known value-free fields, dropping anything else a node might
 # smuggle into a /monitor/run response (a secret, an oversized blob). Mirrors govd's value-free projections.
-_RUN_KEYS = ("run_id", "ts", "principal", "skill", "perk", "decision", "destructive", "approved",
+_RUN_KEYS = ("run_id", "ts", "principal", "skill", "perk", "decision", "destructive", "approved", "cost",
              "seq", "plan_sha", "snippet_shas", "credential_ids", "wrapper", "var_keys", "problems",
              "tlc", "tlc_tla", "tlc_log", "traceparent", "sources", "restored", "failed", "progress")
 _EVENT_KEYS = ("type", "step", "status", "exit", "reason", "span", "authority", "keyid",
                "snippet_shas", "meter", "ts", "traceparent", "result_nonce", "exod_keyid", "plan_sha")
+# the compact per-run row the accounting/risk feeds read — MUST include `cost`, or the fleet credit-spend
+# rollup (_spend_rollup / render_accounting) always reads 0 (the per-run detail carries it, the row dropped it).
+_INDEX_KEYS = ("run_id", "ts", "principal", "skill", "perk", "decision", "destructive", "cost")
 
 
 def _value_free(detail):
@@ -223,8 +226,7 @@ def mirror_node(node, mirror_dir):
                         _atomic_write_bytes(svg_path, svg)
                 except Exception:
                     pass
-            index[rid] = {k: detail.get(k) for k in
-                          ("run_id", "ts", "principal", "skill", "perk", "decision", "destructive")}
+            index[rid] = {k: detail.get(k) for k in _INDEX_KEYS}
             index[rid]["authority"] = _run_authority(detail)
             mirrored += 1
         page += 1

@@ -434,6 +434,22 @@ def test_render_principal_individual_account():
     assert "fs/archive" in html and "fs/rm" in html                  # all of alice's runs (incl. the rejected one)
 
 
+def test_cost_survives_the_central_mirror_allowlist():
+    # REGRESSION (review-followup): the accounting feeds above are hand-built WITH `cost`, but the REAL central
+    # re-mirror (_value_free -> the compact _INDEX_KEYS row) must actually PRESERVE `cost` end-to-end, or every
+    # fleet gauge reads 0. Both allowlists had dropped it — the unit tests stayed green while the pipeline broke.
+    assert "cost" in F._RUN_KEYS and "cost" in F._INDEX_KEYS
+    detail = {"run_id": "r9", "principal": "alice", "skill": "fs", "perk": "archive", "decision": "allow",
+              "destructive": False, "cost": "2.0000", "plan_sha": "deadbeef", "events": [],
+              "token": "SECRET-must-be-dropped"}
+    vf = F._value_free(detail)                                       # the node-detail allowlist (defense in depth)
+    assert vf.get("cost") == "2.0000" and "token" not in vf         # cost kept AND the secret still stripped
+    row = {k: vf.get(k) for k in F._INDEX_KEYS}                      # the compact feed row the accounting reads
+    row["node"] = "mini"
+    assert row["cost"] == "2.0000"
+    assert F._spend_rollup([row])[0]["spent"] == "2.0000"           # -> a non-zero gauge, not 0
+
+
 def test_home_links_to_accounting():
     html = F.render_html([{"name": "n", "role": "node", "reachable": True, "health": {}, "count": 0,
                            "fleet_tier": "edge"}], _ACCT_FEED, F.risk_summary(_ACCT_FEED))
