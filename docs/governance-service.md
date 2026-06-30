@@ -152,6 +152,20 @@ must opt in (`"remote": true`). An undeclared skill stays remote-open until the 
 `ns:*` wildcard, the `*` super-wildcard, or a legacy bare leaf). All three gates re-run on every in-flight
 step (`step_reauthorize`), so a revocation or a tightened policy binds a running multi-step run.
 
+## Budget gate — the per-actor credit shutoff (opt-in)
+
+A fourth, **pricing-stage** gate runs last when the operator sets `budget_enforce` (default **OFF** — see
+[settlement.md](settlement.md)). After the three gates pass, `govern()` prices the claim (`credit_price`) and
+checks the actor's CREDIT balance via the pure `budget_ok`: `insufficient_credits` → **403** when the balance
+can't cover the run (a real shutoff, not `--approve`-able), `budget_unmetered` when an authenticated actor
+under enforcement carries no allowance, `budget_unavailable` when the store can't be read (fail-closed). The
+pre-check is a pure snapshot; the **authoritative** debit is a single atomic transaction in `do_POST` on
+`allow`, so two concurrent same-actor claims can't both pass when only one fits. A value-free `cost` is
+stamped on the verdict and record. Live levers, monitor-token-gated: `POST /budget/topup` (an operator grant)
+and `POST /budget/recharge` (a Stripe purchase of credits, inert until a key is wired). `GET /budget`
+(+ a JSON `/budget/state`) renders a per-actor gauge (green/yellow/red by % of allowance); the fleet
+dashboard's `/accounting` + `/principal/<actor>` aggregate spend across nodes.
+
 ## WebSocket  `/oversight`  (per-run session, status only)
 
 ```
