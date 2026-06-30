@@ -105,9 +105,9 @@ def test_chip_skills_no_manifest_is_empty_failclosed(tmp_path):
 # ── _register: atomic append/replace by name, drops None fields, creates parent dir ──
 def test_register_appends_replaces_and_drops_none(tmp_path):
     f = tmp_path / "sub" / "fleet.json"                 # parent dir is created by _register
-    fd._register(str(f), {"name": "scribe", "fleet_tier": "subagent", "url": "http://x", "tier": None})
-    assert json.load(open(f))["nodes"] == [{"name": "scribe", "fleet_tier": "subagent", "url": "http://x"}]
-    fd._register(str(f), {"name": "scribe", "fleet_tier": "edge", "url": "http://y"})       # replace by name
+    fd._register(str(f), {"name": "node-a", "fleet_tier": "subagent", "url": "http://x", "tier": None})
+    assert json.load(open(f))["nodes"] == [{"name": "node-a", "fleet_tier": "subagent", "url": "http://x"}]
+    fd._register(str(f), {"name": "node-a", "fleet_tier": "edge", "url": "http://y"})       # replace by name
     nodes = json.load(open(f))["nodes"]
     assert len(nodes) == 1 and nodes[0]["fleet_tier"] == "edge"
 
@@ -115,8 +115,8 @@ def test_register_appends_replaces_and_drops_none(tmp_path):
 # ── down: _deregister removes exactly the named row ──
 def test_deregister_removes_named_row(tmp_path):
     f = tmp_path / "fleet.json"
-    f.write_text(json.dumps({"nodes": [{"name": "a"}, {"name": "scribe"}, {"name": "b"}]}))
-    assert fdown._deregister(str(f), "scribe") is True
+    f.write_text(json.dumps({"nodes": [{"name": "a"}, {"name": "node-a"}, {"name": "b"}]}))
+    assert fdown._deregister(str(f), "node-a") is True
     assert [n["name"] for n in json.load(open(f))["nodes"]] == ["a", "b"]
 
 
