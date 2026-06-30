@@ -3,162 +3,142 @@ name: cyberware
 description: >-
   Run real operational tasks — filesystem, git, docker, http, postgres, search, code-quality, releases,
   and more — through cyberware's GOVERNED channel instead of ad-hoc shell. You emit only a CLAIM (a skill,
-  a perk, and your var KEYS) and run the value-free plan the governance server blesses; you never write,
-  paste, or improvise the commands. Two execution modes: cooperative (default — you run the blessed plan
-  from your own registry, any OS) and delegated (`--delegated`, a Linux body whose exod runs each step
-  confined and signs it; you run nothing). Reach for this whenever a task maps to a governed skill.
+  a perk, and your var KEYS) over three calls to the node — GET /catalog, POST /govern, then a per-run
+  WebSocket — and the governance server blesses a value-free plan; you never write, paste, or improvise the
+  commands. Two run modes: delegated (the node's exod runs each step confined and signs it — you run nothing;
+  the default for any agent) and cooperative (you run the blessed plan from your own on-disk registry). Reach
+  for this whenever a task maps to a governed skill.
 ---
 
 # cyberware — the governed channel for an agent
 
 cyberware is a **verifiable governance runtime**. You do not run commands ad-hoc. You make a **claim**;
-**govd** (the governance server) governs it and blesses a **value-free, code-free plan**; you run that
-plan from your **own** registry under live oversight and read back a verdict. The loop below is the
-*entire* contract — follow it, do not improvise around it.
+**govd** (the governance server) governs it and blesses a **value-free, code-free plan**; the plan runs under
+live oversight and you read back a signed verdict. The loop below is the *entire* contract — follow it, do not
+improvise around it.
 
 > **The one principle: no data crosses the boundary, and neither does code you wrote.** govd sees only the
-> *claim* (names + var KEYS) and *status*. The skill code is the registry's, blessed by hash — never
-> yours to author. Your only output is the claim and the call.
+> *claim* (names + var KEYS) and *status*. The skill code is the registry's, blessed by hash — never yours to
+> author. Your only output is the claim and the calls.
 
-Set `GOVD_URL` to the server (e.g. `export GOVD_URL=http://127.0.0.1:5773`). The repo ships `./govd-client`.
+**You talk to the governing node over plain HTTP + one WebSocket on `:5773`** — three calls, no SDK (the loop
+below). Set `BASE` to the node, e.g. `http://127.0.0.1:5773`. The repo's `./govd-client` is **only a local-dev
+convenience** that wraps these same calls for a machine that has the skillChip on disk — its CLI is documented
+separately in [`cyberware_dev/SKILL.md`](cyberware_dev/SKILL.md). By default, go through the protocol.
 
-> **No source tree on disk?** On a **body** node — cyberware runs only as a container, no host checkout —
-> `./govd-client` and `infra/` aren't on the host; the client lives **inside the container**. Run it there,
-> staging your token + ledger in (so ledger path-vars are *container* paths, e.g. `/app/...`):
-> ```sh
-> docker exec -i cyberware sh -c 'cat >/tmp/t'      < ~/agent.token
-> docker exec -i cyberware sh -c 'cat >/tmp/l.json'  < task-ledger.json
-> docker exec -e GOVD_URL=http://127.0.0.1:5773 cyberware \
->   python3 -m infra.govern.govd_client --token-file /tmp/t --ledger /tmp/l.json
-> ```
-> Targeting the node you're *on*? Use its **in-container `127.0.0.1:5773`** — the node's own tailnet IP would
-> hairpin (container → host overlay IP → back) and stall the WS. A small `govd-client` shim wrapping this is
-> the clean drop-in.
-
-**In a fleet?** Any node's discovery plane (`:8773`) tells you *which* node to use — then point `GOVD_URL` there:
+**In a fleet?** Any node's discovery plane (`:8773`) tells you *which* node to use — then that node's `:5773`
+is your `BASE`:
 
 ```sh
-curl -H "Authorization: Bearer $GOVD_TOKEN" "$ANY_NODE:8773/fleet/find?skill=<skill>"   # -> one node's :5773 url
-curl -H "Authorization: Bearer $GOVD_TOKEN" "$ANY_NODE:8773/fleet/nodes"                # -> the full roster
-# then: export GOVD_URL=<the url it returned>
+curl -H "Authorization: Bearer $TOKEN" "$ANY_NODE:8773/fleet/find?skill=<skill>"   # -> one node's :5773 url
+curl -H "Authorization: Bearer $TOKEN" "$ANY_NODE:8773/fleet/nodes"                # -> the full roster
 ```
 
-`/fleet/nodes` + `/fleet/find` are **Bearer-gated** (the roster discloses the fleet — pass your token or get
+`/fleet/find` + `/fleet/nodes` are **Bearer-gated** (the roster discloses the fleet — pass your token or get
 `401`; only `/fleet/health` is open). A lone/unwired node answers with just itself, so the same call works
-fleet or no fleet. The plane only **points** — you still claim + govern on the node's `:5773`.
+fleet or no fleet. The plane only **points** — you still claim + govern on the node's `:5773`. Nodes carry a
+**`fleet_tier`** (mothership > edge > subagent > … — a topology hierarchy *orthogonal* to the trust `tier`);
+narrow discovery with `&fleet_tier=<edge|subagent|…>`. To give a *subagent* its own scoped, strictly-lower-tier
+governed node — its claims bounded to a least-privilege chip + ACL (a content-identity subset of yours) — claim
+**`cws-fleet:deploy`**.
 
-Nodes carry a **`fleet_tier`** (mothership > edge > subagent > … — the topology hierarchy, *orthogonal* to the
-trust `tier`); narrow discovery with `&fleet_tier=<edge|subagent|…>`, and the fleet dashboard groups nodes by
-it. To give a *subagent* its own scoped, strictly-lower-tier governed node — its claims bounded to a
-least-privilege chip + ACL (a content-identity subset of yours) — claim **`cws-fleet:deploy`**.
+## The loop — three calls to the node's `:5773`
 
-## The loop — five steps
-
-**1 · Load this skill.** Done. It is the only cyberware doc you need to start.
-
-**2 · Discover, then read the sub-skill.** Ask govd what it governs:
-
-```sh
-./govd-client --url $GOVD_URL --discover          # or just: GET $GOVD_URL/catalog
-```
-
-You get every governed **skill**, its **perks**, each perk's **var KEYS** (required/optional), and a
-status for *your* copy of each:
-
-| status | meaning | runnable? |
-|---|---|---|
-| `verified` | govd governs it **and** your registry matches the blessed hash | **yes** |
-| `drift` | your copy differs from the governed one | no — reconcile first |
-| `unverified` | a **new** skill govd's image has never seen | no — add it, rebuild the image |
-| `server_drift` | govd's **own** copy of the skill fails its authenticity index — its blessing is untrustworthy | no — wait for a govd image rebuild |
-
-Skill ids are **namespaced** — `<namespace>:<name>` (e.g. `general:fs`, `cws:cws-create`), the namespace
-being the source group a skill ships under (one chip can be **composed** from several sources, so
-`general:search` and `magnumopus:search` coexist). `/catalog` returns the canonical `ns:name`. A **bare**
-name still works when exactly one namespace owns it — govd canonicalizes it — but a name two namespaces own
-is **rejected** (`ambiguous_skill_id`); namespace the claim to disambiguate.
-
-Pick a **`verified`** skill + perk — its **required/optional var-KEYS are already in the `/catalog` output
-above** (e.g. `search/grep` → `PATTERN`, `SEARCH_DIR`). That *is* the claim contract; build the ledger straight
-from it — you do **not** need any on-disk skill file to claim. The perk's `skillChip/<ns>/<skill>/SKILL.md` +
-`perks/<perk>/metadata.json` add only human prose (rules · usage · limitation · example) and live **where the
-skill is installed** — on disk for a source checkout, in the **container** for a body node
-(`docker exec <ct> cat /app/.cyberware/skillChip-cloud/<ns>/<skill>/SKILL.md`), never a host mirror.
-**The `/catalog` contract is the only reading you need to claim.**
-
-**3 · Emit the claim — that is your only output.** Your entire contribution is a small JSON form (the
-task-ledger) naming the skill, the perk, and your var **values** (which stay on your side), plus one
-call. You do **not** write commands, scripts, or a `run.sh`.
+**1 · Discover — `GET BASE/catalog`** (no auth — you may ask "what do you govern?" before you hold a token).
+Returns every governed **skill** + each perk's var **KEYS**:
 
 ```json
-{
-  "skill": "fs",
-  "perk": "find_large",
-  "record_store": "<abs dir for outputs + the run-ledger>",
-  "vars": { "SEARCH_DIR": "/data", "MIN_SIZE": "200M" }
-}
+{ "skills": [ {
+  "skill": "general:fs", "verified": true, "skill_sha": "…", "drift": null,
+  "perks": [ { "id": "find_large", "destructive": false,
+               "vars": { "required": ["SEARCH_DIR"], "optional": ["MIN_SIZE"] } } ] } ] }
 ```
 
-```sh
-./govd-client --url $GOVD_URL --ledger task-ledger.json
-# hardened / remote govd: add --token-file <path> (or GOVD_TOKEN_FILE) — your principal Bearer token,
-# read from the file so the raw value never lands in argv. An open/local govd needs none.
+Pick a perk on a skill whose **`verified`** is `true` (`drift` ≠ `null` → its copy fails its authenticity index;
+don't run it). Its `vars.required` / `vars.optional` **KEYS** are the entire claim contract — you never open a
+skill file to claim. Skill ids are **namespaced** `<ns>:<name>` (`general:fs`, `cws:cws-create`); `/catalog`
+returns the canonical `ns:name`. A **bare** name works when exactly one namespace owns it, but a name two own is
+rejected `ambiguous_skill_id` — namespace it.
+
+**2 · Claim — `POST BASE/govern`** (`Content-Type: application/json`). **This call** carries
+`Authorization: Bearer <token>` on a hardened node — the token is a **principal credential the operator
+provisions out-of-band** (govd matches its sha256 in a principals registry; there is **no self-service
+issuance**). Send **names + KEYS only — never the values:**
+
+```json
+{ "skill": "general:fs", "perk": "find_large", "var_keys": ["SEARCH_DIR", "MIN_SIZE"] }
 ```
 
-`fetch` sends govd the var **keys** only (`SEARCH_DIR`, `MIN_SIZE`) — never the values. **Secrets are
-never plaintext:** pass a **`*_FILE` pointer** (a path to a `chmod 600` file) that the snippet `cat`s at
-runtime; a plaintext-secret key (`PGPASSWORD`, `*_TOKEN`, …) is refused.
+**Secrets are never a value, and never a plain key:** a secret-ish key (`PGPASSWORD`, anything `*_TOKEN`, …) is
+**refused** (`plaintext_secret_key`). Pass it as a **`*_FILE` pointer** instead — a key ending `_FILE` whose
+value is a path to a `chmod 600` file the snippet `cat`s at runtime. *(Optional body fields: `"approve":["<perk>"]`
+to confirm a destructive perk after a push_back; `"traceparent":"<w3c-trace>"`.)*
 
-**4 · govd governs → you run the blessed plan.** govd checks the claim against its **own** registry, runs
-the composition + TLA⁺/TLC model check, and returns one of:
+The verdict returns:
 
-- **`allow`** → the **value-free plan** (tool sequence + each snippet's sha256 + a `${VAR}` wrapper) + a
-  per-run WebSocket. The client **verifies your registry matches the blessed hashes**, then runs the
-  porters+cores **from your registry** step by step, reporting **status only** over the WS. (`--ledger`
-  with no `--fetch-only` does all of this.)
-- **`push_back`** → a **destructive** perk needs explicit approval. Re-claim with `--approve <perk>` only
-  if the destruction is intended.
-- **`reject`** → the claim fails one of govd's **three independent gates** (each fail-closed): **VALIDATE**
-  (registry drift — your copy doesn't match the blessed hash), **ACCESS-1** (the skill's *own* `access.json`
-  policy closes it to you — `skill_remote_closed` when govd serves others and the skill hasn't opted in), or
-  **ACCESS-2** (the claim is outside your token's per-actor ACL scope — a skill/tier you may not run, or a
-  destructive/credentialed perk your token isn't granted). On a node that enforces **per-actor credit
-  budgets**, a priced claim can also be shut off `insufficient_credits` (your actor's credit balance can't
-  cover the run's price) or `budget_unmetered` (no allowance configured for you) — the operator tops you up;
-  it is not `--approve`-able. Plus the structural rejects — bad var key, a plaintext secret, a missing input,
-  a deadlock, or an **ambiguous** skill id (`ambiguous_skill_id` — namespace it). None is clearable by
-  `--approve`; fix the *claim* (or get credited) — never route around the refusal.
-
-The loop above is **cooperative** mode (the default): you run the porters+cores from your registry and
-report status only. Against a Linux **body** you can run **delegated** instead — add `--delegated`:
-
-```sh
-./govd-client --url $GOVD_URL --ledger task-ledger.json --delegated
+```json
+{ "decision": "allow", "run_id": "…", "plan_sha": "…",
+  "plan": { "skill": "general:fs", "perk": "find_large",
+            "sequence": ["find_large_tool"], "snippet_shas": { "find_large.sh": "<sha256>" },
+            "wrapper": "<the run.sh text>" },
+  "ws": "ws://<host>:5773/oversight", "session_token": "…" }
 ```
 
-govd hands a signed grant to **exod**, which runs each step confined and Ed25519-signs the authoritative
-status; you run **nothing**, and govd records exod's status (an agent self-report is rejected). Either way
-the wire is value-free and you read the same verdict. See [containment-delegation.md](docs/containment-delegation.md).
+- **`reject`** → a `problems[]` array names why: **VALIDATE** (registry `drift`), **ACCESS-1**
+  (`skill_remote_closed` — the skill's own `access.json` closes it to you), **ACCESS-2** (per-actor ACL — a
+  skill/tier/perk your token isn't granted), the **budget** shutoff (`insufficient_credits` / `budget_unmetered`),
+  or a structural reject (bad var key · missing input · `plaintext_secret_key` · `ambiguous_skill_id` · deadlock).
+  **Fix the claim — none is `approve`-able; never route around a refusal.**
+- **`push_back`** → a destructive perk needs approval; re-POST the same body with `"approve":["<perk>"]`.
 
-If your principal carries a **per-actor ACL**, a scoped claim on a body also rides an operator-signed
-**attestation** (`--attestation`) and a one-time possession **proof** (`--proof-key`) that exod re-checks
-off-node. When the operator runs exod in **enforce** mode (an ACL-issuer key pinned, `--acl-strict`), that
-re-check means a compromised govd can neither widen your token nor misattribute your run; without it exod
-audits rather than refuses. An unscoped (operator-trusted) token needs neither.
+**3 · Run — open the per-run WebSocket** at the verdict's `ws` field (a raw RFC-6455 upgrade on the **same**
+`:5773`). It is gated by the per-run **`session_token`** in the hello frame — **not** the Bearer. The step ids
+are just `"1" … "N"` for `N = plan.sequence.length` — **the plan is the only source of step truth.** Begin:
 
-You never edit the blessed `run.sh`: a tamper snapshot refuses on drift, and the WS gate refuses any step
-whose `plan_sha` or upstream order doesn't match the pinned plan.
+```
+→ {"type":"hello","run_id":"<run_id>","token":"<session_token>"}   ← {"type":"hello_ack","authorized":true}
+```
 
-**5 · Read the verdict, move on.** The call returns `{decision, plan_sha, results:[{step, exit}], ledger}`.
-The full provenance is govd's, at `GET $GOVD_URL/ledger/<run_id>?token=…`. Confirm the steps ran `ok`, note the
-`plan_sha`, continue. Done.
+Then drive the steps — **the exchange differs by execution mode:**
+
+- **Delegated — *intent in, status out* (the default for any agent that doesn't carry the skill code):** the
+  node runs each step; `step_request` is answered **directly** with the signed result — there is **no `grant`
+  frame**:
+  ```
+  for st = 1 … N:
+  → {"type":"step_request","step":"<st>","plan_sha":"<plan_sha>"}
+  ← {"type":"executed","step":"<st>","status":"ok","exit":0,"authority":"exod"}   ·or·  {"type":"refuse","reason":"…"} → stop
+  ```
+  **exod** ran the step **confined** and Ed25519-signed the status; **you run nothing and send no `step_result`.**
+  (Requires the node in delegated `exec_mode` with exod attached, else every step is `refuse`d — fail-closed.)
+- **Cooperative — you run it from your OWN registry** (you have the skillChip on disk; this is the `./govd-client`
+  path): `step_request` is answered with `grant`; you run the blessed step locally, then report **status only**:
+  ```
+  for st = 1 … N:
+  → {"type":"step_request","step":"<st>","plan_sha":"<plan_sha>"}   ← {"type":"grant"}   ·or·  {"type":"refuse","reason":"…"} → stop
+        run  bash run.sh --step <st>   (run.sh = plan.wrapper) with your var VALUES in the ENV
+        (+ RECORD_STORE=<out dir>, SNIP=<your perks/<perk>/src dir>)
+  → {"type":"step_result","step":"<st>","plan_sha":"<plan_sha>","status":"ok"|"error","exit":<code>}   ← {"type":"recorded"}
+  stop on the first non-ok step
+  ```
+  First verify your perk's src files match `plan.snippet_shas` (sha256) — file bodies never cross the wire; you
+  prove authenticity locally. [`cyberware_dev/SKILL.md`](cyberware_dev/SKILL.md) automates all of this.
+
+Send a WebSocket **close** frame when the steps finish (or after the first non-ok step).
+
+**4 · Read the verdict.** The full signed provenance is `GET BASE/ledger/<run_id>?token=<session_token>` (the
+run token, **not** the Bearer). Confirm each step ran `ok`, note the `plan_sha`, continue. Done.
+
+**Nothing but KEYS in and status out crosses `:5773`** — no var values, no secrets, no command output, and no
+agent-authored code. You never edit the blessed plan: a tamper snapshot refuses on drift, and the WS gate
+refuses any step whose `plan_sha` or upstream order doesn't match the pinned plan.
 
 ## Never
 
 - Run a snippet (`skillChip/.../src/<tool>.sh`) directly, or hand-write the commands a perk would run.
-- Put a secret **value** anywhere — ledger, config, or var. Use a `*_FILE` pointer.
+- Put a secret **value** anywhere — claim, config, or var. Use a `*_FILE` pointer.
 - Edit a blessed plan to skip a step, force order, or slip past a contract.
-- Rely on a `drift` / `unverified` skill. *Governed* means blessed by hash from the image — nothing less.
+- Rely on a `drift` / unverified skill. *Governed* means blessed by hash from the image — nothing less.
 
 ## No matching skill?
 
@@ -169,7 +149,9 @@ review. Once merged and govd's image is rebuilt (the build re-checks every index
 
 ## More
 
+The **local-dev `./govd-client` wrapper** (the `task-ledger.json` form, cooperative-from-registry, the
+in-container exec, the ACL attestation/proof flags) is in [`cyberware_dev/SKILL.md`](cyberware_dev/SKILL.md).
 The govd-less local pipeline (validator → composer → compiler → oversight → executor) is in
 [`cyberware.md`](cyberware.md); the service internals (HTTP, WebSocket, authenticity, dashboard) are in
-[`docs/governance-service.md`](docs/governance-service.md); the live
-[dashboard](https://cyberware.systems/) shows every blueprint, perk flow, and contract.
+[`docs/governance-service.md`](docs/governance-service.md); the live [dashboard](https://cyberware.systems/)
+shows every blueprint, perk flow, and contract.
