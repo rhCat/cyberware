@@ -149,3 +149,65 @@ def test_gate_unmetered_actor_rejected_under_enforcement(chip_env):
                     {"mode": "remote", "budget_enforce": True}, scope={"skills": ["fs"]},
                     principal="nobudget", budget_enforce=True, budget_balance=None, budget_configured=False)
     assert v["decision"] == "reject" and "budget_unmetered" in [p.get("id") for p in v["problems"]]
+
+
+# ── live HTTP: exhaust -> 403 shutoff, then a monitor-gated /budget/topup restores allow (no restart) ──
+def test_live_shutoff_then_topup_restores_allow(chip_env, tmp_path):
+    import json
+    import threading
+    import time
+    import urllib.error
+    import urllib.request
+    from infra.govern import govd
+    from infra.govern import principals as P
+    from infra.store.backend import make_backend
+    from infra.settle.price import load_pricing
+
+    root = str(tmp_path / "ledger")
+    cfg = govd.load_config()
+    cfg.update({"mode": "local", "local": {"host": "127.0.0.1", "ports": [0]}, "record_root": root,
+                "budget_enforce": True, "monitor_token": "admin", "pricing": load_pricing(),
+                "principals": {"alice": {"token_sha": P.token_sha("ALICE"), "rate": 100.0, "burst": 100.0,
+                                         "credits": "2.0000", "acl": {"skills": ["fs"]}}}})
+    be = make_backend(root, cfg)
+    be.budget_post("alice", C("2.0000"), "seed:alice", "seed:alice")          # 2 credits, price 1.0 -> 2 allows
+    httpd, _ = govd.bind_server("127.0.0.1", [0])
+    httpd.daemon_threads = True
+    httpd.cfg, httpd.store, httpd.store_backend, httpd.rate_buckets = cfg, govd.Store(root), be, {}
+    threading.Thread(target=httpd.serve_forever, kwargs={"poll_interval": 0.02}, daemon=True).start()
+    base = f"http://127.0.0.1:{httpd.server_address[1]}"
+    for _ in range(100):
+        try:
+            urllib.request.urlopen(base + "/health", timeout=1)
+            break
+        except OSError:
+            time.sleep(0.02)
+
+    def _req(path, body, headers):
+        req = urllib.request.Request(base + path, data=json.dumps(body).encode(),
+                                     headers={**headers, "Content-Type": "application/json"})
+        try:
+            r = urllib.request.urlopen(req, timeout=3)
+            return r.status, json.loads(r.read() or b"{}")
+        except urllib.error.HTTPError as e:
+            return e.code, json.loads(e.read() or b"{}")
+
+    def govern():
+        return _req("/govern", {"skill": "fs", "perk": "find_large", "var_keys": ["SEARCH_DIR"]},
+                    {"Authorization": "Bearer ALICE"})
+
+    try:
+        assert govern()[0] == 200                                  # allow (balance 2 -> 1)
+        assert govern()[0] == 200                                  # allow (1 -> 0)
+        code, b = govern()                                         # SHUTOFF
+        assert code == 403 and "insufficient_credits" in [p.get("id") for p in b.get("problems", [])]
+        assert be.budget_balance("alice") == C("0.0000")
+        # live top-up (monitor-gated) — no restart
+        tc, tb = _req("/budget/topup", {"actor": "alice", "credits": "5.0000"}, {"X-Govd-Monitor": "admin"})
+        assert tc == 200 and tb["status"] == "posted" and tb["balance"] == "5.0000"
+        assert govern()[0] == 200                                  # the same actor now allows again
+        # a bad monitor token is refused
+        assert _req("/budget/topup", {"actor": "alice", "credits": "1"}, {"X-Govd-Monitor": "wrong"})[0] == 403
+    finally:
+        httpd.shutdown()
+        httpd.server_close()

@@ -949,6 +949,9 @@ class Handler(BaseHTTPRequestHandler):
 
     # --- POST /govern ---
     def do_POST(self):
+        _bp = self.path.split("?", 1)[0]
+        if _bp in ("/budget/topup", "/budget/recharge"):
+            return self._budget_admin(_bp)
         if self.path != "/govern":
             return self._json(404, {"error": "not found", "path": self.path})
         cfg, store = self.server.cfg, self.server.store
@@ -1075,6 +1078,53 @@ class Handler(BaseHTTPRequestHandler):
             resp["session_token"] = token                # present this on the WS and to GET /ledger
         code = {"allow": 200, "push_back": 409, "reject": 403}[v["decision"]]
         return self._json(code, resp)
+
+    # --- budget admin: credits IN (operator grant) + Stripe recharge (buy credits) ---
+    def _budget_admin(self, path):
+        """Monitor-token-gated. Both paths post to the SAME per-actor budget_ledger (idempotent, audited):
+          /budget/topup    — an operator GRANT (or a confirmed Stripe credit) -> credit the actor LIVE;
+          /budget/recharge — mint a Stripe PaymentIntent to BUY credits (inert until the operator wires a
+                             key). The card is Stripe's; the credits are posted when the payment confirms (a
+                             webhook re-calls /budget/topup with source='stripe', ref=<payment_intent_id>)."""
+        cfg = self.server.cfg
+        if not self._monitor_authed(cfg):
+            return self._json(403, {"error": "missing/invalid monitor token (X-Govd-Monitor or ?token=)"})
+        be = getattr(self.server, "store_backend", None)
+        if be is None:
+            return self._json(503, {"error": "budget ledger not initialized"})
+        try:
+            n = int(self.headers.get("Content-Length", 0))
+            body = json.loads(_read_exact(self.rfile, n) or b"{}") if n else {}
+        except Exception as e:
+            return self._json(400, {"error": f"bad request body: {e}"})
+        actor = body.get("actor")
+        if not actor:
+            return self._json(400, {"error": "actor required"})
+        from infra.settle.money import Money
+        if path == "/budget/topup":
+            try:
+                amt = Money(str(body.get("credits")), "CREDITS")   # str() -> Money refuses a JSON float (float-ban)
+            except (TypeError, ValueError):
+                return self._json(400, {"error": "credits must be an exact-decimal amount string (no float)"})
+            source = body.get("source") or "grant"
+            ref = str(body.get("ref") or f"{source}-{uuid.uuid4().hex[:12]}")
+            res = be.budget_post(actor, amt, memo=f"topup:{source}:{ref}", idem=f"topup:{ref}")
+            print(f"  /budget/topup {actor} += {amt.amount} CREDITS (source={source} ref={ref}) -> {res['status']}")
+            return self._json(200, {"actor": actor, "added": str(amt.amount), "currency": "CREDITS",
+                                    "source": source, "ref": ref, "balance": res["balance"], "status": res["status"]})
+        # /budget/recharge — mint the Stripe PaymentIntent (buy credits); crediting happens on confirm.
+        from infra.settle import rails
+        amount = str(body.get("amount") or "")
+        cur = body.get("currency") or "USD"
+        if not amount:
+            return self._json(400, {"error": "amount (the purchase price, e.g. '10.00') required"})
+        charge = {"plan_sha": f"recharge:{actor}:{uuid.uuid4().hex[:12]}", "currency": cur, "total": amount,
+                  "breakdown": [{"account": f"recharge:{actor}", "amount": amount}]}
+        rail = rails.StripeRail(((cfg.get("pricing") or {}).get("rails", {}) or {}).get("stripe") or {})
+        res = rail.collect(charge, charge["plan_sha"])
+        return self._json(200, {"actor": actor, "amount": amount, "currency": cur, "recharge": res,
+                                "note": "on payment success, POST /budget/topup {actor, credits, source:'stripe', "
+                                        "ref:<payment_intent_id>} to credit the bought CREDITS"})
 
     # --- WS /oversight ---
     def _ws_oversight(self):
