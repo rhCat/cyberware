@@ -176,6 +176,68 @@ The whole flow is zero-sum: the debit re-sums to zero (operator drawn down, spli
 that real disbursement of the split to connected accounts is a separate Connect step — the credit posting is
 the *record*, not the payout to third parties.
 
+## Per-actor credit budget — the gauge + the shutoff
+
+`infra/settle/budget.py` is the **per-actor** counterpart to the operator credit tier above: for an event
+where many principals fire claims at one node (or a fleet), the organizer caps **each actor's** spend, hard-
+stops them at the cap, and watches it live. Where the credit tier is one operator balance behind a Stripe
+top-up, a budget is **one credit account per principal id**, enforced wherever that actor fires.
+
+- **The ledger is the actor's account.** `account_of(actor) = "budget:<actor>"`; `balance = seeded allowance
+  + top-ups − debits`, every term an exact-decimal CREDITS posting in the same zero-sum `reward_ledger`, so
+  the existing conservation checks validate the budget chain for free. `seed`/`topup`/`debit` are the in-memory
+  posting form; the **durable, concurrency-safe** debit lives on the store backend.
+- **The decision is pure.** `budget_ok(actor, price, balance, *, configured) -> (ok, problem)` is I/O-free and
+  fail-closed: not configured → `budget_unmetered`; balance unreadable → `budget_unavailable`; balance < price
+  → `insufficient_credits` (the shutoff); else allow. `configured_allowance(spec)` resolves an actor's opening
+  allowance from its principal spec — `credits:` or, equivalently, `budget:` — and the gate uses that **same**
+  predicate, so "configured" ⟺ "seeded" (a key present but null reads as unmetered at both — never a metered-
+  but-unseeded lockout).
+- **The debit is atomic and actor-wide.** `infra/store/backend.py`'s `budget_ledger` table +
+  `budget_debit_atomic(actor, price, idem)` re-read the balance and debit **only if it still fits**, all inside
+  one transaction — a `BEGIN IMMEDIATE` (sqlite) or a `pg_advisory_xact_lock(hashtext(actor))` (Postgres) that
+  serializes same-actor debits — the **same serialize-then-conditional-write primitive as the HA lease**.
+  Two concurrent same-actor claims therefore can't both pass when only one fits; a shared store makes the
+  balance truly actor-wide across nodes, and a store partition **fails closed** (balance unreadable → reject),
+  never over-spends. Idempotent on `idem` (`usage:<run_id>` for a run debit — a retried run is a no-op, not a
+  double charge), scoped to `(actor, idem)` so the same idem under two actors both charge.
+- **Pricing is negotiable, declared in the skill.** `infra/settle/credit_price.py` resolves a run's price in
+  order: the operator's negotiable `credit_prices` override in `pricing.json` (tried `skill/perk → leaf/perk →
+  skill → leaf → namespace` — canonical id then bare leaf, so a legacy un-namespaced table still prices a
+  namespaced claim) → the skill's **own** declared `credit_price` (the perk's `metadata.json`) → `_default`.
+  The skill author **declares** the price; the operator **negotiates** via the override.
+- **The gate is two-phase** (closing the TOCTOU). A pure snapshot pre-check runs **last** in `govern()`
+  (skipped if the claim already has other problems or needs approval — no reservation for a doomed claim),
+  appends `insufficient_credits` on fail → **403** (a real shutoff, not `--approve`-able). The **authoritative**
+  atomic debit then runs in `do_POST` on `allow`, before the record is written; if it loses the race the
+  decision flips to `reject`. The snapshot is the clean common-case reject; the atomic debit is the truth. A
+  value-free `cost` (a CREDITS string) is stamped on the verdict, the record, and the decisions feed.
+- **Enforcement is opt-in.** `budget_enforce` (a config flag, default **OFF**) gates the whole thing — an
+  un-flagged server meters nobody (back-compat), and local dev (no principals registry) is always unmetered.
+  With it ON, every authenticated actor must carry a non-null `credits`/`budget` allowance (seeded at startup)
+  or be rejected `budget_unmetered`.
+
+**Credits in — recharge, no per-run dollar charge.** Two paths add credits, both posting to the same
+`budget_ledger`, live with no restart: an **operator grant** (`POST /budget/topup {actor, credits, ref}`,
+monitor-token-gated — the event organizer's lever, idempotent on `ref`, a unique ref minted when omitted), and
+a **Stripe recharge** (`POST /budget/recharge` mints a PaymentIntent to *buy* credits — the `credits.py`
+thesis: one occasional purchase amortized over many internal debits — **inert until the operator wires
+`stripe.key_file`**; the agent/system never sees the card, Stripe's own UI does). Per run there is only a
+CREDITS **debit**, never a dollar charge.
+
+**Accounting — per-node, fleet, individual.** Each node's monitor renders its own `by_actor` rollup
+(`budget.rollup → {by_actor:[{actor, allowance, spent, balance, runs}], fleet}`) at `GET /budget` (+ a JSON
+`/budget/state`): a gauge per actor that goes **green < 70%, yellow < 100%, red ≥ 100%** of that actor's
+allowance — the node holds the ledger, so it shows allowance/balance directly. The fleet dashboard
+(`infra/tool/fleetdash.py`) aggregates spend **across** the fleet from the mirrored value-free `cost`:
+`/accounting` ranks per-actor credit spend with a gauge relative to the top spender, and `/principal/<actor>`
+is that actor's cross-fleet account.
+
+**Residuals (honest).** Debit timing is **reserve-on-allow = charge** (v1) — a refund-on-never-run reconciler
+keyed on the run id is a documented, deferred residual. Single-node (the common event case) is trivially
+actor-wide; multi-node is actor-wide via the shared transactional store. Stripe recharge's PaymentIntent
+confirmation/webhook is the heavier slice; the operator-grant path is the event MVP.
+
 ## Metered usage — pay for work-shape, refund on fail
 
 `infra/settle/metered.py` makes an exod-**attested** usage meter settleable for metered (`llm/*`) steps. The
