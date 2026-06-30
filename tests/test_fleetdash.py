@@ -493,3 +493,18 @@ def test_serve_does_not_block_on_a_slow_node(node_and_mirror, monkeypatch):
         assert r.status == 200
     dt = time.time() - t0
     assert dt < 1.0, f"home took {dt:.1f}s — the request path is live-probing again (it must read the cache)"
+
+
+def test_non_loopback_bind_fails_closed_without_ack(node_and_mirror, monkeypatch):
+    """The dashboard has NO app-auth + a monitor-token read proxy, so a non-loopback bind must FAIL CLOSED
+    unless the operator acknowledges with FLEETDASH_ALLOW_OPEN=1 (mirrors govd's require_closed_auth). The guard
+    refuses at the TOP of serve(), before any socket bind or background thread — so this is a pure, fast check."""
+    node, mdir = node_and_mirror
+    assert all(F._is_loopback(h) for h in ("127.0.0.1", "::1", "localhost"))           # loopback recognised
+    assert not any(F._is_loopback(h) for h in ("0.0.0.0", "100.64.0.1", "10.0.0.5", "::"))   # routable/any: not
+    monkeypatch.delenv("FLEETDASH_ALLOW_OPEN", raising=False)
+    for host in ("0.0.0.0", "100.64.0.1", "10.0.0.5"):       # a non-loopback bind with no ack -> refuse before bind
+        with pytest.raises(SystemExit):
+            F.serve([node], 0, 5, mdir, 10, bind=host)
+    monkeypatch.setenv("FLEETDASH_ALLOW_OPEN", "1")          # the explicit ack clears the guard (next line raises past it)
+    assert F._is_loopback("127.0.0.1")                       # (loopback never needs the ack)

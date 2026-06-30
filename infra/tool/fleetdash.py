@@ -29,7 +29,7 @@ GOVD_MONITOR_TOKEN_<NODENAME>. fleet.json (tailnet/overlay IPs — never public;
   ]}
 """
 from __future__ import annotations
-import argparse, concurrent.futures, html, json, os, re, secrets, threading, time, urllib.error, urllib.parse, urllib.request
+import argparse, concurrent.futures, html, ipaddress, json, os, re, secrets, threading, time, urllib.error, urllib.parse, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DEFAULT_MIRROR = "~/.cyberware/fleet-ledgers"      # the central durable copy of every node's value-free ledgers
@@ -860,7 +860,24 @@ def load_nodes(path):
     return cfg["nodes"] if isinstance(cfg, dict) else cfg
 
 
+def _is_loopback(host):
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host in ("localhost", "")
+
+
 def serve(nodes, port, refresh, mirror_dir, mirror_interval, bind="127.0.0.1"):
+    # FAIL CLOSED on a non-loopback bind — the dashboard has NO app-auth and carries a monitor-token-injecting
+    # read proxy (/proxy, /embed, /flow), so binding a routable/tailnet/0.0.0.0 interface publishes every node's
+    # ledger + that proxy to anyone who reaches :PORT. Mirror govd's require_closed_auth / fleetd's 0.0.0.0 gate:
+    # refuse unless the operator explicitly acknowledges (FLEETDASH_ALLOW_OPEN=1), having gated :PORT with
+    # deny-by-default tailscale ACLs. The default 127.0.0.1 stays open for local use.
+    if not _is_loopback(bind) and os.environ.get("FLEETDASH_ALLOW_OPEN") != "1":
+        raise SystemExit(
+            f"fleetdash: --bind {bind} exposes a NO-app-auth dashboard (every node's value-free ledger + the "
+            f"monitor-token read proxy) on that interface. Bind 127.0.0.1, or — once deny-by-default tailscale "
+            f"ACLs gate :{port} to operator devices — re-run with FLEETDASH_ALLOW_OPEN=1 to acknowledge.")
     by_name = {n.get("name"): n for n in nodes}
     # Serve every page from a background-refreshed SNAPSHOT so NO request does live network I/O. The cause of
     # the dashboard hanging: fleet_from_mirror's live /health overlay probes each node per request, so every
