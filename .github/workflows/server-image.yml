@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   build-push-sign:
-    runs-on: [self-hosted]          # dev: private repo → self-hosted (free Actions minutes). Revert to ubuntu-latest when cyberware goes public.
+    runs-on: ubuntu-latest          # PUBLIC repo -> hosted + ephemeral (free Actions minutes). Reverted from self-hosted at go-public: a public repo must not build on a persistent runner.
     steps:
       - name: reclaim workspace ownership before checkout (self-hosted runner)
         run: |
