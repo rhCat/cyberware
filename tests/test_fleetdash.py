@@ -344,6 +344,21 @@ def test_safe_runid_blocks_path_traversal():
     assert F._safe("a/b\\c") == "a_b_c"
 
 
+def test_ts_helper_emits_a_utc_data_attribute():
+    assert F._ts("2026-06-29T05:35:38Z") == '<span class="ts" data-utc="2026-06-29T05:35:38Z">2026-06-29T05:35:38</span>'
+    assert F._ts(None) == '<span class="ts" data-utc=""></span>'
+
+
+def test_display_timezone_control_is_client_side():
+    """The fleet control renders each timestamp as a data-utc span + ships a tz selector that converts them
+    client-side (default: the operator's browser-local tz) — the wire stays UTC, only the display tz changes."""
+    feed = [{"node": "n1", "role": "anchor", "ts": "2026-06-29T05:35:38.12", "principal": "p",
+             "skill": "general:fs", "perk": "find_large", "decision": "allow", "run_id": "r1"}]
+    page = F.render_html([{"name": "n1", "role": "anchor", "reachable": True, "health": {}, "count": 1}], feed, {})
+    assert 'data-utc="2026-06-29T05:35:38.12"' in page                    # the UTC instant, machine-readable
+    assert 'id="tzsel"' in page and ">Local<" in page and ">UTC<" in page  # the selector (browser-local default)
+    assert "localStorage.setItem" in page and "toLocaleString" in page    # client-side conversion + persistence
+    assert "<th>when</th>" in page and "when (utc)" not in page            # header relabeled (tz now selectable)
 # ── the hierarchical, searchable side-nav (the home page node nav) ──
 _NODES = [
     {"name": "mini", "role": "anchor", "fleet_tier": "mothership", "reachable": True, "health": {"runs": 5}, "count": 12},
