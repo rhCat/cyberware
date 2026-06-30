@@ -1,0 +1,711 @@
+[
+  {
+    "module": "infra/govern",
+    "name": "claim->govern->grant->exec->sign",
+    "intent": "The full governed syscall: authenticate a principal, govern a value-free claim into a hashed plan, then per-step gate (plan-hash+upstream+ACL), delegate confined execution to exod, verify its signed result, and record server-owned provenance.",
+    "sequence": [
+      "bearer_of",
+      "authenticate",
+      "rate_ok",
+      "do_POST",
+      "resolve_scope",
+      "govern",
+      "acl_allows",
+      "build_plan",
+      "plan_sha",
+      "Store.create",
+      "_ws_oversight",
+      "authorize_step",
+      "Store.claim_step",
+      "execute_step",
+      "result_acceptable",
+      "Store.append"
+    ]
+  },
+  {
+    "module": "infra/govern",
+    "name": "cooperative step path",
+    "intent": "Default mode: the agent runs each step client-side; govd grants on plan-hash+upstream+live-ACL, records the grant, then accepts a status-only step_result only if it follows that grant (unforgeable upstream ledger).",
+    "sequence": [
+      "_ws_oversight",
+      "authorize_step",
+      "acl_allows",
+      "Store.append",
+      "result_acceptable",
+      "Store.append"
+    ]
+  },
+  {
+    "module": "infra/govern",
+    "name": "delegated step path",
+    "intent": "Containment mode: govd atomically claims the step (at-most-once), materializes a confined workspace, mints a signed grant, and hands it to exod which runs confined and signs the authoritative result; agent self-reports are rejected.",
+    "sequence": [
+      "_ws_oversight",
+      "authorize_step",
+      "acl_allows",
+      "Store.claim_step",
+      "execute_step",
+      "materialize_workspace",
+      "perk_sandbox_tier",
+      "Store.append",
+      "Store.release_step"
+    ]
+  },
+  {
+    "module": "infra/govern",
+    "name": "ACL M1 attestation",
+    "intent": "Operator signs an actor->ACL attestation off-body; govd recomputes acl_sha from live registry fields and binds it into the delegated grant so exod re-derives and joins it, enforcing the ceiling off-node against a compromised govd.",
+    "sequence": [
+      "mint_attestation",
+      "acl_sha",
+      "resolve_scope",
+      "acl_allows",
+      "execute_step"
+    ]
+  },
+  {
+    "module": "infra/govern",
+    "name": "plan compose + deadlock check",
+    "intent": "Before blessing: authenticity-verify the registry against its index, structurally and via TLA+/TLC check the blueprint for deadlock, then compile the value-free plan and pin its sha256 (the thing oversight monitors).",
+    "sequence": [
+      "verify_skill",
+      "structural",
+      "emit_tla",
+      "run_tlc",
+      "tlc_check",
+      "build_plan",
+      "plan_sha"
+    ]
+  },
+  {
+    "module": "infra/govern",
+    "name": "chip acquire + validate boot gate",
+    "intent": "Before govd serves: acquire the skillChip (local baked or live cloud clone with leak-free token), validate every skill index + the chip manifest, and pass provenance to govd or exit non-zero (the engine never serves an unchecked cartridge).",
+    "sequence": [
+      "resolve",
+      "fetch_cloud",
+      "validate",
+      "chip_sha"
+    ]
+  },
+  {
+    "module": "infra/govern",
+    "name": "HA active-passive failover",
+    "intent": "Two govd over one shared store: exactly one holds a mutually-exclusive single-writer lease (mirror gated on held); on active death the lease expires and the standby acquires it and resumes, with nonce replay guards making re-sent steps idempotent.",
+    "sequence": [
+      "maybe_enable_ha",
+      "become_active",
+      "LeaseManager.acquire_blocking",
+      "LeaseManager.held",
+      "LeaseManager.start_renewer"
+    ]
+  },
+  {
+    "module": "infra/govern",
+    "name": "monitor SSE feed",
+    "intent": "Token-gated dashboard push: re-derive the value-free snapshot, push a data event only when content (sans the volatile now stamp) changes, paginated and bounded against resource accumulation.",
+    "sequence": [
+      "_monitor_authed",
+      "_monitor_stream",
+      "Store.monitor_snapshot",
+      "digest",
+      "sse_frame",
+      "paginate"
+    ]
+  },
+  {
+    "module": "infra/govern",
+    "name": "plan-hash inconsistency investigation",
+    "intent": "When a presented plan_sha mismatches the blessed one, investigate by PLAIN TEXT DIFF (never execute/source the submitted plan); return the diff to the caller and record only a line-count in the server audit.",
+    "sequence": [
+      "authorize_step",
+      "plan_diff",
+      "Store.append"
+    ]
+  },
+  {
+    "module": "infra/exec (exec)",
+    "name": "claim -> govern -> grant -> exec -> sign",
+    "intent": "govd mints a grant; exod (separate principal) verifies grant+ACL+closure off-node, resolves secrets step-side, runs the step in the kernel sandbox, signs the only step-result the ledger will trust, and the recorder writes it only if exod's signature and run-binding verify.",
+    "sequence": [
+      "mint_grant",
+      "request_step",
+      "Exod.serve",
+      "Exod.run_step",
+      "verify_grant",
+      "Exod._acl_check",
+      "closure_decision",
+      "inject_step_env",
+      "backend_for_tier",
+      "strongest",
+      "run_confined",
+      "Exod._sign_result",
+      "verify_step_result",
+      "record_step_result"
+    ]
+  },
+  {
+    "module": "infra/exec (exec)",
+    "name": "ACL M1 attestation (off-node ceiling)",
+    "intent": "When a grant carries acl_sha and an operator acl-issuer is pinned, exod requires a valid operator attestation that joins the grant by acl_sha and independently re-runs acl_allows, so a compromised govd cannot widen a token's ceiling.",
+    "sequence": [
+      "mint_grant",
+      "Exod.run_step",
+      "Exod._acl_check",
+      "verify_acl_attestation",
+      "attestation_body",
+      "attested_acl",
+      "principals.acl_allows"
+    ]
+  },
+  {
+    "module": "infra/exec (exec)",
+    "name": "ACL M2 token-possession proof (run<->token binding)",
+    "intent": "When the operator binds a client proof pubkey into the attestation, exod requires a matching per-step token proof, so a compromised govd relaying a more-privileged token's attestation cannot misattribute the run.",
+    "sequence": [
+      "mint_token_proof",
+      "Exod.run_step",
+      "Exod._acl_check",
+      "verify_acl_attestation",
+      "verify_token_proof"
+    ]
+  },
+  {
+    "module": "infra/exec (exec)",
+    "name": "closure TOCTOU gate",
+    "intent": "Before a run, exod re-derives the digest of every file in the materialized SNIP closure and requires it to match the grant's pins, refusing a post-grant porter/core swap or a smuggled sibling at time of use.",
+    "sequence": [
+      "mint_grant",
+      "Exod.run_step",
+      "closure_decision",
+      "digest_file"
+    ]
+  },
+  {
+    "module": "infra/exec (exec)",
+    "name": "sandbox tier -> backend monotone floor",
+    "intent": "The grant's sandbox tier selects the confinement backend as a monotone floor over the operator's --backend (community forces gVisor), and a non-enforceable backend fails closed rather than running unconfined.",
+    "sequence": [
+      "backend_for_tier",
+      "strongest",
+      "backend_enforceable",
+      "run_confined"
+    ]
+  },
+  {
+    "module": "infra/exec (exec)",
+    "name": "backend seam-equivalence proof",
+    "intent": "bwrap and runsc render the same value-free SandboxProfile; confinement() extracts the full boundary from each rendering so the community (gVisor) backend is proven to never weaken the bwrap boundary.",
+    "sequence": [
+      "core_profile",
+      "bwrap_argv",
+      "oci_config",
+      "confinement",
+      "community_tier_selftest"
+    ]
+  },
+  {
+    "module": "infra/exec (exec)",
+    "name": "capability manifest exact-match",
+    "intent": "A sandbox is run only if its tier permits the request and its materialized binds provably equal the declared manifest exactly, so a tampered profile can never widen reach.",
+    "sequence": [
+      "community_no_secrets",
+      "materialize",
+      "verify_materialized",
+      "materialize_checked"
+    ]
+  },
+  {
+    "module": "infra/exec (exec)",
+    "name": "double-blind secret resolution",
+    "intent": "exod holds the vault and resolves grant-authorized credentials into the confined step's env after --clearenv, so the secret reaches the step but the agent's environ carries zero secret bytes.",
+    "sequence": [
+      "load_vault",
+      "inject_step_env",
+      "FileVault.get",
+      "secret_bytes_in"
+    ]
+  },
+  {
+    "module": "infra/exec (exec)",
+    "name": "forged-status refusal at the ledger",
+    "intent": "The ledger accepts a status only when exod's signature verifies and it is bound to this run; a forged self-report is refused and recorded as forged_status_refused evidence.",
+    "sequence": [
+      "Exod._sign_result",
+      "record_step_result",
+      "verify_step_result"
+    ]
+  },
+  {
+    "module": "infra/exec (exec)",
+    "name": "SV-3 kernel red-team corpus",
+    "intent": "Each behaviour mounts a real sandbox or channel attack through exod with no in-process scan and asserts the kernel/crypto boundary refuses it while a benign oracle is still accepted.",
+    "sequence": [
+      "run_corpus",
+      "run_attack",
+      "Exod.run_step",
+      "record_step_result"
+    ]
+  },
+  {
+    "module": "infra/cwp (cwp)",
+    "name": "canonical-bytes path",
+    "intent": "Serialize any JSON value to the one RFC 8785 JCS byte sequence and its sha256; every cyberware hash and signed payload is this and only this.",
+    "sequence": [
+      "canonicalize",
+      "canonical_bytes",
+      "digest"
+    ]
+  },
+  {
+    "module": "infra/cwp (cwp)",
+    "name": "native DSSE sign/verify (Ed25519 pure)",
+    "intent": "cwp-native signing: PAE over JCS canonical bytes, deterministic Ed25519, into a DSSE envelope tagged with the stable keyid; verify reverses it.",
+    "sequence": [
+      "canonical_bytes",
+      "pae",
+      "sign",
+      "verify",
+      "keyid"
+    ]
+  },
+  {
+    "module": "infra/cwp (cwp)",
+    "name": "cosign Ed25519ph interop",
+    "intent": "Bridge to sigstore/cosign: Ed25519ph over the identical PAE via the OpenSSL CLI, so cwp envelopes verify in cosign and vice versa \u2014 the base of all publisher signing.",
+    "sequence": [
+      "canonical_bytes",
+      "pae",
+      "ph_sign",
+      "sign_ph",
+      "verify_ph",
+      "ph_verify"
+    ]
+  },
+  {
+    "module": "infra/cwp (cwp)",
+    "name": "in-toto blob attestation",
+    "intent": "Bind a blob's sha256 subject to a predicate as an in-toto Statement and Ed25519ph-DSSE-sign its canonical bytes.",
+    "sequence": [
+      "intoto_statement",
+      "attest_blob",
+      "sign_ph"
+    ]
+  },
+  {
+    "module": "infra/cwp (cwp)",
+    "name": "KeyStore custody seam",
+    "intent": "One custody contract (generate/public_raw/sign/keyid/verify) across a file backend and a non-exportable HSM-shaped backend, validated by the shared contract suite.",
+    "sequence": [
+      "FileKeyStore.generate",
+      "FileKeyStore.sign",
+      "KeyStore.verify",
+      "KeyStore.keyid",
+      "contract_suite",
+      "keystore_drill"
+    ]
+  },
+  {
+    "module": "infra/cwp (cwp)",
+    "name": "publisher release signing (SV-4)",
+    "intent": "Sign the chip+skill release manifest under the publisher key and refuse any unsigned/tampered/drifted release at all three entry points against the pinned TUF root.",
+    "sequence": [
+      "release_manifest",
+      "sign_release",
+      "verify_release",
+      "release_matches_chip",
+      "tri_layer_check"
+    ]
+  },
+  {
+    "module": "infra/cwp (cwp)",
+    "name": "signed revocation feed (fail-closed)",
+    "intent": "A monotonic publisher-signed feed names what must stop running; a consumer refuses any listed artifact and fails closed when the feed is stale, rolled back, or forged.",
+    "sequence": [
+      "sign_feed",
+      "verify_feed",
+      "is_revoked",
+      "revocation_decision"
+    ]
+  },
+  {
+    "module": "infra/cwp (cwp)",
+    "name": "key rotation drill (overlap + cross-sign + revoke)",
+    "intent": "Rotate a signing key with a both-keys-verify overlap, a cross-signed rotation record proving continuous authority, then a clean revocation of the old key via the feed gate.",
+    "sequence": [
+      "kid",
+      "cross_sign_rotation",
+      "verify_rotation",
+      "sign_grant",
+      "verify_grant",
+      "revocation_decision"
+    ]
+  },
+  {
+    "module": "infra/cwp (cwp)",
+    "name": "engine attestation + mutual handshake (SV-4)",
+    "intent": "Publisher-sign the reproducible engine digest; both principals re-measure the live binary and verify under the pinned root, failing closed on any one-byte tamper and binding the running engine to the signed release.",
+    "sequence": [
+      "engine_measure",
+      "sign_engine",
+      "verify_engine",
+      "attest_live",
+      "mutual_handshake",
+      "release_receipt",
+      "health_matches_signed_release"
+    ]
+  },
+  {
+    "module": "infra/cwp (cwp)",
+    "name": "Ledger-v2 chain verification",
+    "intent": "Recompute a prev-hash provenance chain via JCS link digests and validate genesis, single-origin, seq contiguity, tamper, and transplant binding.",
+    "sequence": [
+      "link_of",
+      "link_digest_v2",
+      "link_digest",
+      "head_of",
+      "verify_chain"
+    ]
+  },
+  {
+    "module": "infra/store",
+    "name": "append->mirror->index->reconcile (provenance write path)",
+    "intent": "Govd hands value-free snapshots to the mirror; one worker writes the chain (artifact of record) FIRST then the derived index, and the reconciler later re-derives the chain and proves index == chain.",
+    "sequence": [
+      "StoreMirror.record_run",
+      "StoreMirror.record_event",
+      "StoreMirror._drain",
+      "ChainStore.append_record",
+      "record_columns",
+      "SqliteWalBackend.index_record",
+      "reconcile_run"
+    ]
+  },
+  {
+    "module": "infra/store",
+    "name": "decision mirror",
+    "intent": "A verdict summary is enqueued, written to the decisions chain, then indexed into idx_decision.",
+    "sequence": [
+      "StoreMirror.decision",
+      "StoreMirror._drain",
+      "ChainStore.append_decision",
+      "SqliteWalBackend.index_decision"
+    ]
+  },
+  {
+    "module": "infra/store",
+    "name": "value-free projection (secret exclusion, defense in depth)",
+    "intent": "Allowlist projections strip everything but known-safe keys so the session token / wrapper / model-check log can never ride into the chain or index.",
+    "sequence": [
+      "StoreMirror.record_run",
+      "value_free_run",
+      "StoreMirror.record_event",
+      "value_free_event"
+    ]
+  },
+  {
+    "module": "infra/store",
+    "name": "single-writer lease (P5-T04 active-passive, no split-brain)",
+    "intent": "Atomic store-enforced lease elects one writer; the mirror's drain consults lease_holder via the guard and DROPS+records any shared-chain write attempted without the lease, so a partitioned ex-active can never append behind the new active.",
+    "sequence": [
+      "try_acquire_lease",
+      "renew_lease",
+      "StoreMirror.set_lease_guard",
+      "lease_holder",
+      "StoreMirror._drain",
+      "StoreMirror._record_blocked",
+      "release_lease"
+    ]
+  },
+  {
+    "module": "infra/store",
+    "name": "reconcile divergence taxonomy + transplant guard",
+    "intent": "Each cycle re-verifies the chain, re-asserts the out-of-band expected origin (set_origin/get_origin) to defeat forged genesis, recomputes digests, and set-diffs vs the index \u2014 alarming on gap_below_head/index_ahead/digest_mismatch/chain_broken/origin_missing while treating index_behind as benign lag (optionally repaired).",
+    "sequence": [
+      "ChainStore.read_run",
+      "reconcile_run",
+      "reconcile_all",
+      "continuous_reconcile"
+    ]
+  },
+  {
+    "module": "infra/store",
+    "name": "StoreBackend contract suite (both backends, one identical proof)",
+    "intent": "Hermetic selftest builds a real prev-hash chain, mirrors it, and proves the six contract properties (interface conformance, round-trip, idempotent replay, reconcile-exact, torn-tail-safe, Postgres-inert-until-configured) that every adapter must pass.",
+    "sequence": [
+      "store_selftest",
+      "ChainStore.append_record",
+      "record_columns",
+      "SqliteWalBackend.index_record",
+      "reconcile_run"
+    ]
+  },
+  {
+    "module": "infra/store",
+    "name": "backend selection (inert-until-keyed)",
+    "intent": "Operator config picks Postgres iff a dsn_file/dsn is wired (else local sqlite-WAL); the Postgres tier stays INERT \u2014 every op returns 'unconfigured' \u2014 and the DSN is read lazily server-side and never echoed.",
+    "sequence": [
+      "make_backend",
+      "PsycopgBackend.configured",
+      "PsycopgBackend.open",
+      "SqliteWalBackend.open"
+    ]
+  },
+  {
+    "module": "infra/settle",
+    "name": "price->quote->fund->grant->settle (the priced-run settlement spine)",
+    "intent": "Price a run from its value-free plan, sign+fund the quote in per-quote escrow, admit the grant only when funded, then pay out exactly once on a dual-signed validation:pass quote-bound receipt and release the dispute-window holdback.",
+    "sequence": [
+      "price.price_plan",
+      "quote.compute_quote",
+      "quote.sign_quote",
+      "quote.fund_quote",
+      "quote.grant_admits",
+      "engine.build_receipt",
+      "engine.settle",
+      "engine.release_holdback"
+    ]
+  },
+  {
+    "module": "infra/settle",
+    "name": "price->charge->collect (the settle-time platform tax)",
+    "intent": "Collect the transparent itemized tax (substrate/skill_author/marketplace) automatically at settle via a pluggable rail, refusing any split that does not re-sum to the total, idempotent on plan_sha.",
+    "sequence": [
+      "price.price_plan",
+      "rails.charge_from_price",
+      "rails.split_balances",
+      "rails.make_rail",
+      "rails.collect_tax",
+      "rails.collect_run_tax"
+    ]
+  },
+  {
+    "module": "infra/settle",
+    "name": "credit-tier usage billing",
+    "intent": "Operator tops up a prepaid balance once; each priced run debits its micro-tax internally as a zero-sum split with no per-call Stripe fee, refused as a structural gate if credits cannot cover it.",
+    "sequence": [
+      "credits.topup",
+      "credits.admits",
+      "rails.CreditRail.collect",
+      "credits.debit_usage"
+    ]
+  },
+  {
+    "module": "infra/settle",
+    "name": "metered llm settlement",
+    "intent": "Reconcile exod-attested token meters against the provider receipt, decide the settleable pass-through amount, then settle the llm step by its output-contract verdict - work paid on pass, initiator refunded on fail while provider+govd are still paid.",
+    "sequence": [
+      "metered.reconcile",
+      "metered.settleable",
+      "metered.reimbursement_posting",
+      "intelligence.validate_output",
+      "intelligence.settle_intelligence"
+    ]
+  },
+  {
+    "module": "infra/settle",
+    "name": "reward-ledger conservation + money<->work audit",
+    "intent": "Every movement is a balanced zero-sum posting set; reward_verify proves the money trail and the dual-signed work trail are a clean bijection with no orphan settlement or unpaid authorized receipt.",
+    "sequence": [
+      "reward_ledger.post",
+      "reward_ledger.is_balanced",
+      "reward_ledger.global_zero",
+      "reward_verify.settled_quote_shas",
+      "reward_verify.authorized_quote_shas",
+      "reward_verify.reward_verify"
+    ]
+  },
+  {
+    "module": "infra/settle",
+    "name": "adapter-boundary dust + escrow liveness",
+    "intent": "At a cent-billing PSP boundary the sub-cent residue posts to a dust account and is swept (signed) to treasury; expired unsettled escrow auto-refunds to its funder so no escrow strands value past its bound.",
+    "sequence": [
+      "dust.split_cents",
+      "dust.boundary_posting",
+      "dust.sweep_dust",
+      "escrow_expiry.fund_with_expiry",
+      "escrow_expiry.sweep_expired",
+      "escrow_expiry.stale_escrow_keys"
+    ]
+  },
+  {
+    "module": "infra/settle",
+    "name": "throughput group-commit + resume",
+    "intent": "Single-writer-per-currency batches commit all-or-nothing while maintaining running balances, and an O(accounts) checkpoint lets a restarted writer verify its resume point cheaply.",
+    "sequence": [
+      "throughput.GroupCommitWriter.stage",
+      "throughput.GroupCommitWriter.commit",
+      "throughput.GroupCommitWriter.checkpoint",
+      "throughput.resume_verify"
+    ]
+  },
+  {
+    "module": "infra/settle",
+    "name": "dispute lifecycle",
+    "intent": "After settlement a run is disputed by posting a bond; an m-of-n WebAuthn-approved resolution either claws back the holdback to the disputer or forfeits the bond to the payee, recording reputation deltas.",
+    "sequence": [
+      "engine.settle",
+      "disputes.open_dispute",
+      "disputes.count_approvals",
+      "disputes.resolve"
+    ]
+  },
+  {
+    "module": "infra/settle",
+    "name": "FMV index + competitive award + royalty/self-bounty",
+    "intent": "A manipulation-resistant FMV index prices work; bounties/auctions award one validated winner; verified-tier publishes pay an alchemy-lineage royalty; the security program pays external researchers through the same ledger.",
+    "sequence": [
+      "fmv._collapse_controls",
+      "fmv._is_multimodal",
+      "fmv.fmv_index",
+      "markets.award_bounty",
+      "royalties.publish_with_royalty",
+      "selfbounty.run_security_program"
+    ]
+  },
+  {
+    "module": "infra/settle",
+    "name": "SV-6 capstone close",
+    "intent": "Settle cyberware's own redeemed milestones as internal-credit bounties through the full pipeline, seed the first FMV index from them, and emit a dual-signed TSA-anchored completion receipt that verifies offline - closing the ladder.",
+    "sequence": [
+      "capstone.redeemed_milestones",
+      "capstone.settle_bounties",
+      "fmv.fmv_index",
+      "capstone.plan_completion_receipt",
+      "capstone.verify_plan_completion"
+    ]
+  },
+  {
+    "module": "infra/tool (tool)",
+    "name": "chip authenticity gate (per-skill -> chip -> verify)",
+    "intent": "Pin every skill's files to a skill_sha and roll them into a chip_sha, then re-verify on-disk files match the committed indexes (CI drift gate).",
+    "sequence": [
+      "sha256_file",
+      "skill_files",
+      "build_index",
+      "write_index",
+      "chip_manifest",
+      "write_manifest",
+      "verify",
+      "verify_chip"
+    ]
+  },
+  {
+    "module": "infra/tool (tool)",
+    "name": "manifest-authoritative load set (permit AND present)",
+    "intent": "Resolve the runtime load set from the root manifest's permitted roster intersected with on-disk presence; a directory scan only bootstraps a fresh chip, never routes the load set.",
+    "sequence": [
+      "permitted_skills",
+      "is_present",
+      "loadable",
+      "all_skills",
+      "scan_skills"
+    ]
+  },
+  {
+    "module": "infra/tool (tool)",
+    "name": "value-free discovery catalog (compare by sha)",
+    "intent": "Build a names+hashes-only catalog (skills, authenticity status, perk var-KEYS) so govd and agent registries compare by skill_sha without bodies crossing the wire.",
+    "sequence": [
+      "all_skills",
+      "verify",
+      "skill_sha",
+      "_perk_vars",
+      "catalog"
+    ]
+  },
+  {
+    "module": "infra/tool (tool)",
+    "name": "cartridge compile -> seal -> load-verify",
+    "intent": "Cut a standalone cartridge of exactly the declared skills with a fresh root manifest, then load-verify that each declared skill is present, authentic, and binds to the root chip_sha (undeclared dirs cannot ride along).",
+    "sequence": [
+      "compile",
+      "declared_skills",
+      "verify",
+      "cartridge_selftest"
+    ]
+  },
+  {
+    "module": "infra/tool (tool)",
+    "name": "in-skill governed test (case.json proof)",
+    "intent": "Run each perk's pinned case.json through the SAME governed compiler+executor pipeline in a hermetic dir, then check declared expectations (exit/outputs/contains/json).",
+    "sequence": [
+      "all_cases",
+      "has_test",
+      "case_path",
+      "run",
+      "_resolve",
+      "_abspath",
+      "_subset"
+    ]
+  },
+  {
+    "module": "infra/tool (tool)",
+    "name": "skill scaffold (skeleton that already composes)",
+    "intent": "Generate a new skill's L++ lifecycle blueprint, perks.json, contracts, and per-perk snippet stubs so the skeleton validates and composes out of the box.",
+    "sequence": [
+      "blueprint",
+      "snippet_stub",
+      "py_stub",
+      "porter_stub",
+      "skill_md",
+      "wj",
+      "wsh"
+    ]
+  },
+  {
+    "module": "infra/tool (tool)",
+    "name": "self-monitor gate (building-is-running, M5)",
+    "intent": "Grade the engine against redeemable evidence: deadlock-free blueprints, hash authenticity, no scaffold stubs, relocatable porters, and a mutation-coverage ratchet that may only rise.",
+    "sequence": [
+      "check_blueprints",
+      "check_authenticity",
+      "check_no_stubs",
+      "check_porter_path_hygiene",
+      "mutation_score",
+      "check_mutation"
+    ]
+  },
+  {
+    "module": "infra/tool (tool)",
+    "name": "compose->reconcile->verify->serve",
+    "intent": "Multi-source compose: place each source's skills by namespace, HARD-ERROR on an exact ns:name dup (manual reconciliation), re-pin + full-verify the composed v2 chip, atomic-swap into place.",
+    "sequence": [
+      "scan_skills",
+      "plan",
+      "ComposeConflict?",
+      "compiled_skill_dst",
+      "copytree",
+      "write_manifest",
+      "_full_verify",
+      "atomic_swap"
+    ]
+  },
+  {
+    "module": "infra/govern",
+    "name": "three-gate govern",
+    "intent": "The claim is gated by THREE independent fail-closed ANDs: VALIDATE (the skill's files match its committed index), ACCESS-1 (the skill's own access.json policy), ACCESS-2 (the per-actor token ACL). Re-bound at step time by step_reauthorize.",
+    "sequence": [
+      "canonicalize",
+      "VALIDATE:verify_skill",
+      "build_plan",
+      "ACCESS-2:acl_allows",
+      "ACCESS-1:access_allows",
+      "decide"
+    ]
+  },
+  {
+    "module": "infra/govern",
+    "name": "fleet_tier hierarchy: declare->rank->discover->group",
+    "intent": "The fleet_tier topology hierarchy (orthogonal to trust): nodes self-declare fleet_tier in the roster; fleetd carries it through _self_descriptor/_probe and rank-filters /fleet/find; fleetdash groups the side-nav by it. It is the axis cws-fleet:deploy contains against \u2014 a node may spawn only a STRICTLY-lower fleet_tier subagent with a content-identity (skill_sha) chip + ACL subset of its own.",
+    "sequence": [
+      "_self_descriptor",
+      "_probe",
+      "_fleet_rank",
+      "_fleet_tier_ok",
+      "fleet_roster",
+      "_node_groups",
+      "_sidebar"
+    ]
+  }
+]
