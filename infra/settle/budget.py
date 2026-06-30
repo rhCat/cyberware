@@ -93,6 +93,33 @@ def budget_ok(actor: str, price: Money, bal, *, configured: bool):
     return (True, None)
 
 
+def rollup(backend, actors) -> dict:
+    """Per-actor accounting from the durable ledger — for the gauges + the accountant pages. Returns
+    {by_actor:[{actor, allowance, spent, balance, runs}], fleet:{actors, allowance, spent, balance}}.
+    allowance = total CREDITED (seed + top-ups); spent = total DEBITED (usage); balance = the net. (The UI
+    derives the % gauge from spent/allowance — kept out of this float-banned module.)"""
+    by_actor = []
+    tot_a = tot_s = tot_b = Money.zero(CREDITS)
+    for a in actors:
+        credited = debited = Money.zero(CREDITS)
+        runs = 0
+        for r in backend.budget_rows(a):
+            m = Money(r["delta"], CREDITS)
+            if str(r.get("memo") or "").startswith("usage:"):
+                debited = debited - m                       # the usage delta is negative; -m is the spend
+                runs += 1
+            else:
+                credited = credited + m                     # seed / top-up (positive)
+        bal = credited - debited
+        by_actor.append({"actor": a, "allowance": str(credited.amount), "spent": str(debited.amount),
+                         "balance": str(bal.amount), "runs": runs})
+        tot_a, tot_s, tot_b = tot_a + credited, tot_s + debited, tot_b + bal
+    by_actor.sort(key=lambda x: x["actor"])
+    return {"by_actor": by_actor,
+            "fleet": {"actors": len(by_actor), "allowance": str(tot_a.amount),
+                      "spent": str(tot_s.amount), "balance": str(tot_b.amount)}}
+
+
 def budget_selftest() -> dict:
     """Value-free, no-network: seed an allowance, debit (drawn down + idempotent), refuse over-balance,
     top-up, and the pure gate (allow / shutoff / unmetered)."""

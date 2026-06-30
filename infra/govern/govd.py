@@ -732,6 +732,45 @@ def ws_send(wfile, payload, opcode=0x1):
 
 # ───────────────────────── HTTP / WS handler ─────────────────────────
 
+def _budget_page(roll):
+    """A self-contained server-rendered GAUGE page for the firing govd: per-actor allowance/spent/balance with
+    a green->amber->red bar, value-free (credit amounts only). Auto-refreshes; pairs with the pricing-stage
+    shutoff (the gate) — this is the gauge half of 'a gauge + shutoff at pricing'."""
+    import html as _h
+    from decimal import Decimal
+    esc = lambda s: _h.escape(str(s))
+    fleet = roll.get("fleet", {})
+    body = []
+    for a in roll.get("by_actor", []):
+        try:
+            al, sp = Decimal(a["allowance"]), Decimal(a["spent"])
+        except Exception:
+            al, sp = Decimal(0), Decimal(0)
+        pct = int(sp * 100 / al) if al > 0 else 0
+        zone = "ok" if pct < 70 else ("warn" if pct < 100 else "no")
+        body.append(f'<tr><td><b>{esc(a["actor"])}</b></td>'
+                    f'<td><div class="g"><div class="gb"><div class="gf {zone}" style="width:{min(pct, 100)}%">'
+                    f'</div></div><span class="gl">{esc(a["spent"])} / {esc(a["allowance"])}</span></div></td>'
+                    f'<td class="{zone}">{esc(a["balance"])}</td><td>{esc(a.get("runs", 0))}</td></tr>')
+    rows = "".join(body) or '<tr><td colspan="4" class="muted">no actors with a budget configured</td></tr>'
+    return ("<!doctype html><html><head><meta charset=utf-8><meta http-equiv=refresh content=5>"
+            "<title>govd · budget</title><style>"
+            "body{font:13px ui-monospace,Menlo,monospace;background:#0b0e14;color:#c9d1d9;margin:0;padding:18px}"
+            "h1{font-size:15px;color:#58a6ff;margin:0 0 8px} table{width:100%;border-collapse:collapse}"
+            "td,th{text-align:left;padding:6px 8px;border-bottom:1px solid #21262d}"
+            "th{color:#6e7681;font-size:11px;text-transform:uppercase} .muted{color:#6e7681;text-align:center;padding:18px}"
+            ".g{display:flex;align-items:center;gap:8px} .gb{flex:1;min-width:120px;height:11px;background:#21262d;border-radius:6px;overflow:hidden}"
+            ".gf{height:100%} .gf.ok{background:#2ea043} .gf.warn{background:#d29922} .gf.no{background:#f85149}"
+            ".gl{min-width:130px;color:#8b949e;font-size:11px} .ok{color:#3fb950} .warn{color:#d29922} .no{color:#f85149}"
+            "</style></head><body>"
+            "<h1>govd · budget — credit gauge + pricing shutoff</h1>"
+            f'<p class="muted">fleet: <b>{esc(fleet.get("spent", "0"))}</b> spent / {esc(fleet.get("allowance", "0"))} '
+            f'allowed · {esc(fleet.get("balance", "0"))} balance · {esc(fleet.get("actors", 0))} actors · '
+            "CREDITS · auto-refresh 5s</p>"
+            "<table><thead><tr><th>actor</th><th>spent / allowance</th><th>balance</th><th>runs</th></tr></thead>"
+            f"<tbody>{rows}</tbody></table></body></html>")
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "cyberware-govd/1.0"
     protocol_version = "HTTP/1.1"
@@ -821,6 +860,30 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 dp, dl = 1, DECISIONS_PER_PAGE
             return self._json(200, store.monitor_snapshot(dec_page=dp, dec_limit=dl))
+        if path == "/budget/state":
+            # per-actor CREDIT accounting (gauge + accountant data) from the durable budget ledger — the
+            # firing govd's view of who's spent what against their allowance. Monitor-gated (value-free).
+            if not self._monitor_authed(cfg):
+                return self._json(403, {"error": "missing/invalid monitor token (?token= or X-Govd-Monitor)"})
+            be = getattr(self.server, "store_backend", None)
+            actors = list(cfg.get("principals") or {})
+            roll = budget.rollup(be, actors) if be is not None else {"by_actor": [], "fleet": {}}
+            return self._json(200, {**roll, "enforced": bool(cfg.get("budget_enforce")), "currency": "CREDITS"})
+        if path == "/budget":
+            # the GAUGE page for the firing govd (the gauge half of 'a gauge + shutoff at pricing'). Monitor-
+            # gated; value-free (credit amounts only). Auto-refreshes alongside the live shutoff (the gate).
+            if not self._monitor_authed(cfg):
+                return self._json(403, {"error": "missing/invalid monitor token (?token=)"})
+            be = getattr(self.server, "store_backend", None)
+            roll = (budget.rollup(be, list(cfg.get("principals") or {}))
+                    if be is not None else {"by_actor": [], "fleet": {}})
+            page = _budget_page(roll).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(page)))
+            self.end_headers()
+            self.wfile.write(page)
+            return
         if path == "/monitor/stream":
             if not self._monitor_authed(cfg):
                 return self._json(403, {"error": "missing/invalid monitor token (?token= or X-Govd-Monitor)"})
