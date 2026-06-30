@@ -1165,10 +1165,17 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(400, {"error": "actor required"})
         from infra.settle.money import Money
         if path == "/budget/topup":
+            raw = body.get("credits")
+            # a JSON float would slip past str()-coercion (str(1.5)=='1.5') — refuse a non-string/int amount so
+            # the float-ban holds at the HTTP boundary too. (bool is an int subclass; exclude it.)
+            if isinstance(raw, bool) or not isinstance(raw, (str, int)):
+                return self._json(400, {"error": "credits must be an exact-decimal amount STRING (no float)"})
             try:
-                amt = Money(str(body.get("credits")), "CREDITS")   # str() -> Money refuses a JSON float (float-ban)
+                amt = Money(str(raw), "CREDITS")
             except (TypeError, ValueError):
-                return self._json(400, {"error": "credits must be an exact-decimal amount string (no float)"})
+                return self._json(400, {"error": "credits must be an exact-decimal amount string"})
+            if amt.amount <= 0:                                    # top-ups are credits-IN — reject non-positive
+                return self._json(400, {"error": "credits must be a positive amount"})
             source = body.get("source") or "grant"
             ref = str(body.get("ref") or f"{source}-{uuid.uuid4().hex[:12]}")
             res = be.budget_post(actor, amt, memo=f"topup:{source}:{ref}", idem=f"topup:{ref}")
@@ -1177,7 +1184,10 @@ class Handler(BaseHTTPRequestHandler):
                                     "source": source, "ref": ref, "balance": res["balance"], "status": res["status"]})
         # /budget/recharge — mint the Stripe PaymentIntent (buy credits); crediting happens on confirm.
         from infra.settle import rails
-        amount = str(body.get("amount") or "")
+        raw_amt = body.get("amount")
+        if raw_amt is not None and (isinstance(raw_amt, bool) or not isinstance(raw_amt, (str, int))):
+            return self._json(400, {"error": "amount must be an exact-decimal amount string (no float)"})
+        amount = str(raw_amt or "")
         cur = body.get("currency") or "USD"
         if not amount:
             return self._json(400, {"error": "amount (the purchase price, e.g. '10.00') required"})

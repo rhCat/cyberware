@@ -85,6 +85,21 @@ def test_backend_debit_is_atomic_under_concurrency():
     assert be.budget_balance("a") == C("0.0000")           # never over-spent
 
 
+def test_backend_idem_is_actor_scoped_no_cross_actor_freebie():
+    # the same idem under TWO actors must BOTH charge — a cross-actor idem collision must not be a "duplicate"
+    # no-op (which would have skipped the balance check and granted a free run).
+    be = _backend()
+    be.budget_post("a", C("5.0000"), "seed:a", "seed:a")
+    be.budget_post("b", C("5.0000"), "seed:b", "seed:b")
+    assert be.budget_debit_atomic("a", C("2.0000"), "usage:X")["ok"] is True
+    rb = be.budget_debit_atomic("b", C("2.0000"), "usage:X")            # SAME idem, different actor
+    assert rb["ok"] is True and not rb.get("duplicate")                # b is genuinely charged, not a no-op
+    assert be.budget_balance("a") == C("3.0000") and be.budget_balance("b") == C("3.0000")
+    # a TRUE retry (same actor + idem) is still idempotent
+    assert be.budget_debit_atomic("a", C("2.0000"), "usage:X").get("duplicate") is True
+    assert be.budget_balance("a") == C("3.0000")
+
+
 # ── negotiable credit pricing ──
 def test_credit_price_resolution():
     assert credit_price.credit_price("general:fs", "archive").currency == "CREDITS"
@@ -208,6 +223,9 @@ def test_live_shutoff_then_topup_restores_allow(chip_env, tmp_path):
         assert govern()[0] == 200                                  # the same actor now allows again
         # a bad monitor token is refused
         assert _req("/budget/topup", {"actor": "alice", "credits": "1"}, {"X-Govd-Monitor": "wrong"})[0] == 403
+        # input validation: a JSON float (would slip past str()), a negative, and a missing amount are refused
+        assert _req("/budget/topup", {"actor": "alice", "credits": 1.5}, {"X-Govd-Monitor": "admin"})[0] == 400
+        assert _req("/budget/topup", {"actor": "alice", "credits": "-5.0000"}, {"X-Govd-Monitor": "admin"})[0] == 400
     finally:
         httpd.shutdown()
         httpd.server_close()

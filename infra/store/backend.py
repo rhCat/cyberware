@@ -230,7 +230,7 @@ class SqliteWalBackend(StoreBackend):
         with self._lock:
             self.cx.execute("""CREATE TABLE IF NOT EXISTS budget_ledger(
                 id INTEGER PRIMARY KEY AUTOINCREMENT, actor TEXT NOT NULL, delta TEXT NOT NULL,
-                memo TEXT, idem TEXT UNIQUE, ts REAL)""")
+                memo TEXT, idem TEXT, ts REAL, UNIQUE(actor, idem))""")
             self.cx.execute("CREATE INDEX IF NOT EXISTS idx_budget_actor ON budget_ledger(actor)")
 
     def _budget_sum(self, deltas):                                     # exact-decimal fold (never a float SUM)
@@ -252,7 +252,8 @@ class SqliteWalBackend(StoreBackend):
             self.cx.execute("BEGIN IMMEDIATE")
             try:
                 self._ensure_budget()
-                dup = self.cx.execute("SELECT 1 FROM budget_ledger WHERE idem=?", (idem,)).fetchone() is not None
+                dup = self.cx.execute("SELECT 1 FROM budget_ledger WHERE actor=? AND idem=?",
+                                      (actor, idem)).fetchone() is not None   # actor-scoped: no cross-actor idem collision
                 if not dup:
                     self.cx.execute("INSERT INTO budget_ledger(actor, delta, memo, idem, ts) VALUES(?,?,?,?,?)",
                                     (actor, str(delta.amount), memo, idem, _t.time()))
@@ -270,7 +271,8 @@ class SqliteWalBackend(StoreBackend):
             self.cx.execute("BEGIN IMMEDIATE")
             try:
                 self._ensure_budget()
-                dup = self.cx.execute("SELECT 1 FROM budget_ledger WHERE idem=?", (idem,)).fetchone() is not None
+                dup = self.cx.execute("SELECT 1 FROM budget_ledger WHERE actor=? AND idem=?",
+                                      (actor, idem)).fetchone() is not None   # actor-scoped: no cross-actor idem collision
                 rows = self.cx.execute("SELECT delta FROM budget_ledger WHERE actor=?", (actor,)).fetchall()
                 bal = self._budget_sum(rows)
                 if dup:
@@ -473,7 +475,7 @@ class PsycopgBackend(StoreBackend):
         with self.cx.cursor() as c:
             c.execute("""CREATE TABLE IF NOT EXISTS budget_ledger(
                 id BIGSERIAL PRIMARY KEY, actor TEXT NOT NULL, delta TEXT NOT NULL,
-                memo TEXT, idem TEXT UNIQUE, ts DOUBLE PRECISION)""")
+                memo TEXT, idem TEXT, ts DOUBLE PRECISION, UNIQUE(actor, idem))""")
             c.execute("CREATE INDEX IF NOT EXISTS idx_budget_actor ON budget_ledger(actor)")
 
     def budget_balance(self, actor):
@@ -492,7 +494,7 @@ class PsycopgBackend(StoreBackend):
         with self.cx.transaction():
             with self.cx.cursor() as c:
                 c.execute("INSERT INTO budget_ledger(actor, delta, memo, idem, ts) "
-                          "VALUES(%s,%s,%s,%s, EXTRACT(EPOCH FROM now())) ON CONFLICT(idem) DO NOTHING RETURNING id",
+                          "VALUES(%s,%s,%s,%s, EXTRACT(EPOCH FROM now())) ON CONFLICT(actor, idem) DO NOTHING RETURNING id",
                           (actor, str(delta.amount), memo, idem))
                 posted = c.fetchone() is not None
                 c.execute("SELECT COALESCE(SUM(delta::numeric),0)::text FROM budget_ledger WHERE actor=%s", (actor,))
@@ -505,7 +507,7 @@ class PsycopgBackend(StoreBackend):
         with self.cx.transaction():
             with self.cx.cursor() as c:
                 c.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (actor,))    # serialize per-actor debits
-                c.execute("SELECT 1 FROM budget_ledger WHERE idem=%s", (idem,))
+                c.execute("SELECT 1 FROM budget_ledger WHERE actor=%s AND idem=%s", (actor, idem))
                 dup = c.fetchone() is not None
                 c.execute("SELECT COALESCE(SUM(delta::numeric),0)::text FROM budget_ledger WHERE actor=%s", (actor,))
                 bal = Money(c.fetchone()[0], "CREDITS")
