@@ -146,6 +146,20 @@ def test_govern_returns_a_value_free_plan(server):
     assert rec["var_keys"] == ["SEARCH_DIR"] and "vars" not in rec
 
 
+def test_node_name_attributes_unauthenticated_local_runs(server):
+    """GOVD_NODE_NAME / cfg.node_name: an unauthenticated local-mode run is attributed to the node's fleet name
+    (so the fleet control's WHO is the node), instead of the generic 'local'."""
+    base, store, cfg = server
+    cfg["node_name"] = "ruis-mac-mini"
+    try:
+        _, v = claim(base, "fs", "find_large", var_keys=["SEARCH_DIR"])
+        assert store.get(v["run_id"])["principal"] == "ruis-mac-mini"     # the node's fleet name, not "local"
+    finally:
+        cfg["node_name"] = None
+    _, v2 = claim(base, "fs", "find_large", var_keys=["SEARCH_DIR"])
+    assert store.get(v2["run_id"])["principal"] == "local"               # default when no node_name is set
+
+
 def test_record_persists_the_canonical_skill(server):
     """FIX B (review): a BARE claim is governed + RECORDED under its canonical ns:name. The step-time ACL
     re-check, the signed exod grant, sandbox staging, and the in-toto subject all re-read record["skill"], so
@@ -156,6 +170,41 @@ def test_record_persists_the_canonical_skill(server):
     assert v["decision"] == "allow", v
     rec = store.get(v["run_id"])
     assert rec["skill"] == "general:fs"                                 # the CANONICAL id, not the bare claim
+
+
+def test_skillacl_fold_records_separately_without_touching_acl_sha(server):
+    """Step 6 review-fix: the skillacl_fold flag RECORDS the ACCESS-1 policy sha (skillacl_sha) but must NOT
+    fold it into the grant-bound acl_sha — folding it there breaks exod's acl_join (it re-derives acl_sha from
+    the attested ACTOR ACL) and fail-closes every delegated run. With the flag on, skillacl_sha is recorded and
+    acl_sha is untouched (None here, unscoped principal)."""
+    base, store, cfg = server
+    cfg["skillacl_fold"] = True
+    try:
+        _, v = claim(base, "fs", "find_large", var_keys=["SEARCH_DIR"])
+        rec = store.get(v["run_id"])
+        assert rec.get("skillacl_sha") and len(rec["skillacl_sha"]) == 64   # the policy sha is recorded
+        assert rec.get("acl_sha") is None                                   # unscoped -> acl_sha untouched by the fold
+    finally:
+        cfg["skillacl_fold"] = False
+
+
+def test_skillacl_fold_scoped_principal_acl_sha_stays_unfolded(tmp_path):
+    """Re-review fix-4 gap: on the SCOPED path (where the original exod-break manifested), skillacl_fold must
+    leave acl_sha as the PLAIN actor-ACL sha (so exod's acl_join still matches) and record skillacl_sha apart."""
+    from infra.govern import principals
+    tok_sha = principals.token_sha("S")
+    reg = {"agent-a": {"token_sha": tok_sha, "rate": 5.0, "burst": 5, "acl": {"skills": ["general:fs", "fs"]}}}
+    base, store, httpd = _auth_server(tmp_path, reg)
+    httpd.cfg["skillacl_fold"] = True
+    try:
+        _, v = _post(base, {"skill": "fs", "perk": "find_large", "var_keys": ["SEARCH_DIR"]},
+                     headers={"Authorization": "Bearer S"})
+        assert v and v["decision"] == "allow", v
+        rec = store.get(v["run_id"])
+        assert rec["acl_sha"] == principals.acl_sha("agent-a", tok_sha, reg["agent-a"]["acl"])  # PLAIN, not folded
+        assert rec.get("skillacl_sha") and len(rec["skillacl_sha"]) == 64                       # recorded apart
+    finally:
+        httpd.shutdown(); httpd.server_close()
 
 
 def test_govern_never_receives_values_even_if_sent(server):
@@ -253,6 +302,22 @@ def test_unsolicited_step_result_is_rejected(server):
     assert not ok and "never granted" in why
     store.append("r2", {"type": "granted", "ts": "t", "step": "1", "plan_sha": "PSHA"})
     assert govd.result_acceptable(store, "r2", "1", "PSHA")[0] is True
+
+
+def test_step_reauthorize_rebinds_both_gates():
+    """Re-review fix: the step-time re-bind re-runs BOTH gates. ACCESS-1 is skill-INTRINSIC and must fire even
+    with NO principals registry (the prior bug gated the whole block on a non-empty registry)."""
+    from infra.govern import principals
+    rec = {"skill": "fs", "perk": "find_large", "principal": "x"}
+    # ACCESS-1, registry-INDEPENDENT: remote + enforce + no access.json -> denied EVEN with an empty registry
+    ok, why = govd.step_reauthorize({"mode": "remote", "skillacl_enforce": True}, rec)
+    assert not ok and why == "access:skill_remote_closed"
+    assert govd.step_reauthorize({"mode": "local"}, rec) == (True, None)         # local -> both gates open
+    assert govd.step_reauthorize({}, None) == (True, None)                       # no record -> trivially ok
+    # ACCESS-2: a scoped ACL that does not list the skill refuses at step time too
+    reg = {"x": {"token_sha": principals.token_sha("S"), "acl": {"skills": ["other"]}}}
+    ok, why = govd.step_reauthorize({"principals": reg, "mode": "local"}, rec)
+    assert not ok and why.startswith("acl:")
 
 
 # ── bank-session privacy ──

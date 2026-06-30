@@ -128,6 +128,66 @@ def test_down_peer_marked_unhealthy_not_dropped(tmp_path, monkeypatch):
         srv.shutdown(); srv.server_close()
 
 
+# ── fleet_tier: the topology HIERARCHY, orthogonal to the trust tier ──
+def test_fleet_rank_named_numeric_and_unknown():
+    assert fleetd._fleet_rank("mothership") == 1
+    assert fleetd._fleet_rank("EDGE") == 2                     # case-insensitive
+    assert fleetd._fleet_rank("subagent") == 3
+    assert fleetd._fleet_rank("4") == 4 and fleetd._fleet_rank(5) == 5   # 'and so on' — deeper ints verbatim
+    assert fleetd._fleet_rank(None) is None
+    assert fleetd._fleet_rank("garbage") is None
+    assert fleetd._fleet_rank(0) is None and fleetd._fleet_rank(-1) is None
+    assert fleetd._fleet_rank(True) is None                   # a bool is not a tier (int-subclass guard)
+
+
+def test_fleet_tier_ok_is_exact_by_rank():
+    assert fleetd._fleet_tier_ok("subagent", None) is True    # no filter -> no constraint
+    assert fleetd._fleet_tier_ok("subagent", "garbage") is True
+    assert fleetd._fleet_tier_ok("subagent", "subagent") is True
+    assert fleetd._fleet_tier_ok("subagent", "3") is True     # numeric alias of the same rank matches
+    assert fleetd._fleet_tier_ok("edge", "subagent") is False
+    assert fleetd._fleet_tier_ok(None, "subagent") is False   # an unranked node never wins a constrained query
+
+
+def test_self_descriptor_carries_fleet_tier():
+    srv, base = _start({"mode": "local", "exec_mode": "cooperative", "principals": {},
+                        "fleet": {"fleet_tier": "mothership", "tier": "core"}})
+    try:
+        _, d = _get(base, "/fleet/nodes")
+        me = d["nodes"][0]
+        assert me["fleet_tier"] == "mothership" and me["tier"] == "core"   # both orthogonal axes present
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
+def test_probe_carries_fleet_tier_even_when_peer_is_down(tmp_path, monkeypatch):
+    roster = tmp_path / "fleet.json"
+    roster.write_text(json.dumps({"nodes": [
+        {"name": "ghost", "url": "http://127.0.0.1:1", "tier": "core", "fleet_tier": "subagent"}]}))
+    monkeypatch.setenv("FLEETD_FLEET", str(roster))
+    srv, base = _start({"mode": "local", "exec_mode": "cooperative", "principals": {}})
+    try:
+        _, d = _get(base, "/fleet/nodes")
+        ghost = {n["url"]: n for n in d["nodes"]}["http://127.0.0.1:1"]
+        assert ghost["fleet_tier"] == "subagent"              # topology is roster-declared; survives an unreachable probe
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
+def test_find_filters_by_fleet_tier(monkeypatch):
+    srv, base = _start({"mode": "local", "exec_mode": "cooperative", "principals": {},
+                        "fleet": {"fleet_tier": "mothership"}})
+    try:
+        _, nodes = _get(base, "/fleet/nodes")
+        skill = nodes["nodes"][0]["skills"][0]                 # a skill self really offers
+        hit = _get(base, f"/fleet/find?skill={skill}&fleet_tier=mothership")
+        assert hit[0] == 200 and hit[1]["fleet_tier"] == "mothership"
+        miss = _get(base, f"/fleet/find?skill={skill}&fleet_tier=subagent")   # self is mothership, not subagent
+        assert miss[0] == 404
+    finally:
+        srv.shutdown(); srv.server_close()
+
+
 # ── pure units ──
 def test_tier_ceiling():
     assert fleetd._tier_ok("core", "verified") is True        # core is at least as trusted as verified

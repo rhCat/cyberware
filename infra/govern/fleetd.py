@@ -44,6 +44,8 @@ CACHE_TTL = 5.0               # collapse query bursts (matches the repo's 5s pol
 SOCKET_TIMEOUT = 15.0         # per-connection read timeout — no slowloris on the fleet plane
 
 _TIER_RANK = {"core": 0, "verified": 1, "community": 2}   # catalog TRUST order (core = most trusted)
+_FLEET_RANK = {"mothership": 1, "edge": 2, "subagent": 3}  # fleet HIERARCHY (topology) — ORTHOGONAL to trust;
+                                                          # lower rank = higher authority; deeper ints allowed ("and so on")
 _CACHE: dict = {}             # {"roster": (ts, [descriptor, ...])} — tiny in-process TTL cache
 
 
@@ -164,6 +166,7 @@ def _self_descriptor(cfg, self_url) -> dict:
     return {"node_id": f.get("node_id") or socket.gethostname(), "url": self_url,
             "role": f.get("role", "node"), "arch": (f.get("arch") or None),
             "chip_sha": chip, "chip_source": _src(prov), "skills": skills, "tier": (f.get("tier") or None),
+            "fleet_tier": (f.get("fleet_tier") or None),
             "exec_mode": exec_mode, "exod_attached": exod,
             "healthy": True, "last_seen": int(time.time())}
 
@@ -172,7 +175,8 @@ def _probe(node: dict) -> dict:
     """Live-probe one peer's UNGATED :5773 /health + /catalog. A dead/unreachable peer is KEPT (never silently
     dropped) but marked healthy:false with last_seen=None. Bounded by PROBE_TIMEOUT — never hangs the handler."""
     base = {"node_id": node.get("name") or node.get("node_id"), "url": node["url"],
-            "role": node.get("role"), "arch": node.get("arch"), "tier": (node.get("tier") or None)}
+            "role": node.get("role"), "arch": node.get("arch"), "tier": (node.get("tier") or None),
+            "fleet_tier": (node.get("fleet_tier") or None)}
     u = node["url"].rstrip("/")
     try:
         h = _get_json(u + "/health")
@@ -219,6 +223,32 @@ def _tier_ok(node_tier, want) -> bool:
         return True
     nt = _TIER_RANK.get(node_tier, _TIER_RANK["community"])   # unknown/untiered -> least trusted, never elevated
     return nt <= _TIER_RANK[want]
+
+
+def _fleet_rank(ft):
+    """Rank of a fleet_tier on the topology HIERARCHY (orthogonal to trust): named tier via _FLEET_RANK
+    (mothership=1 highest authority), or a bare positive int verbatim ('and so on' beyond subagent). Absent
+    or unparseable -> None (callers treat None as deepest/unranked — never elevated)."""
+    if ft is None:
+        return None
+    if isinstance(ft, bool):                                  # bool is an int subclass — exclude it explicitly
+        return None
+    if isinstance(ft, int):
+        return ft if ft > 0 else None
+    s = str(ft).strip().lower()
+    if s in _FLEET_RANK:
+        return _FLEET_RANK[s]
+    return int(s) if (s.isdigit() and int(s) > 0) else None
+
+
+def _fleet_tier_ok(node_ft, want) -> bool:
+    """Exact fleet-tier (topology) discovery filter: an absent/unparseable `want` imposes no constraint;
+    otherwise the node must sit at EXACTLY that tier (compared by rank, so 'subagent' == 3). An unranked
+    node never satisfies a constrained query."""
+    wr = _fleet_rank(want)
+    if wr is None:
+        return True
+    return _fleet_rank(node_ft) == wr
 
 
 def _leaf(skill_id: str) -> str:
@@ -294,20 +324,21 @@ class FleetHandler(BaseHTTPRequestHandler):
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             skill = (qs.get("skill") or [""])[0]
             tier = (qs.get("tier") or [None])[0]
+            fleet_tier = (qs.get("fleet_tier") or [None])[0]
             want_all = (qs.get("all") or ["0"])[0] in ("1", "true", "yes")
             if not skill:
-                return self._json(400, {"error": "skill query param required", "usage": "/fleet/find?skill=<id>&tier=<core|verified|community>&all=1"})
+                return self._json(400, {"error": "skill query param required", "usage": "/fleet/find?skill=<id>&tier=<core|verified|community>&fleet_tier=<mothership|edge|subagent>&all=1"})
             matches = [n for n in fleet_roster(cfg, self_url)
                        if n.get("healthy") and any(_skill_matches(skill, rid) for rid in (n.get("skills") or []))
-                       and _tier_ok(n.get("tier"), tier)]
+                       and _tier_ok(n.get("tier"), tier) and _fleet_tier_ok(n.get("fleet_tier"), fleet_tier)]
             if want_all:
                 return self._json(200, {"skill": skill, "count": len(matches), "nodes": matches})
             if not matches:
                 return self._json(404, {"skill": skill, "url": None, "reason": "no healthy node offers this skill"})
             m = matches[0]
             return self._json(200, {"skill": skill, "url": m["url"], "node_id": m.get("node_id"),
-                                    "tier": m.get("tier"), "exec_mode": m.get("exec_mode"),
-                                    "exod_attached": m.get("exod_attached")})
+                                    "tier": m.get("tier"), "fleet_tier": m.get("fleet_tier"),
+                                    "exec_mode": m.get("exec_mode"), "exod_attached": m.get("exod_attached")})
 
         return self._json(404, {"error": "not found",
                                 "fleet_endpoints": ["/fleet/health", "/fleet/nodes", "/fleet/find?skill="]})

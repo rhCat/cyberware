@@ -47,6 +47,11 @@ curl -H "Authorization: Bearer $GOVD_TOKEN" "$ANY_NODE:8773/fleet/nodes"        
 `401`; only `/fleet/health` is open). A lone/unwired node answers with just itself, so the same call works
 fleet or no fleet. The plane only **points** — you still claim + govern on the node's `:5773`.
 
+Nodes carry a **`fleet_tier`** (mothership > edge > subagent > … — the topology hierarchy, *orthogonal* to the
+trust `tier`); narrow discovery with `&fleet_tier=<edge|subagent|…>`, and the fleet dashboard groups nodes by
+it. To give a *subagent* its own scoped, strictly-lower-tier governed node — its claims bounded to a
+least-privilege chip + ACL (a content-identity subset of yours) — claim **`cws-fleet:deploy`**.
+
 ## The loop — five steps
 
 **1 · Load this skill.** Done. It is the only cyberware doc you need to start.
@@ -67,12 +72,18 @@ status for *your* copy of each:
 | `unverified` | a **new** skill govd's image has never seen | no — add it, rebuild the image |
 | `server_drift` | govd's **own** copy of the skill fails its authenticity index — its blessing is untrustworthy | no — wait for a govd image rebuild |
 
+Skill ids are **namespaced** — `<namespace>:<name>` (e.g. `general:fs`, `cws:cws-create`), the namespace
+being the source group a skill ships under (one chip can be **composed** from several sources, so
+`general:search` and `magnumopus:search` coexist). `/catalog` returns the canonical `ns:name`. A **bare**
+name still works when exactly one namespace owns it — govd canonicalizes it — but a name two namespaces own
+is **rejected** (`ambiguous_skill_id`); namespace the claim to disambiguate.
+
 Pick a **`verified`** skill + perk — its **required/optional var-KEYS are already in the `/catalog` output
 above** (e.g. `search/grep` → `PATTERN`, `SEARCH_DIR`). That *is* the claim contract; build the ledger straight
-from it — you do **not** need any on-disk skill file to claim. The perk's `skillChip/<skill>/SKILL.md` +
+from it — you do **not** need any on-disk skill file to claim. The perk's `skillChip/<ns>/<skill>/SKILL.md` +
 `perks/<perk>/metadata.json` add only human prose (rules · usage · limitation · example) and live **where the
 skill is installed** — on disk for a source checkout, in the **container** for a body node
-(`docker exec <ct> cat /app/.cyberware/skillChip-cloud/magnumopus/<skill>/SKILL.md`), never a host mirror.
+(`docker exec <ct> cat /app/.cyberware/skillChip-cloud/<ns>/<skill>/SKILL.md`), never a host mirror.
 **The `/catalog` contract is the only reading you need to claim.**
 
 **3 · Emit the claim — that is your only output.** Your entire contribution is a small JSON form (the
@@ -107,10 +118,13 @@ the composition + TLA⁺/TLC model check, and returns one of:
   with no `--fetch-only` does all of this.)
 - **`push_back`** → a **destructive** perk needs explicit approval. Re-claim with `--approve <perk>` only
   if the destruction is intended.
-- **`reject`** → bad var key, a plaintext secret, a missing input, registry drift, a deadlock, or a claim
-  **outside your token's ACL scope** (a skill or tier you may not run, or a destructive/credentialed perk
-  your token isn't granted — an ACL denial is *not* clearable by `--approve`). Fix the *claim* — never
-  route around the refusal.
+- **`reject`** → the claim fails one of govd's **three independent gates** (each fail-closed): **VALIDATE**
+  (registry drift — your copy doesn't match the blessed hash), **ACCESS-1** (the skill's *own* `access.json`
+  policy closes it to you — `skill_remote_closed` when govd serves others and the skill hasn't opted in), or
+  **ACCESS-2** (the claim is outside your token's per-actor ACL scope — a skill/tier you may not run, or a
+  destructive/credentialed perk your token isn't granted). Plus the structural rejects — bad var key, a
+  plaintext secret, a missing input, a deadlock, or an **ambiguous** skill id (`ambiguous_skill_id` —
+  namespace it). None is clearable by `--approve`; fix the *claim* — never route around the refusal.
 
 The loop above is **cooperative** mode (the default): you run the porters+cores from your registry and
 report status only. Against a Linux **body** you can run **delegated** instead — add `--delegated`:

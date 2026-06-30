@@ -25,7 +25,7 @@ import time
 # value-free projections — ALLOWLISTS (defense in depth): a newly-added, possibly secret-bearing field is
 # excluded by default; the token / wrapper / model-check spec+log can never ride into the chain or the index.
 _SAFE_RUN_KEYS = ("ts", "skill", "perk", "decision", "destructive", "approved", "plan_sha", "var_keys",
-                  "principal", "snippet_shas", "traceparent")
+                  "principal", "cost", "snippet_shas", "traceparent")
 _SAFE_EVENT_KEYS = ("ts", "type", "step", "status", "exit", "reason", "span", "authority", "keyid",
                     "snippet_shas", "meter", "traceparent")
 
