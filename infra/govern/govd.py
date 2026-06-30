@@ -738,7 +738,9 @@ def _budget_page(roll):
     shutoff (the gate) — this is the gauge half of 'a gauge + shutoff at pricing'."""
     import html as _h
     from decimal import Decimal
-    esc = lambda s: _h.escape(str(s))
+
+    def esc(s):
+        return _h.escape(str(s))
     fleet = roll.get("fleet", {})
     body = []
     for a in roll.get("by_actor", []):
