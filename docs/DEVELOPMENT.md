@@ -123,7 +123,7 @@ v1.1 proved each piece in isolation. **v1.2 wires them into one enforced floor**
 a signed, monotone, never-root, server-executed base. The through-line — turn the *intended* kernel
 into the *enforced* kernel: the agent can only **know**; every **act** is a governed syscall the node
 cannot self-relax. The north-star userspace operator
-([netrunner-flathead](https://github.com/rhCat/netrunner-flathead), its own private repo) becomes
+(netrunner-flathead, a separate repo that is not yet public) becomes
 safe-by-construction only once the kernel boundary below it actually holds.
 
 ### Theme 1 — Tiered governance (the centerpiece)

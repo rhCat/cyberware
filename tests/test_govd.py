@@ -150,10 +150,10 @@ def test_node_name_attributes_unauthenticated_local_runs(server):
     """GOVD_NODE_NAME / cfg.node_name: an unauthenticated local-mode run is attributed to the node's fleet name
     (so the fleet control's WHO is the node), instead of the generic 'local'."""
     base, store, cfg = server
-    cfg["node_name"] = "ruis-mac-mini"
+    cfg["node_name"] = "node-a"
     try:
         _, v = claim(base, "fs", "find_large", var_keys=["SEARCH_DIR"])
-        assert store.get(v["run_id"])["principal"] == "ruis-mac-mini"     # the node's fleet name, not "local"
+        assert store.get(v["run_id"])["principal"] == "node-a"     # the node's fleet name, not "local"
     finally:
         cfg["node_name"] = None
     _, v2 = claim(base, "fs", "find_large", var_keys=["SEARCH_DIR"])

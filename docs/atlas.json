@@ -2,7 +2,7 @@
   "_meta": {
     "repo_commit": "623c121",
     "method": "putrefactio typestate (structural base) + citrinitas stated-intent + call-graph-validated declared flows \u2014 the governed magnumopus:atlas/extract perk",
-    "scope": "/Users/ruihe/hunyuan/cyberware",
+    "scope": "cyberware",
     "counts": {
       "functions": 895,
       "modules": 6,

@@ -363,7 +363,7 @@ def test_display_timezone_control_is_client_side():
 _NODES = [
     {"name": "mini", "role": "anchor", "fleet_tier": "mothership", "reachable": True, "health": {"runs": 5}, "count": 12},
     {"name": "edge-1", "role": "body", "fleet_tier": "edge", "reachable": False, "health": {}, "count": 3},
-    {"name": "scribe", "role": "body", "fleet_tier": "subagent", "reachable": True, "health": {}, "count": 24},
+    {"name": "node-a", "role": "body", "fleet_tier": "subagent", "reachable": True, "health": {}, "count": 24},
     {"name": "legacy", "role": "node", "fleet_tier": None, "reachable": None, "health": {}, "count": 0},
 ]
 _FEED = [{"node": "mini", "role": "anchor", "run_id": "r", "ts": "2026-06-29T10:00:00",
@@ -381,7 +381,7 @@ def test_sidebar_groups_nodes_by_fleet_tier():
     pos = [html.index(f'data-tier="{t}"') for t in ("mothership", "edge", "subagent", "untiered")]
     assert pos == sorted(pos)                                # tiers in hierarchy order, untiered last
     assert 'class="dot up"' in html and 'class="dot down"' in html and 'class="dot stale"' in html
-    for n in ("mini", "edge-1", "scribe", "legacy"):
+    for n in ("mini", "edge-1", "node-a", "legacy"):
         assert f'/node/{n}"' in html
     assert 'class="main"' in html and "fs/find" in html      # the runs table is still in the main column
 
@@ -389,7 +389,7 @@ def test_sidebar_groups_nodes_by_fleet_tier():
 def test_sidebar_search_and_collapse_are_client_side_and_persisted():
     html = F.render_html(_NODES, _FEED, F.risk_summary(_FEED))
     assert 'class="navsearch"' in html                       # a filter box
-    assert 'data-search="scribe body subagent"' in html      # each node carries a lowercased search haystack
+    assert 'data-search="node-a body subagent"' in html      # each node carries a lowercased search haystack
     assert "cw-nav" in html and "localStorage" in html       # state persists like the tz selector (survives refresh)
     assert "navhdr" in html and "collapsed" in html          # per-tier collapse
 
