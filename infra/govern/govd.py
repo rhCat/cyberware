@@ -52,6 +52,7 @@ from infra.govern import principals  # P1-T08: Bearer-principal auth + token-buc
 from infra.govern import skillacl     # ACCESS-1: the skill's intrinsic access policy (access.json), gate 2 of 3
 from infra.govern import tracing     # P5-T05: W3C traceparent across planes + in-toto run provenance
 from infra.tool import skill_index   # verify the registry matches its committed per-skill authenticity index
+from infra.settle import budget, credit_price   # per-actor CREDIT budget — the gauge + the pricing-stage shutoff
 import difflib             # the inconsistency path is a plain text diff — never execute a submitted plan
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -185,7 +186,8 @@ def tlc_check(bp):
     return _TLC_CACHE[key]
 
 
-def govern(ledger, cfg, *, scope=None, principal=None, local_dev=False, principal_tier=None, strict=False, now=None):
+def govern(ledger, cfg, *, scope=None, principal=None, local_dev=False, principal_tier=None, strict=False,
+           now=None, budget_enforce=False, budget_balance=None, budget_configured=False):
     """Govern a CLAIM — never payload. The agent sends skill, perk, and var KEYS (names only, no values,
     no file contents, no secrets); govd checks the claim against its OWN trusted registry and blesses a
     value-free execution PLAN (sequence + snippet hashes + wrapper), pinning its sha256. Destructiveness
@@ -295,12 +297,28 @@ def govern(ledger, cfg, *, scope=None, principal=None, local_dev=False, principa
     needs_approve = []
     if destructive and not ({perk, "destructive"} & set(approve)):
         needs_approve = [perk]
+
+    # 6. BUDGET gate — the LAST restriction (a CREDIT / shutoff gate). Price the otherwise-allowable, non-
+    #    pending claim in CREDITS and check the actor's balance (do_POST read it + passes the snapshot in;
+    #    govern stays I/O-free). A PURE restriction — only APPENDS a hard, non-self-approvable problem, never
+    #    relaxes a gate. Skipped when the claim already rejects or merely awaits approval (we don't reserve
+    #    credits for those). This snapshot check is the clean reject reason; the AUTHORITATIVE atomic debit
+    #    happens in do_POST on allow (closing the read-then-debit race).
+    cost = None
+    if budget_enforce and not problems and not needs_approve:
+        price_c = credit_price.credit_price(skill, perk, pricing=cfg.get("pricing"))
+        cost = str(price_c.amount)
+        b_ok, b_problem = budget.budget_ok(principal, price_c, budget_balance, configured=budget_configured)
+        if not b_ok:
+            problems.append(b_problem)
+
     decision = "reject" if problems else ("push_back" if needs_approve else "allow")
     return {"decision": decision, "problems": problems, "destructive": destructive,
             "skill": skill,                              # the CANONICAL ns:name govern() resolved + gated on —
             "approved": [a for a in approve if a in (perk, "destructive")],  # the record persists THIS, so every
             "plan": plan, "plan_sha": psha, "seq": plan["sequence"],         # downstream re-check keys off it too
             "tlc": tlc_msg, "tlc_tla": tlc_tla, "tlc_log": tlc_out,   # the model-check spec + full log
+            "cost": cost,                                # the value-free CREDIT price (None when unmetered)
             "needs_approve": needs_approve}
 
 
@@ -963,10 +981,24 @@ class Handler(BaseHTTPRequestHandler):
 
         scope = principals.resolve_scope(reg, pid) if reg else None
         pspec = (reg or {}).get(pid) or {}               # ACCESS-1 inputs: the principal's dev-override + trust tier
+        # BUDGET: meter only AUTHENTICATED actors (a registry present) under the rollout flag — local dev (no
+        # registry) stays unmetered. An authenticated actor must carry a `credits`/`budget` allowance, else
+        # budget_unmetered → reject (fail-closed). Read the actor's CREDIT balance (snapshot) for govern's
+        # pre-check; an unreadable balance → None → budget_ok fails closed (budget_unavailable).
+        budget_enforce = bool(cfg.get("budget_enforce")) and bool(reg)
+        budget_configured = budget_enforce and ("credits" in pspec or "budget" in pspec)
+        budget_balance = None
+        if budget_configured:
+            try:
+                budget_balance = self.server.store_backend.budget_balance(pid)
+            except Exception:
+                budget_balance = None
         try:
             v = govern(ledger, cfg, scope=scope, principal=pid,
                        local_dev=bool(pspec.get("local_dev")), principal_tier=pspec.get("tier"),
-                       strict=bool(cfg.get("acl_strict")), now=time.time())
+                       strict=bool(cfg.get("acl_strict")), now=time.time(),
+                       budget_enforce=budget_enforce, budget_balance=budget_balance,
+                       budget_configured=budget_configured)
         except Exception as e:                           # never leak a stack trace; never 500 the thread
             return self._json(400, {"error": f"govern failed: {type(e).__name__}: {e}"})
         # ACL M1: recompute the actor's acl_sha from the LIVE registry fields (never an operator-supplied field)
@@ -980,6 +1012,20 @@ class Handler(BaseHTTPRequestHandler):
         skillacl_sha = (skillacl.access_policy_sha(skillacl.load_access(v.get("skill") or ledger.get("skill")))
                         if cfg.get("skillacl_fold") else None)
         run_id = uuid.uuid4().hex[:16]
+        # BUDGET debit — the AUTHORITY (govern's check was against a snapshot). On allow, atomically re-check +
+        # debit the actor's balance; if a concurrent claim moved it (lost the race) or the store is unreadable,
+        # flip to reject — so two same-actor claims can never both pass when only one fits. Idempotent per RUN
+        # (run_id), NOT per plan (two runs of one perk share a plan_sha — each must be charged).
+        if v["decision"] == "allow" and budget_enforce and budget_configured and v.get("cost"):
+            from infra.settle.money import Money
+            try:
+                deb = self.server.store_backend.budget_debit_atomic(pid, Money(v["cost"], "CREDITS"), "usage:" + run_id)
+            except Exception:
+                deb = {"ok": False, "balance": None}
+            if not deb.get("ok"):
+                v["decision"] = "reject"
+                v["problems"] = (v.get("problems") or []) + [{"id": "insufficient_credits",
+                                 "detail": {"reason": "raced_or_unavailable", "balance": deb.get("balance")}}]
         # a per-run session token — the run's private credential (like a bank session). Issued once, here,
         # only to the caller; required to open the WS or read the ledger for this run.
         token = secrets.token_urlsafe(32) if v["decision"] == "allow" else None
@@ -995,7 +1041,7 @@ class Handler(BaseHTTPRequestHandler):
         # signed exod grant, sandbox materialization, and the in-toto subject ALL re-read record["skill"], so a
         # bare here would re-resolve independently (TOCTOU) and never carry the ':' the ns:* wildcard needs.
         record = {"run_id": run_id, "ts": now(), "skill": v.get("skill") or ledger.get("skill"), "perk": ledger.get("perk"),
-                  "principal": pid, "token": token, "var_keys": var_keys, "decision": v["decision"],
+                  "principal": pid, "cost": v.get("cost"), "token": token, "var_keys": var_keys, "decision": v["decision"],
                   "traceparent": traceparent,
                   "destructive": v.get("destructive", False), "approved": v.get("approved", []),
                   "acl_sha": acl_sha,                       # ACL M1: bound into the delegated grant (None = unscoped)
@@ -1011,7 +1057,7 @@ class Handler(BaseHTTPRequestHandler):
             store.remember(run_id, record)               # in the monitor (ledger + plan + problems), not on disk
         # every decision (incl. push_back/reject) is logged for the monitor — metadata only, no token
         store.record_decision({"run_id": run_id, "ts": record["ts"], "skill": record["skill"],
-                               "perk": record["perk"], "principal": pid, "decision": v["decision"],
+                               "perk": record["perk"], "principal": pid, "cost": v.get("cost"), "decision": v["decision"],
                                "destructive": v.get("destructive", False), "var_keys": var_keys,
                                "plan_sha": (v.get("plan_sha") or "")[:12], "tlc": v.get("tlc"),
                                "problems": [p.get("id") for p in v.get("problems", [])],
@@ -1230,6 +1276,23 @@ def serve(cfg):
     httpd.rate_buckets = {}                               # P1-T08: per-principal token-bucket state (in-memory)
     _load_exec_mode(cfg, httpd)                           # P2-T12: cooperative (client-side) | delegated (exod limb)
     httpd.lease = _lease.maybe_enable_ha(cfg, store)      # P5-T04: active-passive single-writer lease (off unless configured)
+    # BUDGET: a dedicated backend for the per-actor CREDIT ledger — shares the store db (so the balance is
+    # actor-wide under a shared/HA store) but its own connection (never contends with the index writer). Load
+    # the negotiable pricing once, and seed each configured principal's opening CREDIT allowance (idempotent).
+    httpd.store_backend = None
+    try:
+        from infra.store import backend as _sb
+        from infra.settle import price as _price
+        from infra.settle.money import Money as _Money
+        httpd.store_backend = _sb.make_backend(store.root, cfg)
+        cfg.setdefault("pricing", _price.load_pricing())
+        for _pid, _spec in (cfg.get("principals") or {}).items():
+            _allow = _spec.get("credits") if isinstance(_spec, dict) else None
+            if _allow is not None:
+                httpd.store_backend.budget_post(_pid, _Money(str(_allow), "CREDITS"),
+                                                memo="seed:" + _pid, idem="seed:" + _pid)
+    except Exception as e:                                # budget stays inert if the backend/seed can't init
+        print(f"  [budget] ledger init skipped: {type(e).__name__}: {e}", file=sys.stderr)
     dash_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
     print(f"govd · {cfg['mode']} · http://{host}:{port}  ·  ws://{host}:{port}/oversight")
     prov = chip_provenance()

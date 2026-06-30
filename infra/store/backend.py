@@ -54,6 +54,14 @@ class StoreBackend:
     def release_lease(self, lease_id, holder_id) -> dict: raise NotImplementedError
     def lease_holder(self, lease_id, now=None): raise NotImplementedError  # current non-expired holder | None
 
+    # per-actor CREDIT budget over the SHARED store — the same atomic primitive as the lease. budget_debit_atomic
+    # is a single serialized check-and-debit so two concurrent same-actor claims can never both pass when only
+    # one fits (and across two HA instances on one shared db). Amounts are exact-decimal CREDITS strings.
+    def budget_balance(self, actor): raise NotImplementedError             # Money(CREDITS); zero if never seeded
+    def budget_post(self, actor, delta, memo, idem) -> dict: raise NotImplementedError   # idempotent append (seed/topup)
+    def budget_debit_atomic(self, actor, price, idem) -> dict: raise NotImplementedError  # {ok, balance} — serialized
+    def budget_rows(self, actor) -> list: raise NotImplementedError
+
 
 class SqliteWalBackend(StoreBackend):
     """Default tier — local sqlite in WAL mode. Always configured; no server needed."""
@@ -216,6 +224,74 @@ class SqliteWalBackend(StoreBackend):
         if row is None or row[1] is None or row[1] <= now:             # unclaimed or expired → no live holder
             return None
         return row[0]
+
+    # ── per-actor CREDIT budget — atomic check-and-debit via BEGIN IMMEDIATE (same primitive as the lease) ──
+    def _ensure_budget(self):
+        with self._lock:
+            self.cx.execute("""CREATE TABLE IF NOT EXISTS budget_ledger(
+                id INTEGER PRIMARY KEY AUTOINCREMENT, actor TEXT NOT NULL, delta TEXT NOT NULL,
+                memo TEXT, idem TEXT UNIQUE, ts REAL)""")
+            self.cx.execute("CREATE INDEX IF NOT EXISTS idx_budget_actor ON budget_ledger(actor)")
+
+    def _budget_sum(self, deltas):                                     # exact-decimal fold (never a float SUM)
+        from infra.settle.money import Money
+        bal = Money.zero("CREDITS")
+        for (d,) in deltas:
+            bal = bal + Money(d, "CREDITS")
+        return bal
+
+    def budget_balance(self, actor):
+        with self._lock:
+            self._ensure_budget()
+            rows = self.cx.execute("SELECT delta FROM budget_ledger WHERE actor=?", (actor,)).fetchall()
+        return self._budget_sum(rows)
+
+    def budget_post(self, actor, delta, memo, idem) -> dict:
+        import time as _t
+        with self._lock:
+            self.cx.execute("BEGIN IMMEDIATE")
+            try:
+                self._ensure_budget()
+                dup = self.cx.execute("SELECT 1 FROM budget_ledger WHERE idem=?", (idem,)).fetchone() is not None
+                if not dup:
+                    self.cx.execute("INSERT INTO budget_ledger(actor, delta, memo, idem, ts) VALUES(?,?,?,?,?)",
+                                    (actor, str(delta.amount), memo, idem, _t.time()))
+                rows = self.cx.execute("SELECT delta FROM budget_ledger WHERE actor=?", (actor,)).fetchall()
+                self.cx.execute("COMMIT")
+            except Exception:
+                self.cx.execute("ROLLBACK"); raise
+        return {"status": "duplicate" if dup else "posted", "balance": str(self._budget_sum(rows).amount)}
+
+    def budget_debit_atomic(self, actor, price, idem) -> dict:
+        # re-read the balance and debit ONLY if it still fits — all inside ONE BEGIN IMMEDIATE, so two racing
+        # same-actor debits serialize (one wins, the loser gets ok:False). Idempotent on idem (plan_sha).
+        import time as _t
+        with self._lock:
+            self.cx.execute("BEGIN IMMEDIATE")
+            try:
+                self._ensure_budget()
+                dup = self.cx.execute("SELECT 1 FROM budget_ledger WHERE idem=?", (idem,)).fetchone() is not None
+                rows = self.cx.execute("SELECT delta FROM budget_ledger WHERE actor=?", (actor,)).fetchall()
+                bal = self._budget_sum(rows)
+                if dup:
+                    self.cx.execute("COMMIT")
+                    return {"ok": True, "duplicate": True, "balance": str(bal.amount)}
+                if bal < price:
+                    self.cx.execute("COMMIT")
+                    return {"ok": False, "balance": str(bal.amount)}
+                self.cx.execute("INSERT INTO budget_ledger(actor, delta, memo, idem, ts) VALUES(?,?,?,?,?)",
+                                (actor, str((-price).amount), "usage:" + idem, idem, _t.time()))
+                self.cx.execute("COMMIT")
+                return {"ok": True, "balance": str((bal - price).amount)}
+            except Exception:
+                self.cx.execute("ROLLBACK"); raise
+
+    def budget_rows(self, actor) -> list:
+        with self._lock:
+            self._ensure_budget()
+            rows = self.cx.execute("SELECT actor, delta, memo, idem, ts FROM budget_ledger WHERE actor=? "
+                                   "ORDER BY id", (actor,)).fetchall()
+        return [{"actor": r[0], "delta": r[1], "memo": r[2], "idem": r[3], "ts": r[4]} for r in rows]
 
 
 class PsycopgBackend(StoreBackend):
@@ -391,6 +467,64 @@ class PsycopgBackend(StoreBackend):
         if r is None or r[1] is None or r[1] <= now:
             return None
         return r[0]
+
+    # ── per-actor CREDIT budget — atomic check-and-debit via a txn + per-actor advisory lock ──
+    def _ensure_budget(self):
+        with self.cx.cursor() as c:
+            c.execute("""CREATE TABLE IF NOT EXISTS budget_ledger(
+                id BIGSERIAL PRIMARY KEY, actor TEXT NOT NULL, delta TEXT NOT NULL,
+                memo TEXT, idem TEXT UNIQUE, ts DOUBLE PRECISION)""")
+            c.execute("CREATE INDEX IF NOT EXISTS idx_budget_actor ON budget_ledger(actor)")
+
+    def budget_balance(self, actor):
+        if not self.configured():
+            return None                                                # unreadable -> budget_ok fails closed
+        from infra.settle.money import Money
+        self._ensure_budget()
+        with self.cx.cursor() as c:
+            c.execute("SELECT COALESCE(SUM(delta::numeric),0)::text FROM budget_ledger WHERE actor=%s", (actor,))
+            r = c.fetchone()
+        return Money(r[0] if r else "0", "CREDITS")                    # NUMERIC sum is EXACT in Postgres (no float)
+
+    def budget_post(self, actor, delta, memo, idem) -> dict:
+        from infra.settle.money import Money
+        self._ensure_budget()
+        with self.cx.transaction():
+            with self.cx.cursor() as c:
+                c.execute("INSERT INTO budget_ledger(actor, delta, memo, idem, ts) "
+                          "VALUES(%s,%s,%s,%s, EXTRACT(EPOCH FROM now())) ON CONFLICT(idem) DO NOTHING RETURNING id",
+                          (actor, str(delta.amount), memo, idem))
+                posted = c.fetchone() is not None
+                c.execute("SELECT COALESCE(SUM(delta::numeric),0)::text FROM budget_ledger WHERE actor=%s", (actor,))
+                bal = c.fetchone()[0]
+        return {"status": "posted" if posted else "duplicate", "balance": str(Money(bal, "CREDITS").amount)}
+
+    def budget_debit_atomic(self, actor, price, idem) -> dict:
+        from infra.settle.money import Money
+        self._ensure_budget()
+        with self.cx.transaction():
+            with self.cx.cursor() as c:
+                c.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (actor,))    # serialize per-actor debits
+                c.execute("SELECT 1 FROM budget_ledger WHERE idem=%s", (idem,))
+                dup = c.fetchone() is not None
+                c.execute("SELECT COALESCE(SUM(delta::numeric),0)::text FROM budget_ledger WHERE actor=%s", (actor,))
+                bal = Money(c.fetchone()[0], "CREDITS")
+                if dup:
+                    return {"ok": True, "duplicate": True, "balance": str(bal.amount)}
+                if bal < price:
+                    return {"ok": False, "balance": str(bal.amount)}
+                c.execute("INSERT INTO budget_ledger(actor, delta, memo, idem, ts) "
+                          "VALUES(%s,%s,%s,%s, EXTRACT(EPOCH FROM now()))",
+                          (actor, str((-price).amount), "usage:" + idem, idem))
+                return {"ok": True, "balance": str((bal - price).amount)}
+
+    def budget_rows(self, actor) -> list:
+        if not self.configured():
+            return []
+        self._ensure_budget()
+        with self.cx.cursor() as c:
+            c.execute("SELECT actor, delta, memo, idem, ts FROM budget_ledger WHERE actor=%s ORDER BY id", (actor,))
+            return [{"actor": r[0], "delta": r[1], "memo": r[2], "idem": r[3], "ts": r[4]} for r in c.fetchall()]
 
 
 def make_backend(root, config: dict = None) -> StoreBackend:
