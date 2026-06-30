@@ -1,23 +1,23 @@
 {
   "_meta": {
-    "generated": "2026-06-27",
-    "repo_commit": "853a3cf",
+    "generated": "2026-06-29",
+    "repo_commit": "4cc160f",
     "method": "citrinitas intent-alignment + putrefactio/alembic structural layer; 6 module extractors + 4 doc extractors + 1 gap synth (workflow)",
     "scope": "core governance kernel: infra/{govern,exec,cwp,store,settle,tool} vs SKILL.md/README.md/index.html/docs/*",
     "counts": {
-      "functions": 319,
-      "flows": 53,
+      "functions": 335,
+      "flows": 56,
       "documents": 14,
       "documented": 74,
       "partial": 1,
       "undocumented": 0
     },
-    "note": "intent atlas of CODE + DOCS; coverage re-judged after the doc-gap fill (settlement.md + architecture.md sections + acl/backend doc fixes)"
+    "note": "intent atlas of CODE + DOCS; updated for the fleet-management layer \u2014 the fleet_tier topology hierarchy (orthogonal to the trust tier) in fleetd, the hierarchical + searchable fleetdash side-nav, and the cws-fleet skill (a subagent's scoped GOVERNANCE domain: strictly-lower-tier spawns gated by a content-identity chip/ACL subset). Prior: the namespaced multi-chip registry + compose + the three govern gates (VALIDATE / ACCESS-1 / ACCESS-2)."
   },
   "module_summaries": [
     {
       "module": "infra/govern",
-      "summary": "The cyberware governance control/audit plane: govern a value-free CLAIM, bless a hashed execution plan, gate each WS step (plan-hash + upstream + per-actor ACL), delegate confined execution to exod, and record server-owned provenance \u2014 never seeing data, never executing.",
+      "summary": "The cyberware governance control/audit plane: govern a value-free CLAIM through THREE independent fail-closed gates \u2014 VALIDATE (authenticity) / ACCESS-1 (the skill's own access.json policy, skillacl.py) / ACCESS-2 (the per-actor token ACL, principals.py, with an ns:* wildcard) \u2014 bless a value-free plan, monitor it over a per-run WS, and re-bind authority on every in-flight step (step_reauthorize). It never sees data and never runs code.",
       "n_functions": 61,
       "n_flows": 9
     },
@@ -47,7 +47,7 @@
     },
     {
       "module": "infra/tool (tool)",
-      "summary": "Chip tooling: pins skills to sha256 indexes + a roll-up chip_sha (authenticity gate), resolves the manifest-authoritative load set, builds the value-free discovery catalog, compiles/verifies standalone cartridges, runs in-skill governed tests, scaffolds new skills, and self-monitors the engine against redeemable evidence.",
+      "summary": "Chip tooling: pins skills to sha256 indexes + a roll-up chip_sha (authenticity gate), resolves the manifest-authoritative load set, builds the value-free discovery catalog, compiles/verifies standalone cartridges, runs in-skill governed tests, scaffolds new skills, and self-monitors the engine against redeemable evidence. compose.py merges multiple source chips into one namespaced composed chip (hard-error reconciliation on an exact ns:name duplicate); skill_index pins the v2 namespaced manifest (ns:name keys, placement-invariant skill_sha).",
       "n_functions": 41,
       "n_flows": 7
     }
@@ -719,6 +719,48 @@
         "check_mutation"
       ],
       "intent": "Grade the engine against redeemable evidence: deadlock-free blueprints, hash authenticity, no scaffold stubs, relocatable porters, and a mutation-coverage ratchet that may only rise."
+    },
+    {
+      "module": "infra/tool (tool)",
+      "name": "compose->reconcile->verify->serve",
+      "sequence": [
+        "scan_skills",
+        "plan",
+        "ComposeConflict?",
+        "compiled_skill_dst",
+        "copytree",
+        "write_manifest",
+        "_full_verify",
+        "atomic_swap"
+      ],
+      "intent": "Multi-source compose: place each source's skills by namespace, HARD-ERROR on an exact ns:name dup (manual reconciliation), re-pin + full-verify the composed v2 chip, atomic-swap into place."
+    },
+    {
+      "module": "infra/govern",
+      "name": "three-gate govern",
+      "sequence": [
+        "canonicalize",
+        "VALIDATE:verify_skill",
+        "build_plan",
+        "ACCESS-2:acl_allows",
+        "ACCESS-1:access_allows",
+        "decide"
+      ],
+      "intent": "The claim is gated by THREE independent fail-closed ANDs: VALIDATE (the skill's files match its committed index), ACCESS-1 (the skill's own access.json policy), ACCESS-2 (the per-actor token ACL). Re-bound at step time by step_reauthorize."
+    },
+    {
+      "module": "infra/govern",
+      "name": "fleet_tier hierarchy: declare->rank->discover->group",
+      "sequence": [
+        "_self_descriptor",
+        "_probe",
+        "_fleet_rank",
+        "_fleet_tier_ok",
+        "fleet_roster",
+        "_node_groups",
+        "_sidebar"
+      ],
+      "intent": "The fleet_tier topology hierarchy (orthogonal to trust): nodes self-declare fleet_tier in the roster; fleetd carries it through _self_descriptor/_probe and rank-filters /fleet/find; fleetdash groups the side-nav by it. It is the axis cws-fleet:deploy contains against \u2014 a node may spawn only a STRICTLY-lower fleet_tier subagent with a content-identity (skill_sha) chip + ACL subset of its own."
     }
   ],
   "functions": [
@@ -726,9 +768,9 @@
       "module": "infra/govern",
       "name": "govern",
       "file": "infra/govern/govd.py",
-      "line": 186,
-      "signature": "govern(ledger, cfg, *, scope=None, strict=False, now=None) -> dict",
-      "intent": "Govern a CLAIM (keys only); bless a value-free plan; gate destructive+ACL",
+      "line": 187,
+      "signature": "govern(ledger, cfg, *, scope=None, principal=None, local_dev=False, principal_tier=None, strict=False, now=None) -> dict",
+      "intent": "Govern a CLAIM (keys only): canonicalize the skill id, then THREE independent fail-closed gates \u2014 VALIDATE (authenticity) / ACCESS-1 (skill access.json) / ACCESS-2 (per-actor ACL) \u2014 bless a value-free plan",
       "flow_role": "step 2 of claim->govern->grant->exec->sign",
       "public": true
     },
@@ -3911,6 +3953,162 @@
       "intent": "CLI: run all self-monitor checks and enforce policy (exit 1 on fail)",
       "flow_role": "CLI entry to self-monitor gate",
       "public": true
+    },
+    {
+      "module": "infra",
+      "name": "parse_skill_id",
+      "file": "infra/registry.py",
+      "line": 56,
+      "signature": "parse_skill_id(skill_id) -> (namespace|None, name|None)",
+      "intent": "Split a skill id into (ns, name): one ':' -> (ns,name); zero -> (None,name); >=2/non-str -> (None,None)",
+      "flow_role": "namespace addressing \u2014 split before the per-segment gate",
+      "public": true
+    },
+    {
+      "module": "infra",
+      "name": "canonicalize",
+      "file": "infra/registry.py",
+      "line": 70,
+      "signature": "canonicalize(skill_id, chip=None) -> str",
+      "intent": "Bare claim -> ns:name iff EXACTLY ONE namespace owns it; >=2 -> AMBIGUOUS (never first-source-wins); flat/unknown -> unchanged",
+      "flow_role": "the back-compat shim govd applies before governing a bare claim",
+      "public": true
+    },
+    {
+      "module": "infra",
+      "name": "skill_dir",
+      "file": "infra/registry.py",
+      "line": 93,
+      "signature": "skill_dir(skill, chip=None) -> str",
+      "intent": "Resolve a skill id to its dir: namespaced -> <chip>/<ns>/<name>; bare -> flat or unique-owner; ambiguous/unknown -> fail-closed sentinel",
+      "flow_role": "path resolution (read), fail-closed",
+      "public": true
+    },
+    {
+      "module": "infra",
+      "name": "compiled_skill_dst",
+      "file": "infra/registry.py",
+      "line": 142,
+      "signature": "compiled_skill_dst(skill, out_dir) -> str",
+      "intent": "WRITE-path dir for a skill being compiled/composed: ns:name -> <out>/<ns>/<name>, bare -> flat; structural, never the fail-closed resolver",
+      "flow_role": "compose/cartridge placement (write)",
+      "public": true
+    },
+    {
+      "module": "infra",
+      "name": "source_groups",
+      "file": "infra/registry.py",
+      "line": 25,
+      "signature": "source_groups(chip=None) -> list",
+      "intent": "The chip's namespace dirs \u2014 immediate subdirs that themselves hold skills (cws/, general/, llm/, nvidia/, ...)",
+      "flow_role": "namespace enumeration",
+      "public": true
+    },
+    {
+      "module": "infra/tool (tool)",
+      "name": "compose",
+      "file": "infra/tool/compose.py",
+      "line": 113,
+      "signature": "compose(sources, out_dir, *, validate_sources=True) -> dict",
+      "intent": "Merge N source chips into one composed chip, each skill placed by namespace; exact ns:name dup -> HARD ERROR; temp-dir build + atomic swap; re-pins the v2 manifest",
+      "flow_role": "multi-chip compose \u2014 step 1 of compose->verify->serve",
+      "public": true
+    },
+    {
+      "module": "infra/tool (tool)",
+      "name": "plan",
+      "file": "infra/tool/compose.py",
+      "line": 77,
+      "signature": "plan(sources) -> (placements, conflicts)",
+      "intent": "Resolve every source skill to its composed id + DETECT exact-dup conflicts (FS-fold keyed) BEFORE any write",
+      "flow_role": "compose conflict detection (fail-closed, pre-write)",
+      "public": true
+    },
+    {
+      "module": "infra/govern",
+      "name": "access_allows",
+      "file": "infra/govern/skillacl.py",
+      "line": 53,
+      "signature": "access_allows(access, *, mode, is_local_dev=False, principal=None, principal_tier=None, perk=None, enforce_default_closed=False) -> (ok, problem|None)",
+      "intent": "ACCESS-1: the skill-intrinsic access.json gate \u2014 local-open / remote-closed (behind skillacl_enforce); declared policy always enforced; fail-closed",
+      "flow_role": "gate 2 of 3 (VALIDATE / ACCESS-1 / ACCESS-2), in govern() + step_reauthorize",
+      "public": true
+    },
+    {
+      "module": "infra/govern",
+      "name": "load_access",
+      "file": "infra/govern/skillacl.py",
+      "line": 33,
+      "signature": "load_access(skill, chip=None) -> dict|None",
+      "intent": "The skill's access.json policy, or None when absent (the flag-governed default); malformed -> CLOSED sentinel",
+      "flow_role": "ACCESS-1 policy load",
+      "public": true
+    },
+    {
+      "module": "infra/govern",
+      "name": "access_policy_sha",
+      "file": "infra/govern/skillacl.py",
+      "line": 76,
+      "signature": "access_policy_sha(access) -> str",
+      "intent": "Stable sha of the effective access policy; recorded as skillacl_sha (behind skillacl_fold) for exod's off-node re-check (Step 7)",
+      "flow_role": "ACCESS-1 provenance fold",
+      "public": true
+    },
+    {
+      "module": "infra/govern",
+      "name": "step_reauthorize",
+      "file": "infra/govern/govd.py",
+      "line": 602,
+      "signature": "step_reauthorize(cfg, rec0, *, now=None) -> (ok, reason|None)",
+      "intent": "Re-bind authority on an IN-FLIGHT step to the live registry + skill policy: re-run ACCESS-2 (needs the registry) AND ACCESS-1 (skill-intrinsic, registry-independent)",
+      "flow_role": "step-time re-governance \u2014 binds revocation / tightened policy mid-run",
+      "public": true
+    },
+    {
+      "module": "infra/govern",
+      "name": "_skill_listed",
+      "file": "infra/govern/principals.py",
+      "line": 103,
+      "signature": "_skill_listed(skill, skills) -> bool",
+      "intent": "ACCESS-2 skill match: exact ns:name, the per-namespace ns:* wildcard, OR a legacy bare leaf (pre-cutover back-compat)",
+      "flow_role": "per-actor ACL skill match",
+      "public": false
+    },
+    {
+      "module": "infra/govern",
+      "name": "_fleet_rank",
+      "file": "infra/govern/fleetd.py",
+      "line": 228,
+      "signature": "_fleet_rank(ft) -> int | None",
+      "intent": "Rank a node's fleet_tier on the topology HIERARCHY (mothership=1 > edge=2 > subagent=3 > \u2026 \u2014 lower rank = higher authority; bare positive ints allowed beyond subagent). ORTHOGONAL to the trust tier; unknown/absent -> None (an unranked node is never elevated).",
+      "flow_role": "fleet-tier hierarchy"
+    },
+    {
+      "module": "infra/govern",
+      "name": "_fleet_tier_ok",
+      "file": "infra/govern/fleetd.py",
+      "line": 244,
+      "signature": "_fleet_tier_ok(node_ft, want) -> bool",
+      "intent": "Exact fleet-tier discovery filter for /fleet/find?fleet_tier=: an absent/unparseable `want` imposes no constraint; otherwise the node must sit at EXACTLY that tier (compared by rank). An unranked node never satisfies a constrained query.",
+      "flow_role": "fleet discovery"
+    },
+    {
+      "module": "infra/tool",
+      "name": "_node_groups",
+      "file": "infra/tool/fleetdash.py",
+      "line": 507,
+      "signature": "_node_groups(results) -> list[(fleet_tier, [node, ...])]",
+      "intent": "Group fleet-dashboard nodes by fleet_tier in hierarchy order (mothership -> edge -> subagent -> deeper -> untiered last) for the side-nav.",
+      "flow_role": "fleet dashboard"
+    },
+    {
+      "module": "infra/tool",
+      "name": "_sidebar",
+      "file": "infra/tool/fleetdash.py",
+      "line": 520,
+      "signature": "_sidebar(results) -> str",
+      "intent": "Render the hierarchical, searchable node side-nav: a filter box + nodes grouped under collapsible fleet-tier headers with up/down/stale status dots and run counts. Client-side search + per-tier collapse persist in localStorage ('cw-nav') across the 5s refresh.",
+      "flow_role": "fleet dashboard"
     }
   ],
   "documents": [

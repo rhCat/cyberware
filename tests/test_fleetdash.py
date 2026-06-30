@@ -359,3 +359,82 @@ def test_display_timezone_control_is_client_side():
     assert 'id="tzsel"' in page and ">Local<" in page and ">UTC<" in page  # the selector (browser-local default)
     assert "localStorage.setItem" in page and "toLocaleString" in page    # client-side conversion + persistence
     assert "<th>when</th>" in page and "when (utc)" not in page            # header relabeled (tz now selectable)
+# ── the hierarchical, searchable side-nav (the home page node nav) ──
+_NODES = [
+    {"name": "mini", "role": "anchor", "fleet_tier": "mothership", "reachable": True, "health": {"runs": 5}, "count": 12},
+    {"name": "edge-1", "role": "body", "fleet_tier": "edge", "reachable": False, "health": {}, "count": 3},
+    {"name": "scribe", "role": "body", "fleet_tier": "subagent", "reachable": True, "health": {}, "count": 24},
+    {"name": "legacy", "role": "node", "fleet_tier": None, "reachable": None, "health": {}, "count": 0},
+]
+_FEED = [{"node": "mini", "role": "anchor", "run_id": "r", "ts": "2026-06-29T10:00:00",
+          "skill": "fs", "perk": "find", "principal": "mini", "decision": "allow", "authority": "blessed"}]
+
+
+def test_node_groups_orders_hierarchy_then_untiered_last():
+    order = [ft for ft, _ in F._node_groups(_NODES)]
+    assert order == ["mothership", "edge", "subagent", None]      # rank 1<2<3, untiered (None) last
+
+
+def test_sidebar_groups_nodes_by_fleet_tier():
+    html = F.render_html(_NODES, _FEED, F.risk_summary(_FEED))
+    assert '<aside class="sidebar">' in html and 'class="layout"' in html and 'class="chips"' not in html
+    pos = [html.index(f'data-tier="{t}"') for t in ("mothership", "edge", "subagent", "untiered")]
+    assert pos == sorted(pos)                                # tiers in hierarchy order, untiered last
+    assert 'class="dot up"' in html and 'class="dot down"' in html and 'class="dot stale"' in html
+    for n in ("mini", "edge-1", "scribe", "legacy"):
+        assert f'/node/{n}"' in html
+    assert 'class="main"' in html and "fs/find" in html      # the runs table is still in the main column
+
+
+def test_sidebar_search_and_collapse_are_client_side_and_persisted():
+    html = F.render_html(_NODES, _FEED, F.risk_summary(_FEED))
+    assert 'class="navsearch"' in html                       # a filter box
+    assert 'data-search="scribe body subagent"' in html      # each node carries a lowercased search haystack
+    assert "cw-nav" in html and "localStorage" in html       # state persists like the tz selector (survives refresh)
+    assert "navhdr" in html and "collapsed" in html          # per-tier collapse
+
+
+def test_sidebar_handles_empty_roster():
+    html = F.render_html([], [], F.risk_summary([]))
+    assert "no nodes in the roster" in html and '<aside class="sidebar">' in html
+
+
+# ── fleet credit accounting (the accountant pages: fleet + individual) ──
+_ACCT_FEED = [
+    {"node": "mini", "role": "anchor", "principal": "alice", "skill": "fs", "perk": "find",
+     "decision": "allow", "cost": "1.0000", "ts": "2026-06-29T10:00:00", "run_id": "r1", "authority": "blessed"},
+    {"node": "mini", "role": "anchor", "principal": "alice", "skill": "fs", "perk": "archive",
+     "decision": "allow", "cost": "2.0000", "ts": "2026-06-29T10:01:00", "run_id": "r2", "authority": "blessed"},
+    {"node": "edge", "role": "body", "principal": "bob", "skill": "http", "perk": "get",
+     "decision": "allow", "cost": "1.0000", "ts": "2026-06-29T10:02:00", "run_id": "r3", "authority": "blessed"},
+    {"node": "mini", "role": "anchor", "principal": "alice", "skill": "fs", "perk": "rm",
+     "decision": "reject", "cost": None, "ts": "2026-06-29T10:03:00", "run_id": "r4", "authority": "—"},
+]
+
+
+def test_spend_rollup_sums_cost_by_actor_across_fleet():
+    by = {r["actor"]: r for r in F._spend_rollup(_ACCT_FEED)}
+    assert by["alice"]["spent"] == "3.0000" and by["alice"]["allows"] == 2 and by["alice"]["runs"] == 3
+    assert by["bob"]["spent"] == "1.0000" and by["bob"]["nodes"] == 1
+    assert F._spend_rollup(_ACCT_FEED)[0]["actor"] == "alice"        # sorted by spend desc
+
+
+def test_render_accounting_fleet_total_and_per_actor_gauges():
+    html = F.render_accounting(_ACCT_FEED)
+    assert "fleet accounting" in html and "<b>4.0000</b>" in html    # fleet-wide total spend
+    assert html.count('class="gfill"') == 2                          # one gauge bar per actor (a reject adds no actor)
+    assert "/principal/alice" in html and "/principal/bob" in html
+    assert ">3.0000<" in html                                        # alice's spend (the cost-None reject excluded)
+
+
+def test_render_principal_individual_account():
+    html = F.render_principal("alice", _ACCT_FEED)
+    assert "alice — credit account" in html
+    assert "spent across the fleet: <b>3.0000</b>" in html
+    assert "fs/archive" in html and "fs/rm" in html                  # all of alice's runs (incl. the rejected one)
+
+
+def test_home_links_to_accounting():
+    html = F.render_html([{"name": "n", "role": "node", "reachable": True, "health": {}, "count": 0,
+                           "fleet_tier": "edge"}], _ACCT_FEED, F.risk_summary(_ACCT_FEED))
+    assert 'href="/accounting"' in html

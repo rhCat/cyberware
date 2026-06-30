@@ -100,6 +100,42 @@ def acl_sha(pid: str, tok_sha: str, acl) -> str:
     return hashlib.sha256(acl_canonical(pid, tok_sha, acl).encode()).hexdigest()
 
 
+def _skill_listed(skill, skills) -> bool:
+    """Is a canonical `skill` (bare or `ns:name`) present in an ACL `skills` list — by EXACT id, by the
+    per-namespace wildcard `ns:*` (every skill in that namespace), OR by its BARE LEAF (a legacy pre-namespace
+    ACL entry `fs` admits the canonical claim `general:fs`)? The bare `*` super-wildcard is handled by the
+    caller. Fail-closed on a non-list.
+
+    Back-compat note: the leaf fallback keeps every ACL minted BEFORE the namespace cutover working unchanged.
+    Its only widening is that a legacy bare entry `fs` would also admit a DIFFERENT namespace's same-leaf skill
+    (`magnumopus:fs`) — but such a claim must be EXPLICITLY namespaced to even reach here (a bare `fs` claim is
+    rejected as ambiguous when >=2 namespaces own the leaf), and no leaf is shared across namespaces today.
+    Operators importing a colliding leaf should namespace the ACL entry (`general:fs`) for precision."""
+    if not isinstance(skills, list):
+        return False
+    if skill in skills:
+        return True
+    if ":" in skill:
+        ns, name = skill.split(":", 1)
+        return (ns + ":*") in skills or name in skills    # ns:* wildcard, OR a legacy bare-leaf entry
+    return False
+
+
+def _pmap_entry(skill, pmap):
+    """The perks list an ACL perks-map binds to a canonical `skill` — by EXACT id, then by BARE leaf (a legacy
+    pre-namespace perks-map `{"fs": [...]}` governs the canonical claim `general:fs`). Returns (key, perks) or
+    (None, None). Same back-compat semantics + caveat as `_skill_listed`."""
+    if not isinstance(pmap, dict):
+        return None, None
+    if skill in pmap:
+        return skill, pmap[skill]
+    if ":" in skill:
+        leaf = skill.split(":", 1)[1]
+        if leaf in pmap:
+            return leaf, pmap[leaf]
+    return None, None
+
+
 def acl_allows(acl, skill, perk, perk_tier, destructive, credentialed, *, now=None, strict=False):
     """(ok, problem|None) for a CANONICAL (skill, perk) claim under an actor scope `acl`. Deny-by-default
     when an acl is present; under `strict` an absent acl denies too (the Phase-B end-state). Every branch
@@ -116,12 +152,13 @@ def acl_allows(acl, skill, perk, perk_tier, destructive, credentialed, *, now=No
         return False, {"id": "acl_expired", "detail": exp}
     skills = acl.get("skills")
     pmap = acl.get("perks") or {}
-    allowed_skill = (skills == ["*"]) or (skills is not None and skill in skills) or (skill in pmap)
+    pkey, pperks = _pmap_entry(skill, pmap)                       # canonical id OR legacy bare leaf
+    allowed_skill = (skills == ["*"]) or _skill_listed(skill, skills) or (pkey is not None)
     if not allowed_skill:
         return False, {"id": "acl_skill_denied", "detail": f"{skill}/{perk}"}
-    if skill in pmap and perk not in pmap[skill]:                 # perks[skill] is AUTHORITATIVE for that skill
+    if pkey is not None and perk not in pperks:                   # perks[skill] is AUTHORITATIVE for that skill
         return False, {"id": "acl_perk_denied", "detail": f"{skill}/{perk}"}
-    if destructive and not (skill in pmap and perk in pmap[skill]):   # a bare-skill grant never admits destructive
+    if destructive and not (pkey is not None and perk in pperks):     # a bare-skill grant never admits destructive
         return False, {"id": "acl_destructive_unlisted", "detail": f"{skill}/{perk}"}
     if credentialed and not acl.get("secrets"):                  # the secret axis: may this token reach creds?
         return False, {"id": "acl_secret_denied", "detail": f"{skill}/{perk}"}

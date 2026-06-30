@@ -95,11 +95,13 @@ def llm_cost(in_tokens: int, out_tokens: int, rate: dict) -> Money:
 
 def tool_fee(skill: str, perk: str, pricing: dict) -> Money:
     """The tool's pay route: gov-provider fee (pricing.json, by 'skill/perk' then 'skill'), else the skill's
-    own declared price (perk metadata.json `price.amount`), else the default."""
+    own declared price (perk metadata.json `price.amount`), else the default. Each key is tried with the
+    CANONICAL id first and then its BARE leaf, so a legacy pre-namespace `pricing.json` keyed `fs`/`fs/perk`
+    still prices the canonical claim `general:fs` — the same back-compat leaf-fallback the per-actor ACL uses
+    (else the cutover would silently fee-MISS a mixed-vintage fee table and under-charge)."""
     fees = pricing.get("tool_fees", {})
-    val = fees.get(f"{skill}/{perk}")
-    if val is None:
-        val = fees.get(skill)
+    leaf = skill.split(":", 1)[1] if ":" in skill else skill        # bare back-compat for a legacy fee table
+    val = next((fees[k] for k in (f"{skill}/{perk}", f"{leaf}/{perk}", skill, leaf) if k in fees), None)
     if val is None:
         try:
             md = json.loads(_read(os.path.join(_perk_dir(skill, perk), "metadata.json")) or "{}")

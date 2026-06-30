@@ -5,6 +5,7 @@ Pure stdlib."""
 from __future__ import annotations
 import os
 
+from infra import registry
 from infra.tool import cartridge, skill_index
 
 
@@ -33,8 +34,9 @@ def test_roster_cartridge_excludes_undeclared(tmp_path):
     roster = [s for s in ("git_ops", "fs", "markdown") if s in avail][:2] or avail[:2]
     out = str(tmp_path / "roster")
     cartridge.compile(roster, out, source=src)
-    # only the rostered skills exist in the cartridge; the rest of the dev chip is absent
-    present = sorted(d for d in os.listdir(out) if os.path.isdir(os.path.join(out, d)))
+    # only the rostered skills exist in the cartridge; the rest of the dev chip is absent (scan_skills walks
+    # the namespaced layout — <out>/<ns>/<name> — and returns the same ids the manifest declares)
+    present = sorted(skill_index.scan_skills(out))
     assert present == sorted(roster)
     assert cartridge.verify(out)["ok"]
 
@@ -54,7 +56,7 @@ def test_tampered_cartridge_fails_verify(tmp_path):
     # mutate a skill SOURCE file → its hash no longer matches skill_sha → caught. (Deterministic: a fixed
     # file in the skill_sha set, NOT a glob — glob order is filesystem-dependent and could land on the
     # self-referential index.json, whose own bytes skill_sha cannot include.)
-    with open(os.path.join(out, target, "perks.json"), "a") as f:
+    with open(os.path.join(registry.skill_dir(target, out), "perks.json"), "a") as f:
         f.write("\n")
     v = cartridge.verify(out)
     assert not v["ok"] and v["problems"]
@@ -69,7 +71,7 @@ def test_rewritten_skill_manifest_fails_verify(tmp_path):
     target = "git_ops" if os.path.isdir(os.path.join(src, "git_ops")) else skill_index.all_skills(src)[0]
     out = str(tmp_path / "cart")
     cartridge.compile([target], out, source=src)
-    with open(os.path.join(out, target, "perks.json"), "a") as f:
+    with open(os.path.join(registry.skill_dir(target, out), "perks.json"), "a") as f:
         f.write("\n")
     skill_index.write_index(target, out)        # re-pin: files now match the skill's REWRITTEN index.json …
     v = cartridge.verify(out)

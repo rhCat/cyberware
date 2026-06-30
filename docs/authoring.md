@@ -4,12 +4,13 @@ A skill is a directory on the **skillChip** — cyberware's skill cartridge, a s
 `skillChip/` submodule (located by `$CYBERWARE_SKILLCHIP`, default `<repo>/skillChip`). Its anatomy:
 
 ```
-skillChip/<skill>/
+skillChip/<ns>/<skill>/    # <ns> = the source group — cws/ for cws-* skills, else general/ (an upstream's in its own dir); canonical id is <ns>:<skill>
   SKILL.md                 context for the intelligence — what it does, what to watch, which logs to check
   blueprint.json           the L++ CFG (the perk-agnostic lifecycle + safety_invariants)
   perks.json               the proven pathways (id, summary, tools, destructive?)
   ledger.json              the FORM the LLM fills → task-ledger.json
   index.json               per-file sha256 + a roll-up skill_sha (by skill_index.py) — the authenticity manifest
+  access.json              (optional) the ACCESS-1 policy {remote, principals[], min_tier}; absent = local-open / remote-closed (governed by the skillacl_enforce rollout flag)
   blueprint.{drawio,svg}   generated diagrams (by visualize.py)
   perks/<perk>/
     metadata.json          description · rules · usage · limitation · minimal_example

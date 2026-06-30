@@ -17,7 +17,22 @@ cyberware is the **engine**; the skills are a separate **cartridge** — the [**
 
 The chip is located by `infra/registry.py` (`registry.SKILLCHIP`): the hardcoded default `<repo>/skillChip`, overridable with **`$CYBERWARE_SKILLCHIP`**. The chip is **self-describing** — `skillChip/index.json` is its **manifest**: every skill with its `skill_sha`, plus a roll-up `chip_sha`, which cyberware retrieves to discover + verify the whole chip as a unit (each skill keeps its own `index.json` for file-level authenticity). Swap the chip — point `$CYBERWARE_SKILLCHIP` elsewhere — and the same engine governs a different feed-stock, unchanged.
 
-The chip is a **multi-source cartridge**: skills live under a **source group** — cyberware's own `cws-*` skills in `cws/`, the rest in `general/`, and skills merged from a named upstream in their own dir (e.g. future `nvidia/`, `claude/`). Names are unique across sources; `registry.skill_dir(name)` resolves a skill NAME to its directory whatever the layout — flat (`<chip>/<skill>`, e.g. a compiled single-skill cartridge) or source-grouped (`<chip>/<source>/<skill>`). The **manifest is the authoritative load set**, never a directory scan; a porter never assumes its depth in the chip (enforced by the `check_porter_path_hygiene` ouroboros gate), so a skill stays relocatable across sources and cartridges.
+The chip is a **multi-source cartridge** and skills are **namespaced**: a skill is addressed
+`<namespace>:<name>`, the namespace being its **source-group** dir — cyberware's own `cws-*` skills in `cws/`,
+the rest in `general/`, an upstream's in its own dir (`nvidia/`, `claude/`, …). The same leaf can exist under
+two namespaces (`general:search` ≠ `magnumopus:search`). `registry.parse_skill_id` splits an id;
+`registry.skill_dir` resolves `ns:name` directly to `<chip>/<ns>/<name>` (a flat `<chip>/<name>` compiled
+single-skill cartridge still resolves bare). A **bare** claim is a back-compat shim — `registry.canonicalize`
+rewrites it to `ns:name` when **exactly one** namespace owns the leaf, and returns the `AMBIGUOUS` sentinel
+(→ govd rejects `ambiguous_skill_id`) when **≥2** do, never first-source-wins. The **v2 manifest is the
+authoritative load set** (keyed on `ns:name`), never a directory scan; each per-skill `index.json` keeps the
+bare leaf + a placement-invariant `skill_sha`, so a skill composes verbatim across chips.
+
+**Composing a chip from sources.** `python3 -m infra.tool.compose --out <dir> --source <pathA> --source
+<pathB>:<namespace>` merges several source chips into one served chip, each skill placed by namespace; an exact
+`ns:name` duplicate across sources is a **hard error** (exit 2, manual reconciliation — never first-source-wins),
+while a shared leaf under different namespaces coexists. The composed chip re-pins its v2 manifest and is built
+atomically (temp dir + swap); `chipfetch` then serves it exactly like a baked chip.
 
 `infra/` is a Python package, invoked as `python3 -m infra.<pkg>.<module>`:
 
@@ -37,7 +52,7 @@ The chip is a **multi-source cartridge**: skills live under a **source group** �
 ## A skill is a package
 
 A skill is **not a prose description you trust** — it is a self-contained unit you can verify and build
-upon. `skillChip/<skill>/`:
+upon. `skillChip/<ns>/<skill>/`:
 
 ```
 SKILL.md            context: what it does, what to watch, which logs to check
@@ -101,6 +116,26 @@ plus acquisition provenance (`local`, or `cloud source @ ref`).
 > This pipeline is itself captured as a formal **L++ blueprint** —
 > [`infra/document/pipeline.blueprint.json`](../infra/document/pipeline.blueprint.json) — so the framework
 > is described in its own formalism (the **ouroboros**); the dashboard renders it.
+
+## The three govern gates
+
+Before govd blesses a claim, `govern()` runs **three independent, fail-closed gates** — each an AND (any one
+failure rejects; none is self-approvable by `--approve`):
+
+1. **VALIDATE** — authenticity. The skill's files must match its committed `index.json` (`verify_skill`); a
+   drifted or server-drifted skill is refused. govd never blesses code it cannot vouch for.
+2. **ACCESS-1** — the skill's **own** access policy (`skillChip/<ns>/<skill>/access.json`, enforced by
+   `infra/govern/skillacl.py`): is this skill reachable *here at all*? A skill is **local-open /
+   remote-closed** — served on a govd run for the local developer (`--mode local`), or to a principal flagged
+   `local_dev`, but it must opt in (`{"remote": true, "principals": [...], "min_tier": "..."}`) to be reachable
+   when govd serves **others**. An undeclared skill stays remote-open until the operator flips
+   `skillacl_enforce`, then the secure default takes hold. Independent of *who* claims.
+3. **ACCESS-2** — the **per-actor** token ACL (`principals.acl_allows`): may *this* principal run this
+   skill/perk/tier? Entries match by exact `ns:name`, a per-namespace `ns:*` wildcard, the `*` super-wildcard,
+   or a legacy bare leaf (back-compat). Independent of the skill's own policy.
+
+All three re-run on every in-flight step (`step_reauthorize`), so a revocation, a tightened ACL, or a tightened
+`access.json` binds a running multi-step run — not just the claim.
 
 ## The governance model
 

@@ -25,7 +25,7 @@ def test_catalog_is_value_free_and_covers_every_skill():
     c = skill_index.catalog()
     assert c["count"] == len(c["skills"]) == len(skill_index.all_skills())
     assert {s["skill"] for s in c["skills"]} == set(skill_index.all_skills())
-    fs = next(s for s in c["skills"] if s["skill"] == "fs")
+    fs = next(s for s in c["skills"] if s["skill"] == "general:fs")
     assert fs["verified"] and len(fs["skill_sha"]) == 64 and fs["drift"] is None
     fl = next(p for p in fs["perks"] if p["id"] == "find_large")
     assert fl["vars"]["required"] == ["SEARCH_DIR"] and "MIN_SIZE" in fl["vars"]["optional"]
@@ -43,7 +43,7 @@ def test_catalog_tags_a_foreign_registry(tmp_path):
     shutil.copytree(skill_index.SKILLS, tmp_path / "skills")
     skill_index.write_index("fs", str(tmp_path / "skills"))                    # regenerate so it's authentic
     c = skill_index.catalog(str(tmp_path / "skills"))
-    assert next(s for s in c["skills"] if s["skill"] == "fs")["verified"]
+    assert next(s for s in c["skills"] if s["skill"] == "general:fs")["verified"]
 
 
 def test_tamper_and_missing_are_detected(tmp_path, monkeypatch):

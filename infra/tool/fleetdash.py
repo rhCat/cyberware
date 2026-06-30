@@ -333,7 +333,8 @@ def fleet_from_mirror(nodes, mirror_dir, live_health=True):
                 health, reachable = _get(node["url"].rstrip("/") + "/health"), True
             except Exception:
                 reachable = False
-        return {"name": name, "role": node.get("role", "-"), "url": node["url"].rstrip("/"),
+        return {"name": name, "role": node.get("role", "-"), "fleet_tier": node.get("fleet_tier"),
+                "url": node["url"].rstrip("/"),
                 "reachable": reachable, "health": health, "index": m["index"], "count": len(m["index"])}
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, max(1, len(nodes)))) as ex:
@@ -376,7 +377,8 @@ def risk_summary(feed):
 # ============================ live one-shot poll (CLI text view; also used when no mirror) ============================
 def poll(node):
     name, url = node.get("name", "?"), node["url"].rstrip("/")
-    out = {"name": name, "role": node.get("role", "-"), "url": url, "ok": False, "health": None,
+    out = {"name": name, "role": node.get("role", "-"), "fleet_tier": node.get("fleet_tier"),
+           "url": url, "ok": False, "health": None,
            "decisions": [], "feed": []}
     try:
         out["health"] = _get(url + "/health")
@@ -430,10 +432,23 @@ _STYLE = """
  a{color:#58a6ff;text-decoration:none} a:hover{text-decoration:underline}
  h1{font-size:15px;color:#58a6ff;margin:0 0 12px} h2{font-size:13px;color:#8b949e;margin:18px 0 8px}
  .muted{color:#6e7681;text-align:center;padding:18px} .back{font-size:12px;color:#6e7681}
- .chips{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 16px}
- .chip{display:block;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:8px 12px;min-width:170px;color:#c9d1d9}
- .chip.up{border-left:3px solid #2ea043} .chip.down{border-left:3px solid #f85149} .chip.stale{border-left:3px solid #6e7681}
- .chip .role{color:#6e7681;margin-left:6px} .chip .sub{color:#8b949e;margin-top:3px;font-size:11px}
+ .layout{display:flex;gap:18px;align-items:flex-start}
+ .sidebar{flex:0 0 240px;position:sticky;top:0} .main{flex:1 1 auto;min-width:0}
+ .navsearch{width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;padding:6px 8px;margin:0 0 10px;font:12px ui-monospace,Menlo,monospace}
+ .navsearch:focus{outline:none;border-color:#58a6ff}
+ .navtier{margin-bottom:8px}
+ .navhdr{cursor:pointer;color:#8b949e;text-transform:uppercase;font-size:11px;font-weight:600;padding:4px 2px;user-select:none}
+ .navhdr .caret{display:inline-block;width:12px;color:#6e7681}
+ .navtier.collapsed .navlist{display:none} .navtier.collapsed .caret{transform:rotate(-90deg)}
+ .tcount,.navnode .cnt{color:#6e7681}
+ .navlist{display:flex;flex-direction:column;gap:4px;margin-top:4px}
+ .navnode{display:flex;align-items:center;gap:6px;background:#161b22;border:1px solid #30363d;border-radius:6px;padding:5px 8px;color:#c9d1d9}
+ .navnode:hover{background:#1c2230;text-decoration:none}
+ .navnode .role{margin-left:0} .navnode .cnt{margin-left:auto}
+ .dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+ .dot.up{background:#2ea043} .dot.down{background:#f85149} .dot.stale{background:#6e7681}
+ .navempty{color:#6e7681;font-size:11px;padding:6px 2px}
+ @media(max-width:760px){.layout{flex-direction:column}.sidebar{flex:none;width:100%;position:static}}
  table{width:100%;border-collapse:collapse} th,td{text-align:left;padding:5px 8px;border-bottom:1px solid #21262d}
  th{color:#6e7681;font-weight:600;text-transform:uppercase;font-size:11px} td.t{color:#8b949e}
  tr.run{cursor:pointer} tr.run:hover td{background:#161b22}
@@ -448,6 +463,11 @@ _STYLE = """
  .pill{display:inline-block;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:600}
  .pill.approval{background:#3d1418;color:#ffb4ac} .pill.high{background:#3a2c0a;color:#e3b341} .pill.reject{background:#21262d;color:#8b949e}
  .off{color:#f85149;font-size:11px} .stalez{color:#6e7681;font-size:11px}
+ .hlink{font-size:12px;color:#58a6ff;margin-left:10px}
+ .gauge{display:flex;align-items:center;gap:8px}
+ .gbar{flex:1;min-width:80px;height:10px;background:#21262d;border-radius:5px;overflow:hidden}
+ .gfill{height:100%;background:linear-gradient(90deg,#2ea043,#d29922 70%,#f85149)}
+ .glab{min-width:70px;color:#8b949e;font-size:11px}
  pre{background:#161b22;border:1px solid #21262d;border-radius:6px;padding:10px;overflow:auto;max-height:340px;color:#8b949e;white-space:pre-wrap;word-break:break-word}
  details{margin:6px 0} summary{cursor:pointer;color:#58a6ff;padding:4px 0}
  img{display:block;margin:8px 0}
@@ -529,18 +549,78 @@ def _risk_pill(d):
     return f'<span class="pill {c}">{c}</span>' if c else ""
 
 
-def render_html(results, feed, risk, refresh=5):
-    chips = []
+def _node_groups(results):
+    """Group node summaries by fleet_tier, ordered mothership -> edge -> subagent -> deeper -> untiered (last)."""
+    from infra.govern.fleetd import _fleet_rank        # single source of truth for the hierarchy rank
+    groups = {}
     for r in results:
-        h = r.get("health") or {}
-        reach = r.get("reachable")
-        cls = "up" if reach else ("down" if reach is False else "stale")
-        flag = "" if reach is None else ('' if reach else ' <span class="off">offline</span>')
-        sub = (f"{h.get('exec_mode','?')} · exod {h.get('exod_attached','?')} · runs {h.get('runs','?')}"
-               if h else '<span class="stalez">no data yet</span>') + flag
-        chips.append(f'<a class="chip {cls}" href="/node/{_esc(r["name"])}"><b>{_esc(r["name"])}</b>'
-                     f'<span class="role">{_esc(r["role"])}</span> <span class="role">[{r.get("count",0)}]</span>'
-                     f'<div class="sub">{sub}</div></a>')
+        groups.setdefault(r.get("fleet_tier"), []).append(r)
+
+    def key(ft):
+        rk = _fleet_rank(ft)
+        return (rk is None, rk if rk is not None else 0, str(ft if ft is not None else "~"))
+    return [(ft, groups[ft]) for ft in sorted(groups, key=key)]
+
+
+def _sidebar(results):
+    """The hierarchical, searchable node nav: a filter box + nodes grouped under collapsible fleet-tiers."""
+    parts = ['<input class="navsearch" id="navsearch" placeholder="filter nodes…" autocomplete="off">']
+    if not results:
+        parts.append('<div class="navempty">no nodes in the roster</div>')
+    for ft, nodes in _node_groups(results):
+        label = _esc(ft if ft is not None else "untiered")
+        items = []
+        for r in nodes:
+            reach = r.get("reachable")
+            dot = "up" if reach else ("down" if reach is False else "stale")
+            name, role = _esc(r.get("name", "?")), _esc(r.get("role") or "")
+            search = _esc(" ".join(str(x) for x in (r.get("name"), r.get("role"), ft) if x).lower())
+            items.append(f'<a class="navnode" data-search="{search}" href="/node/{name}">'
+                         f'<span class="dot {dot}"></span><b>{name}</b>'
+                         f'<span class="role">{role}</span><span class="cnt">{r.get("count", 0)}</span></a>')
+        parts.append(f'<div class="navtier" data-tier="{label}">'
+                     f'<div class="navhdr" data-tier="{label}"><span class="caret">▾</span>{label} '
+                     f'<span class="tcount">{len(nodes)}</span></div>'
+                     f'<div class="navlist">{"".join(items)}</div></div>')
+    return '<aside class="sidebar">' + "".join(parts) + '</aside>'
+
+
+# Client-side nav: search-filter + per-tier collapse, persisted in localStorage so they survive the 5s
+# meta-refresh (the same pattern the display-timezone selector uses). No new server round-trips.
+_NAVJS = """
+(function(){
+  var KEY='cw-nav', box=document.getElementById('navsearch'), s={};
+  try{s=JSON.parse(localStorage.getItem(KEY))||{}}catch(e){}
+  function save(){ try{localStorage.setItem(KEY,JSON.stringify(s))}catch(e){} }
+  if(box && s.q) box.value=s.q;
+  document.querySelectorAll('.navtier').forEach(function(t){
+    if(s.collapsed && s.collapsed[t.getAttribute('data-tier')]) t.classList.add('collapsed');
+  });
+  function filter(){
+    var q=(box?box.value:'').trim().toLowerCase();
+    document.querySelectorAll('.navtier').forEach(function(t){
+      var any=false;
+      t.querySelectorAll('.navnode').forEach(function(n){
+        var hit=!q||(n.getAttribute('data-search')||'').indexOf(q)>=0;
+        n.style.display=hit?'':'none'; if(hit) any=true;
+      });
+      t.style.display=(!q||any)?'':'none';
+    });
+  }
+  if(box) box.addEventListener('input',function(){ s.q=box.value; save(); filter(); });
+  document.querySelectorAll('.navhdr').forEach(function(h){
+    h.addEventListener('click',function(){
+      var t=h.parentNode;
+      t.classList.toggle('collapsed');
+      s.collapsed=s.collapsed||{}; s.collapsed[h.getAttribute('data-tier')]=t.classList.contains('collapsed'); save();
+    });
+  });
+  filter();
+})();
+"""
+
+
+def render_html(results, feed, risk, refresh=5):
     rows = []
     for x in feed[:300]:
         cls = {"allow": "ok", "reject": "no", "push_back": "warn"}.get(x.get("decision"), "")
@@ -553,12 +633,15 @@ def render_html(results, feed, risk, refresh=5):
                     f'<td class="{cls}">{_esc(x.get("decision"))} {_risk_pill(x)}</td></tr>')
     body = "".join(rows) or '<tr><td colspan="6" class="muted">no runs mirrored yet — they appear as nodes run governed work</td></tr>'
     up = sum(1 for r in results if r.get("reachable"))
-    content = (f'<h1>cyberware · fleet control — who fired what, where</h1>{_banner(risk)}'
-               f'<div class="chips">{"".join(chips)}</div>'
+    content = (f'<h1>cyberware · fleet control — who fired what, where '
+               f'<a class="hlink" href="/accounting">accounting →</a></h1>'
+               f'<div class="layout">{_sidebar(results)}'
+               f'<section class="main">{_banner(risk)}'
                f'<table><thead><tr><th>when</th><th>where (node)</th><th>who (principal)</th>'
                f'<th>what (skill/perk)</th><th>exec</th><th>outcome</th></tr></thead><tbody>{body}</tbody></table>'
                f'<p class="muted">click a node or a run for detail · central mirror of {len(feed)} runs · '
-               f'{up}/{len(results)} nodes live · auto-refresh {refresh}s</p>')
+               f'{up}/{len(results)} nodes live · auto-refresh {refresh}s</p>'
+               f'</section></div><script>{_NAVJS}</script>')
     return _page("cyberware — fleet control", content, refresh)
 
 
@@ -580,6 +663,81 @@ def render_risk(feed, risk, refresh=5):
                + section("high", "high-risk (ran)", "destructive operations that were approved and executed — audit them.")
                + section("reject", "rejected", "claims govd refused (structural problems)."))
     return _page("fleet — risk queue", content, refresh)
+
+
+def _spend_rollup(feed):
+    """Per-actor CREDIT spend across the fleet, from the mirrored value-free `cost`. Returns rows sorted by
+    spend (desc), each {actor, spent, allows, runs, nodes, _spent}."""
+    from infra.settle.money import Money
+    agg = {}
+    for x in feed:
+        a = x.get("principal") or "?"
+        e = agg.setdefault(a, {"actor": a, "_spent": Money.zero("CREDITS"), "allows": 0, "runs": 0, "nodes": set()})
+        e["runs"] += 1
+        e["nodes"].add(x.get("node"))
+        if x.get("decision") == "allow" and x.get("cost"):
+            try:
+                e["_spent"] = e["_spent"] + Money(str(x["cost"]), "CREDITS")
+                e["allows"] += 1
+            except (TypeError, ValueError):
+                pass
+    rows = [{"actor": e["actor"], "spent": str(e["_spent"].amount), "allows": e["allows"],
+             "runs": e["runs"], "nodes": len(e["nodes"]), "_spent": e["_spent"]} for e in agg.values()]
+    rows.sort(key=lambda r: r["_spent"].amount, reverse=True)
+    return rows
+
+
+def render_accounting(feed, refresh=5):
+    """The fleet ACCOUNTANT page: per-actor CREDIT spend across the fleet (from the mirrored cost), gauged
+    relative to the top spender. Click an actor for their cross-fleet account. (The per-node allowance/balance
+    gauge lives on each node's own monitor — that node holds the budget ledger.)"""
+    from infra.settle.money import Money
+    rows = _spend_rollup(feed)
+    total = Money.zero("CREDITS")
+    for r in rows:
+        total = total + r["_spent"]
+    top = max((r["_spent"].amount for r in rows), default=0) or 1
+    body = []
+    for r in rows:
+        pct = int(r["_spent"].amount * 100 / top)                    # relative bar (exact Decimal, no float)
+        body.append(f'<tr class="run" onclick="location=\'/principal/{_esc(r["actor"])}\'">'
+                    f'<td><b>{_esc(r["actor"])}</b></td>'
+                    f'<td><div class="gauge"><div class="gbar"><div class="gfill" style="width:{pct}%"></div></div>'
+                    f'<span class="glab">{_esc(r["spent"])}</span></div></td>'
+                    f'<td>{r["allows"]}/{r["runs"]}</td><td>{r["nodes"]}</td></tr>')
+    rows_html = "".join(body) or '<tr><td colspan="4" class="muted">no metered runs yet</td></tr>'
+    content = ('<a class="back" href="/">← fleet</a><h1>fleet accounting — credit spend by actor</h1>'
+               f'<p class="kv">total spent across the fleet: <b>{_esc(str(total.amount))}</b> CREDITS · '
+               f'{len(rows)} actors · click an actor for their account · the per-node allowance/balance gauge '
+               f'is on each node\'s monitor (it holds the budget ledger).</p>'
+               '<table><thead><tr><th>actor</th><th>spend (relative)</th><th>allowed/runs</th><th>nodes</th>'
+               f'</tr></thead><tbody>{rows_html}</tbody></table>')
+    return _page("fleet — accounting", content, refresh)
+
+
+def render_principal(actor, feed, refresh=5):
+    """The individual ACCOUNTANT page: one actor's runs + credit spend across the fleet."""
+    from infra.settle.money import Money
+    mine = [x for x in feed if (x.get("principal") or "?") == actor]
+    spent = Money.zero("CREDITS")
+    rows = []
+    for x in sorted(mine, key=lambda d: d.get("ts") or "", reverse=True)[:300]:
+        if x.get("decision") == "allow" and x.get("cost"):
+            try:
+                spent = spent + Money(str(x["cost"]), "CREDITS")
+            except (TypeError, ValueError):
+                pass
+        cls = {"allow": "ok", "reject": "no", "push_back": "warn"}.get(x.get("decision"), "")
+        rows.append(f'<tr class="run" onclick="location=\'/run/{_esc(x["node"])}/{_esc(x.get("run_id") or "")}\'">'
+                    f'<td class="t">{_esc(str(x.get("ts"))[:19])}</td><td>{_esc(x["node"])}</td>'
+                    f'<td>{_esc(x.get("skill"))}/{_esc(x.get("perk"))}</td><td>{_esc(x.get("cost") or "—")}</td>'
+                    f'<td class="{cls}">{_esc(x.get("decision"))}</td></tr>')
+    rows_html = "".join(rows) or '<tr><td colspan="5" class="muted">no runs</td></tr>'
+    content = (f'<a class="back" href="/accounting">← accounting</a><h1>{_esc(actor)} — credit account</h1>'
+               f'<p class="kv">spent across the fleet: <b>{_esc(str(spent.amount))}</b> CREDITS · {len(mine)} runs</p>'
+               '<table><thead><tr><th>when</th><th>node</th><th>what</th><th>cost</th><th>outcome</th></tr></thead>'
+               f'<tbody>{rows_html}</tbody></table>')
+    return _page(f"{_esc(actor)} — account", content, refresh)
 
 
 def render_node(node, summary, refresh=5):
@@ -781,6 +939,12 @@ def serve(nodes, port, refresh, mirror_dir, mirror_interval):
                 if parts[0] == "risk":                              # fleet-wide risk / approval queue
                     results, feed = fleet_from_mirror(nodes, mirror_dir)
                     return self._send(200, render_risk(feed, risk_summary(feed), refresh))
+                if parts[0] == "accounting":                        # fleet CREDIT accounting (spend by actor)
+                    _, feed = fleet_from_mirror(nodes, mirror_dir)
+                    return self._send(200, render_accounting(feed, refresh))
+                if parts[0] == "principal" and len(parts) == 2:     # one actor's cross-fleet credit account
+                    _, feed = fleet_from_mirror(nodes, mirror_dir)
+                    return self._send(200, render_principal(parts[1], feed, refresh))
                 if parts[0] == "node" and len(parts) == 2:          # per-node = the LIVE individual-monitor UI (iframe)
                     node = by_name.get(parts[1])
                     if not node:
@@ -868,7 +1032,8 @@ def main():
             results, feed = fleet_from_mirror(nodes, mirror_dir)
         else:
             live = [poll(n) for n in nodes]
-            results = [{"name": r["name"], "role": r["role"], "url": r["url"], "reachable": r["ok"],
+            results = [{"name": r["name"], "role": r["role"], "fleet_tier": r.get("fleet_tier"),
+                        "url": r["url"], "reachable": r["ok"],
                         "health": r.get("health"), "index": {}, "count": 0} for r in live]
             feed = []
             for r in live:
