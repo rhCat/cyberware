@@ -122,9 +122,12 @@ the composition + TLA⁺/TLC model check, and returns one of:
   (registry drift — your copy doesn't match the blessed hash), **ACCESS-1** (the skill's *own* `access.json`
   policy closes it to you — `skill_remote_closed` when govd serves others and the skill hasn't opted in), or
   **ACCESS-2** (the claim is outside your token's per-actor ACL scope — a skill/tier you may not run, or a
-  destructive/credentialed perk your token isn't granted). Plus the structural rejects — bad var key, a
-  plaintext secret, a missing input, a deadlock, or an **ambiguous** skill id (`ambiguous_skill_id` —
-  namespace it). None is clearable by `--approve`; fix the *claim* — never route around the refusal.
+  destructive/credentialed perk your token isn't granted). On a node that enforces **per-actor credit
+  budgets**, a priced claim can also be shut off `insufficient_credits` (your actor's credit balance can't
+  cover the run's price) or `budget_unmetered` (no allowance configured for you) — the operator tops you up;
+  it is not `--approve`-able. Plus the structural rejects — bad var key, a plaintext secret, a missing input,
+  a deadlock, or an **ambiguous** skill id (`ambiguous_skill_id` — namespace it). None is clearable by
+  `--approve`; fix the *claim* (or get credited) — never route around the refusal.
 
 The loop above is **cooperative** mode (the default): you run the porters+cores from your registry and
 report status only. Against a Linux **body** you can run **delegated** instead — add `--delegated`:
