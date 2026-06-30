@@ -1407,12 +1407,15 @@ def serve(cfg):
     httpd.store_backend = None
     try:
         from infra.store import backend as _sb
+        from infra.settle import budget as _budget
         from infra.settle import price as _price
         from infra.settle.money import Money as _Money
         httpd.store_backend = _sb.make_backend(store.root, cfg)
         cfg.setdefault("pricing", _price.load_pricing())
         for _pid, _spec in (cfg.get("principals") or {}).items():
-            _allow = _spec.get("credits") if isinstance(_spec, dict) else None
+            # seed on `credits` OR `budget` — the govern() gate counts EITHER key as configured (budget_configured),
+            # so the seeder must honor both or a `budget:`-keyed actor is metered-but-unseeded (locked out at 0).
+            _allow = _budget.configured_allowance(_spec)
             if _allow is not None:
                 httpd.store_backend.budget_post(_pid, _Money(str(_allow), "CREDITS"),
                                                 memo="seed:" + _pid, idem="seed:" + _pid)

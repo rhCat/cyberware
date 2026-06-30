@@ -11,6 +11,11 @@ a dollar charge.
 `budget_ok` is the PURE gate decision (no I/O — unit-tested both-sides like principals.acl_allows/rate_ok).
 The in-memory `seed`/`topup`/`debit` here are the posting logic + the selftest path; the durable, ATOMIC
 debit that serializes concurrent same-actor claims lives on the store backend (`budget_debit_atomic`).
+
+ROLLOUT (operator-facing): enforcement is gated by govd's `budget_enforce` flag, default OFF — an un-flagged
+server meters nobody (back-compat), and local dev (no principals registry) is always unmetered. With the flag
+ON, every AUTHENTICATED actor must carry an allowance — a `credits:` or `budget:` key in its principal spec,
+seeded at startup — or it is rejected `budget_unmetered` (fail-closed: no allowance configured ⇒ no run).
 """
 from __future__ import annotations
 
@@ -26,6 +31,17 @@ _USAGE_PREFIX = "bud-usage:"
 def account_of(actor: str) -> str:
     """The actor's credit-budget balance account."""
     return f"budget:{actor}"
+
+
+def configured_allowance(spec) -> str | None:
+    """The actor's opening allowance from its principal spec — its `credits:` or, equivalently, `budget:` key.
+    BOTH keys mark an actor as budget-configured to govd's gate, so BOTH must seed; resolving only `credits`
+    would leave a `budget:`-keyed actor metered-but-unseeded (locked out at a 0 balance). Returns None when no
+    allowance is declared (the actor is unmetered)."""
+    if not isinstance(spec, dict):
+        return None
+    v = spec.get("credits")
+    return v if v is not None else spec.get("budget")
 
 
 def balance(entries: list, actor: str) -> Money:
@@ -50,20 +66,26 @@ def seed(entries: list, actor: str, allowance: Money, ref: str = None) -> dict:
 
 
 def topup(entries: list, actor: str, amount: Money, source: str = "grant", ref: str = "") -> dict:
-    """Add credits to the actor — an operator grant or a Stripe recharge. Idempotent on ref."""
-    if ref and _posted(entries, _TOPUP_PREFIX, ref):
+    """Add credits to the actor — an operator grant or a Stripe recharge. REQUIRES a unique `ref` (the grant id
+    or Stripe PaymentIntent id) and is idempotent on it: a retried grant is a no-op, while two DISTINCT grants
+    (distinct refs) both land. An empty ref is REFUSED — defaulting it would either silently collapse distinct
+    grants or double-credit a retry, both money-safety hazards (the HTTP handler mints a unique ref when the
+    caller omits one)."""
+    if not ref:
+        return {"status": "error", "error": "ref_required", "balance": str(balance(entries, actor).amount)}
+    if _posted(entries, _TOPUP_PREFIX, ref):
         return {"status": "duplicate", "ref": ref, "balance": str(balance(entries, actor).amount)}
     reward_ledger.post(entries, [reward_ledger._posting(account_of(actor), amount),
                                  reward_ledger._posting(f"budget:topup:{source}", -amount)],
-                       memo=_TOPUP_PREFIX + (ref or source))
+                       memo=_TOPUP_PREFIX + ref)
     return {"status": "credited", "added": str(amount.amount), "source": source,
             "balance": str(balance(entries, actor).amount)}
 
 
 def debit(entries: list, actor: str, price: Money, idem: str) -> dict:
     """Debit a run's credit price from the actor — REFUSED (no posting) if the balance won't cover it;
-    idempotent on idem (plan_sha). The non-atomic, in-memory form (tests/selftest); the durable, concurrency-
-    safe form is store backend.budget_debit_atomic."""
+    idempotent on idem (the caller's key — `usage:<run_id>` for a run debit). The non-atomic, in-memory form
+    (tests/selftest); the durable, concurrency-safe form is store backend.budget_debit_atomic."""
     if _posted(entries, _USAGE_PREFIX, idem):
         return {"status": "duplicate", "idem": idem, "balance": str(balance(entries, actor).amount)}
     bal = balance(entries, actor)

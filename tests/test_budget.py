@@ -49,6 +49,31 @@ def test_budget_selftest_passes():
     assert all(r.values()), r
 
 
+def test_configured_allowance_resolves_credits_or_budget():
+    # govd's budget_configured gate counts EITHER `credits` or `budget`; the seeder MUST resolve both or a
+    # `budget:`-keyed actor is metered-but-unseeded (locked out at 0). (review-followup regression.)
+    assert budget.configured_allowance({"credits": "5.0000"}) == "5.0000"
+    assert budget.configured_allowance({"budget": "7.0000"}) == "7.0000"        # the seed gap the review caught
+    assert budget.configured_allowance({"credits": "5.0000", "budget": "9"}) == "5.0000"   # credits wins
+    assert budget.configured_allowance({"rate": 10.0}) is None                  # no allowance -> unmetered
+    assert budget.configured_allowance(None) is None and budget.configured_allowance("x") is None
+
+
+def test_topup_requires_a_unique_ref():
+    # an empty ref is a money-safety hazard (silently collapse OR double-credit) -> REFUSED; distinct refs both
+    # land; a repeated ref is an idempotent no-op. (review-followup regression.)
+    led = reward_ledger.open_ledger()
+    budget.seed(led, "alice", C("1.0000"), ref="s1")
+    r = budget.topup(led, "alice", C("3.0000"), ref="")                         # empty ref -> refused, no posting
+    assert r["status"] == "error" and r["error"] == "ref_required"
+    assert budget.balance(led, "alice") == C("1.0000")                          # balance untouched
+    assert budget.topup(led, "alice", C("3.0000"), ref="g1")["status"] == "credited"
+    assert budget.topup(led, "alice", C("3.0000"), ref="g1")["status"] == "duplicate"   # same ref -> no-op
+    assert budget.topup(led, "alice", C("2.0000"), ref="g2")["status"] == "credited"    # distinct ref lands
+    assert budget.balance(led, "alice") == C("6.0000")                          # 1 + 3 (g1) + 2 (g2)
+    assert reward_ledger.global_zero(led)
+
+
 # ── the durable, ATOMIC store debit ──
 def _backend():
     return SqliteWalBackend(os.path.join(tempfile.mkdtemp(), "idx.sqlite")).open()

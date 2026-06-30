@@ -265,7 +265,8 @@ class SqliteWalBackend(StoreBackend):
 
     def budget_debit_atomic(self, actor, price, idem) -> dict:
         # re-read the balance and debit ONLY if it still fits — all inside ONE BEGIN IMMEDIATE, so two racing
-        # same-actor debits serialize (one wins, the loser gets ok:False). Idempotent on idem (plan_sha).
+        # same-actor debits serialize (one wins, the loser gets ok:False). Idempotent on idem (the caller's key
+        # — `usage:<run_id>` for a run debit, so a retried run is a no-op).
         import time as _t
         with self._lock:
             self.cx.execute("BEGIN IMMEDIATE")
@@ -312,7 +313,8 @@ class PsycopgBackend(StoreBackend):
     def _dsn(self):
         if self.config.get("dsn"):
             return self.config["dsn"]
-        return open(os.path.expanduser(self.config["dsn_file"]), encoding="utf-8").read().strip()
+        with open(os.path.expanduser(self.config["dsn_file"]), encoding="utf-8") as f:
+            return f.read().strip()
 
     def open(self):
         if not self.configured():

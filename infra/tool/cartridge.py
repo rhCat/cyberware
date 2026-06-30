@@ -112,31 +112,36 @@ def cartridge_selftest() -> dict:
     """Compile a SINGLE-skill cartridge from the dev chip and prove the model: it loads with only the skill +
     the root json (verify ok, chip_sha = one-skill roll-up); a skill NOT in the cartridge is absent; and a
     tampered skill file breaks the root-sha verification (the cartridge is sealed). Hermetic."""
+    import shutil
     import tempfile
     src = skill_index.SKILLS
     # pick a real, authentic, self-contained skill from the dev chip
     target = "git_ops" if os.path.isdir(os.path.join(src, "git_ops")) else skill_index.all_skills(src)[0]
     d = tempfile.mkdtemp(prefix="cartridge-")
-    cart = os.path.join(d, "cart")
-    info = compile([target], cart, source=src)
+    try:
+        cart = os.path.join(d, "cart")
+        info = compile([target], cart, source=src)
 
-    v = verify(cart)
-    single_skill = v["ok"] and v["skills"] == [target] and len(declared_skills(cart)) == 1
-    sha_is_rollup = v["chip_sha"] == info["chip_sha"]
-    foreign_absent = not os.path.isdir(os.path.join(cart, "cws-release"))   # only the declared skill is present
+        v = verify(cart)
+        single_skill = v["ok"] and v["skills"] == [target] and len(declared_skills(cart)) == 1
+        sha_is_rollup = v["chip_sha"] == info["chip_sha"]
+        foreign_absent = not os.path.isdir(os.path.join(cart, "cws-release"))   # only the declared skill is present
 
-    # seal check: tamper a file inside the cartridge skill → root verification must fail
-    import glob
-    victim = next(iter(glob.glob(os.path.join(registry.compiled_skill_dst(target, cart), "perks", "*", "src", "*"))), None)
-    tamper_caught = True
-    if victim and os.path.isfile(victim):
-        open(victim, "a").write("\n# tamper\n")
-        tamper_caught = not verify(cart)["ok"]
+        # seal check: tamper a file inside the cartridge skill → root verification must fail
+        import glob
+        victim = next(iter(glob.glob(os.path.join(registry.compiled_skill_dst(target, cart), "perks", "*", "src", "*"))), None)
+        tamper_caught = True
+        if victim and os.path.isfile(victim):
+            with open(victim, "a") as _vf:
+                _vf.write("\n# tamper\n")
+            tamper_caught = not verify(cart)["ok"]
 
-    return {"single_skill_cartridge_loads": single_skill, "chip_sha_is_one_skill_rollup": sha_is_rollup,
-            "only_declared_skill_present": foreign_absent, "tamper_breaks_root_sha": tamper_caught,
-            "chip_sha": info["chip_sha"][:16],
-            "ok": single_skill and sha_is_rollup and foreign_absent and tamper_caught}
+        return {"single_skill_cartridge_loads": single_skill, "chip_sha_is_one_skill_rollup": sha_is_rollup,
+                "only_declared_skill_present": foreign_absent, "tamper_breaks_root_sha": tamper_caught,
+                "chip_sha": info["chip_sha"][:16],
+                "ok": single_skill and sha_is_rollup and foreign_absent and tamper_caught}
+    finally:
+        shutil.rmtree(d, ignore_errors=True)               # selftest temp-dir is always reclaimed
 
 
 if __name__ == "__main__":
