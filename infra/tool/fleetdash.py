@@ -483,10 +483,50 @@ def _esc(s):
     return html.escape(str(s))
 
 
+def _ts(ts):
+    """A timestamp rendered in the operator's CHOSEN timezone (default: their browser-local tz). The server
+    emits the stored UTC instant in `data-utc`; the page's tz control rewrites the visible text client-side,
+    so no node clock or server locale is assumed (UTC is the wire format, not the display)."""
+    iso = str(ts or "")
+    return f'<span class="ts" data-utc="{_esc(iso)}">{_esc(iso[:19])}</span>'
+
+
+# A fleet-wide DISPLAY-timezone control (top-right, on every page). The instant on the wire stays UTC; only
+# the rendering changes. The choice persists in localStorage and survives the page's auto-refresh.
+_TZCSS = (".tzbar{position:fixed;top:8px;right:12px;z-index:60;font-size:12px;background:#161b22;"
+          "border:1px solid #30363d;border-radius:6px;padding:3px 8px;color:#8b949e}"
+          ".tzbar select{background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;"
+          "font-size:12px;padding:1px 4px}")
+_TZBAR = ('<div class="tzbar">🕐 <select id="tzsel" title="display timezone">'
+          '<option value="local">Local</option><option value="UTC">UTC</option>'
+          '<option value="America/Los_Angeles">US/Pacific</option>'
+          '<option value="America/Denver">US/Mountain</option>'
+          '<option value="America/Chicago">US/Central</option>'
+          '<option value="America/New_York">US/Eastern</option>'
+          '<option value="America/Sao_Paulo">São Paulo</option>'
+          '<option value="Europe/London">London</option><option value="Europe/Berlin">Berlin</option>'
+          '<option value="Asia/Kolkata">India</option><option value="Asia/Shanghai">China</option>'
+          '<option value="Asia/Tokyo">Japan</option><option value="Australia/Sydney">Sydney</option>'
+          '</select> <span id="tzlabel"></span></div>')
+_TZJS = ("<script>(function(){var K='cw-tz';var sel=document.getElementById('tzsel');"
+         "function pick(){return localStorage.getItem(K)||'local';}"
+         "function zone(v){return v==='local'?Intl.DateTimeFormat().resolvedOptions().timeZone:v;}"
+         "function fmt(u,z){if(!u)return u;var s=/(?:Z|[+-]\\d\\d:?\\d\\d)$/.test(u)?u:u+'Z';"
+         "var d=new Date(s);if(isNaN(d.getTime()))return u.slice(0,19);"
+         "try{return d.toLocaleString('sv-SE',{timeZone:z});}catch(e){return u.slice(0,19);}}"
+         "function apply(){var v=pick(),z=zone(v);"
+         "document.querySelectorAll('.ts').forEach(function(e){var u=e.getAttribute('data-utc');"
+         "if(u)e.textContent=fmt(u,z);});"
+         "var l=document.getElementById('tzlabel');if(l)l.textContent=z;if(sel)sel.value=v;}"
+         "if(sel)sel.addEventListener('change',function(){localStorage.setItem(K,sel.value);apply();});"
+         "apply();})();</script>")
+
+
 def _page(title, content, refresh=None):
     meta = f'<meta http-equiv="refresh" content="{refresh}">' if refresh else ""
     return ('<!doctype html><html><head><meta charset="utf-8">' + meta + "<title>" + _esc(title)
-            + "</title><style>" + _STYLE + "</style></head><body>" + content + "</body></html>")
+            + "</title><style>" + _STYLE + _TZCSS + "</style></head><body>" + _TZBAR + content
+            + _TZJS + "</body></html>")
 
 
 def _banner(risk):
@@ -587,7 +627,7 @@ def render_html(results, feed, risk, refresh=5):
         what = _esc(f"{x.get('skill')}/{x.get('perk')}") + (' <span class="warn">⚠</span>' if x.get("destructive") else "")
         rid = _esc(x.get("run_id") or "")
         rows.append(f'<tr class="run" onclick="location=\'/run/{_esc(x["node"])}/{rid}\'">'
-                    f'<td class="t">{_esc(str(x.get("ts"))[:19])}</td><td><b>{_esc(x["node"])}</b> '
+                    f'<td class="t">{_ts(x.get("ts"))}</td><td><b>{_esc(x["node"])}</b> '
                     f'<span class="role">{_esc(x["role"])}</span></td><td>{_esc(x.get("principal"))}</td><td>{what}</td>'
                     f'<td>{_esc(x.get("authority") or "—")}</td>'
                     f'<td class="{cls}">{_esc(x.get("decision"))} {_risk_pill(x)}</td></tr>')
@@ -597,7 +637,7 @@ def render_html(results, feed, risk, refresh=5):
                f'<a class="hlink" href="/accounting">accounting →</a></h1>'
                f'<div class="layout">{_sidebar(results)}'
                f'<section class="main">{_banner(risk)}'
-               f'<table><thead><tr><th>when (utc)</th><th>where (node)</th><th>who (principal)</th>'
+               f'<table><thead><tr><th>when</th><th>where (node)</th><th>who (principal)</th>'
                f'<th>what (skill/perk)</th><th>exec</th><th>outcome</th></tr></thead><tbody>{body}</tbody></table>'
                f'<p class="muted">click a node or a run for detail · central mirror of {len(feed)} runs · '
                f'{up}/{len(results)} nodes live · auto-refresh {refresh}s</p>'
@@ -611,7 +651,7 @@ def render_risk(feed, risk, refresh=5):
         items = risk.get(key, [])
         rows = "".join(
             f'<tr class="run" onclick="location=\'/run/{_esc(x["node"])}/{_esc(x.get("run_id") or "")}\'">'
-            f'<td class="t">{_esc(str(x.get("ts"))[:19])}</td><td><b>{_esc(x["node"])}</b></td>'
+            f'<td class="t">{_ts(x.get("ts"))}</td><td><b>{_esc(x["node"])}</b></td>'
             f'<td>{_esc(x.get("principal"))}</td><td>{_esc(x.get("skill"))}/{_esc(x.get("perk"))}</td>'
             f'<td>{_risk_pill(x)}</td></tr>' for x in items)
         rows = rows or '<tr><td colspan="5" class="muted">none</td></tr>'
@@ -711,7 +751,7 @@ def render_node(node, summary, refresh=5):
         cls = {"allow": "ok", "reject": "no", "push_back": "warn"}.get(d.get("decision"), "")
         rid = _esc(d.get("run_id") or "")
         rows.append(f'<tr class="run" onclick="location=\'/run/{name}/{rid}\'">'
-                    f'<td class="t">{_esc(str(d.get("ts"))[:19])}</td><td>{_esc(d.get("principal","?"))}</td>'
+                    f'<td class="t">{_ts(d.get("ts"))}</td><td>{_esc(d.get("principal","?"))}</td>'
                     f'<td>{_esc(d.get("skill"))}/{_esc(d.get("perk"))}</td>'
                     f'<td>{_esc(d.get("authority") or "—")}</td>'
                     f'<td class="{cls}">{_esc(d.get("decision"))} {_risk_pill(d)}</td></tr>')
@@ -757,7 +797,7 @@ def render_run(name, run_id, detail, has_svg=False):
         f'<tr><td>{_esc(e.get("type"))}</td><td>{_esc(e.get("step","—"))}</td>'
         f'<td>{_esc(e.get("status","—"))}</td><td>{_esc(e.get("authority","—"))}</td>'
         f'<td><code>{_esc(str(e.get("exod_keyid") or e.get("keyid") or "")[:18]) or "—"}</code></td>'
-        f'<td class="t">{_esc(str(e.get("ts"))[:19])}</td></tr>'
+        f'<td class="t">{_ts(e.get("ts"))}</td></tr>'
         for e in detail.get("events", [])) or '<tr><td colspan="6" class="muted">no events recorded</td></tr>'
 
     snip = detail.get("snippet_shas") or {}
@@ -782,7 +822,7 @@ def render_run(name, run_id, detail, has_svg=False):
     content = (back + f'<h1>{_esc(detail.get("skill"))}/{_esc(detail.get("perk"))} '
                f'<span class="{dcls}">{_esc(detail.get("decision"))}</span> {_risk_pill(detail)}</h1>'
                f'<p class="kv">where <b>{node_e}</b> · who <b>{_esc(detail.get("principal","?"))}</b> · when '
-               f'<b>{_esc(str(detail.get("ts"))[:19])}</b> · run <code>{rid}</code> · '
+               f'<b>{_ts(detail.get("ts"))}</b> · run <code>{rid}</code> · '
                f'<a href="/raw/{node_e}/{rid}">raw ledger ↗</a></p>'
 
                '<h2>claim &amp; approval</h2>'
