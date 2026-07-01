@@ -148,6 +148,61 @@ def test_exec_hands_govd_the_validated_chip(chip_repo, tmp_path, monkeypatch, ca
     assert "chip VALID" in capsys.readouterr().out
 
 
+# ── multi-source: several chips cloned then COMPOSED into one served registry ──
+
+def test_sources_parses_single_multi_and_namespaces(monkeypatch):
+    monkeypatch.setenv("CLOUD_SOURCE", "https://x/a.git")
+    assert chipfetch._sources() == [{"url": "https://x/a.git", "namespace": None}]
+    monkeypatch.setenv("CLOUD_SOURCE", "https://x/a.git , https://x/b.git|mo")   # comma + a re-home namespace
+    assert chipfetch._sources() == [{"url": "https://x/a.git", "namespace": None},
+                                    {"url": "https://x/b.git", "namespace": "mo"}]
+    monkeypatch.delenv("CLOUD_SOURCE", raising=False)                            # empty -> the default source, single
+    assert chipfetch._sources() == [{"url": chipfetch.DEFAULT_SOURCE, "namespace": None}]
+
+
+def test_cloud_multi_composes_disjoint_namespaces(chip_repo, tmp_path, monkeypatch):
+    """Two sources re-homed under DISJOINT namespaces compose into ONE served, validated registry."""
+    monkeypatch.setenv("CLOUD_MODE", "1")
+    monkeypatch.setenv("CLOUD_SOURCE", f"{chip_repo}|alpha  {chip_repo}|beta")   # one feedstock, two namespaces
+    monkeypatch.setenv("CLOUD_SOURCE_TAG", "v1")
+    monkeypatch.setenv("CLOUD_CHIP_DIR", str(tmp_path / "cloud"))
+    chip, prov = chipfetch.resolve()
+    assert prov["mode"] == "cloud-multi" and len(prov["sources"]) == 2
+    assert chipfetch.validate(chip) == []                                       # the SAME gate as every other mode
+    assert sorted(skill_index.all_skills(chip)) == ["alpha:fs", "alpha:search", "beta:fs", "beta:search"]
+    assert chip.endswith(os.sep + "composed")
+    assert not os.path.exists(os.path.join(tmp_path / "cloud", ".sources"))     # staged per-source clones dropped
+
+
+def test_cloud_multi_refuses_a_cross_source_collision(chip_repo, tmp_path, monkeypatch):
+    """The same namespace from two sources yields the same ns:name — compose REFUSES; govd never starts."""
+    monkeypatch.setenv("CLOUD_MODE", "1")
+    monkeypatch.setenv("CLOUD_SOURCE", f"{chip_repo}|dup  {chip_repo}|dup")      # both -> dup:fs, dup:search
+    monkeypatch.setenv("CLOUD_SOURCE_TAG", "v1")
+    monkeypatch.setenv("CLOUD_CHIP_DIR", str(tmp_path / "cloud"))
+    with pytest.raises(SystemExit):
+        chipfetch.resolve()
+    assert not os.path.exists(os.path.join(tmp_path / "cloud", "composed"))     # fail-closed: nothing served
+
+
+def test_exec_hands_govd_the_composed_multi_chip(chip_repo, tmp_path, monkeypatch):
+    """--exec on a multi-source chip hands govd the COMPOSED dir and still drops every boot-only secret."""
+    monkeypatch.setenv("CLOUD_MODE", "1")
+    monkeypatch.setenv("CLOUD_SOURCE", f"{chip_repo}|alpha {chip_repo}|beta")
+    monkeypatch.setenv("CLOUD_SOURCE_TAG", "v1")
+    monkeypatch.setenv("CLOUD_CHIP_DIR", str(tmp_path / "cloud"))
+    monkeypatch.setenv("CLOUD_SOURCE_TOKEN", "sekret")                          # must NOT reach govd's env
+    seen = {}
+    monkeypatch.setattr(os, "execvpe", lambda f, argv, env: seen.update(env=env))
+    monkeypatch.setattr("sys.argv", ["chipfetch", "--exec", "true"])
+    chipfetch.main()
+    assert seen["env"]["CYBERWARE_SKILLCHIP"].endswith(os.sep + "composed")
+    prov = json.loads(seen["env"]["GOVD_CHIP_PROVENANCE"])
+    assert prov["mode"] == "cloud-multi" and prov["skills"] == 4 and prov["chip_sha"]
+    for k in ("CLOUD_SOURCE_TOKEN", "CLOUD_MODE", "CLOUD_SOURCE", "CLOUD_SOURCE_TAG"):
+        assert k not in seen["env"], f"{k} leaked into govd's env"
+
+
 def test_main_exits_nonzero_on_a_drifted_chip(chip_repo, tmp_path, monkeypatch):
     p = chip_repo / "search" / "perks.json"
     p.write_text(p.read_text().replace("grep", "grpe"))         # tamper without re-indexing
