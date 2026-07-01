@@ -128,32 +128,49 @@ def _sources():
     return out or [{"url": DEFAULT_SOURCE, "namespace": None}]
 
 
+def _relabel(msg, specs, provs):
+    """Rewrite compose's internal staging-path labels (`.sources/srcN`) back to the operator's SANITISED source
+    URLs, so a refusal names the actual chips that collided / failed — not chipfetch's temp dirs."""
+    for spec, prov in zip(specs, provs):
+        msg = msg.replace(spec["path"], _sanitize(prov["source"]))
+    return msg
+
+
 def fetch_cloud_multi(sources, tag, token=None):
     """Clone EACH cloud source, then COMPOSE them into ONE namespace-partitioned chip that govd serves. One
     shared ref + token cover every source (chips published under one owner; a token works on a public source
     too). Returns (composed_chip_dir, provenance). Compose validates every source's authenticity AND the
     composed result, and HARD-FAILS on a cross-source `ns:name` collision — so a multi-chip registry is either
-    authentic and unambiguous, or govd never starts. Staged per-source clones (with their `.git`) are dropped
-    after the compose copies out only the skills."""
+    authentic and unambiguous, or govd never starts. A declared source that contributes ZERO skills (a wrong
+    ref / empty repo) is refused too — a multi-source deploy must get every chip it named, not silently fewer.
+    Staged per-source clones (with their `.git`) are dropped on EVERY exit, success or refusal — nothing
+    lingers on disk."""
     base = os.environ.get("CLOUD_CHIP_DIR") or os.path.expanduser("~/.cyberware/skillChip-cloud")
     if os.path.exists(base):
         shutil.rmtree(base)                                      # fresh each boot, like the single-source path
     stage = os.path.join(base, ".sources")
     os.makedirs(stage, exist_ok=True)
-    specs, provs = [], []
-    for i, s in enumerate(sources):
-        _, prov = fetch_cloud(s["url"], tag, token=token, dest=os.path.join(stage, f"src{i}"))
-        specs.append({"path": os.path.join(stage, f"src{i}"), "namespace": s["namespace"]})
-        provs.append({"source": prov["source"], "ref": prov["ref"], "commit": prov["commit"],
-                      "namespace": s["namespace"]})
-    out = os.path.join(base, "composed")
     try:
-        result = compose.compose(specs, out)                     # authenticity gate + conflict gate, atomic swap
-    except compose.ComposeConflict as e:
-        sys.exit(f"chipfetch: REFUSED — sources collide on a skill id (cannot compose):\n  {e}")
-    except (ValueError, OSError) as e:
-        sys.exit(f"chipfetch: REFUSED — compose failed: {e}")
-    shutil.rmtree(stage, ignore_errors=True)                     # the composed chip is self-contained now
+        specs, provs = [], []
+        for i, s in enumerate(sources):
+            dest = os.path.join(stage, f"src{i}")
+            _, prov = fetch_cloud(s["url"], tag, token=token, dest=dest)
+            if not skill_index.scan_skills(dest):                # a named-but-empty chip is a misconfig, not a no-op
+                sys.exit(f"chipfetch: REFUSED — declared source {_sanitize(s['url'])} contributed 0 skills "
+                         f"(wrong ref, or an empty repo)")
+            specs.append({"path": dest, "namespace": s["namespace"]})
+            provs.append({"source": prov["source"], "ref": prov["ref"], "commit": prov["commit"],
+                          "namespace": s["namespace"]})
+        out = os.path.join(base, "composed")
+        try:
+            result = compose.compose(specs, out)                 # authenticity gate + conflict gate, atomic swap
+        except compose.ComposeConflict as e:
+            sys.exit("chipfetch: REFUSED — sources collide on a skill id (cannot compose):\n  "
+                     + _relabel(str(e), specs, provs))
+        except (ValueError, OSError) as e:
+            sys.exit("chipfetch: REFUSED — compose failed: " + _relabel(str(e), specs, provs))
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)                 # staged clones (+ their .git) never linger
     return out, {"mode": "cloud-multi", "ref": tag, "sources": provs, "chip_sha": result["chip_sha"],
                  "source": ", ".join(_sanitize(p["source"]) for p in provs)}
 

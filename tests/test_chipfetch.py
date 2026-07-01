@@ -180,9 +180,33 @@ def test_cloud_multi_refuses_a_cross_source_collision(chip_repo, tmp_path, monke
     monkeypatch.setenv("CLOUD_SOURCE", f"{chip_repo}|dup  {chip_repo}|dup")      # both -> dup:fs, dup:search
     monkeypatch.setenv("CLOUD_SOURCE_TAG", "v1")
     monkeypatch.setenv("CLOUD_CHIP_DIR", str(tmp_path / "cloud"))
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as e:
         chipfetch.resolve()
     assert not os.path.exists(os.path.join(tmp_path / "cloud", "composed"))     # fail-closed: nothing served
+    assert not os.path.exists(os.path.join(tmp_path / "cloud", ".sources"))     # staged clones dropped on refusal too
+    assert ".sources" not in str(e.value) and str(chip_repo) in str(e.value)    # refusal names the SOURCE, not a temp dir
+
+
+def test_cloud_multi_refuses_an_empty_source(chip_repo, tmp_path, monkeypatch):
+    """A declared source that clones to ZERO skills (wrong ref / empty repo) is refused — no silent partial."""
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    (empty / "README.md").write_text("no skills here\n")
+    subprocess.run(["git", "init", "-q", "-b", "main", str(empty)], check=True, capture_output=True)
+    _git(empty, "config", "user.email", "t@t")
+    _git(empty, "config", "user.name", "t")
+    _git(empty, "config", "commit.gpgsign", "false")
+    _git(empty, "add", "-A")
+    _git(empty, "commit", "-q", "-m", "empty")
+    monkeypatch.setenv("CLOUD_MODE", "1")
+    monkeypatch.setenv("CLOUD_SOURCE", f"{chip_repo}|alpha  {empty}|beta")       # 2 entries -> multi; beta is empty
+    monkeypatch.setenv("CLOUD_SOURCE_TAG", "main")
+    monkeypatch.setenv("CLOUD_CHIP_DIR", str(tmp_path / "cloud"))
+    with pytest.raises(SystemExit) as e:
+        chipfetch.resolve()
+    assert "0 skills" in str(e.value) and str(empty) in str(e.value)            # names the empty source, refuses
+    assert not os.path.exists(os.path.join(tmp_path / "cloud", "composed"))     # nothing served
+    assert not os.path.exists(os.path.join(tmp_path / "cloud", ".sources"))     # staged clones dropped here too
 
 
 def test_exec_hands_govd_the_composed_multi_chip(chip_repo, tmp_path, monkeypatch):
