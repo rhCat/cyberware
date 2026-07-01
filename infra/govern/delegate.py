@@ -65,7 +65,7 @@ def materialize_workspace(rec, base, registry=None):
             sp = os.path.join(src, name)
             if os.path.isfile(sp):
                 shutil.copy2(sp, os.path.join(snip, name))
-    env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "SNIP": snip, "RECORD_STORE": store}
+    env = {"PATH": "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin", "SNIP": snip, "RECORD_STORE": store}   # /usr/local/bin: slim-image python3
     return ws, env, run_sh
 
 

@@ -48,7 +48,8 @@ class SandboxProfile:
     dev: bool = True
     tmpfs: tuple = ("/tmp",)
     clearenv: bool = True
-    env: Mapping[str, str] = dataclasses.field(default_factory=lambda: {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin"})
+    env: Mapping[str, str] = dataclasses.field(default_factory=lambda:
+        {"PATH": "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"})   # /usr/local/bin FIRST: the slim-image python3 lives there
     hostname: str = "sandbox"
     uid: int = 65534          # bwrap sets up the namespaces as userns-root, then drops the STEP to this
     gid: int = 65534          # unprivileged id ("nobody") before exec — an empty capability set + DAC
