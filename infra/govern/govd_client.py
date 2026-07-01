@@ -21,13 +21,30 @@ read from the file/env, never argv. An open/local govd (no registry) needs none.
 P1-T08: the token + the endpoint are all the agent holds; every action is a governed syscall over this.
 """
 from __future__ import annotations
-import argparse, base64, collections, hashlib, json, os, socket, subprocess, sys, urllib.error, urllib.parse, urllib.request
+import argparse, base64, collections, hashlib, json, os, re, socket, subprocess, sys, urllib.error, urllib.parse, urllib.request
 
 from infra import registry as _reg   # the agent's `registry` arg = its skillChip; default = the bundled chip
 from infra.exec import aclverify     # ACL M2: mint_token_proof + read the attestation's token_sha (client side)
 from infra.govern import compiler
 from infra.govern import runlog
 from infra.tool import skill_index   # the value-free catalog builder — shared with govd, so the two can't drift
+
+# a var name that LOOKS secret must never ride the wire as a VALUE (delegated); it stays a *_FILE pointer or a
+# vault credential (node-local). Mirrors govd's SECRET_KEY — govd re-filters authoritatively, this is hygiene.
+_SECRET_KEY = re.compile(r"(?i)(password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key)")
+
+
+def _wire_values(vars_dict):
+    """The NON-secret subset of the ledger's var VALUES to send over the per-run WS for a delegated step: drop
+    any secret-named key (unless a *_FILE pointer) and the reserved CWS_SECRET_* vault namespace."""
+    out = {}
+    for k, v in (vars_dict or {}).items():
+        if k.startswith("CWS_SECRET_"):
+            continue
+        if _SECRET_KEY.search(k) and not k.endswith("_FILE"):
+            continue
+        out[k] = str(v)
+    return out
 
 
 def _auth_headers():
@@ -293,6 +310,9 @@ def run_delegated(base_url, ledger, approve=(), attestation=None, proof_key=None
     results = []
     for st in steps:
         msg = {"type": "step_request", "step": st, "plan_sha": psha}
+        _vv = _wire_values(ledger.get("vars"))          # caller NON-secret VALUES for a parameterized delegated step
+        if _vv:                                         # (govd re-gates on the `params` ACL + declared-subset)
+            msg["var_values"] = _vv
         if attestation is not None:                     # ACL M1: relay the operator attestation to exod (the
             msg["attestation"] = attestation            # agent holds it; govd only relays, it cannot forge it)
         if proof_key is not None and token_sha is not None:   # ACL M2: prove possession of THIS token's proof key

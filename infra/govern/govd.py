@@ -277,8 +277,9 @@ def govern(ledger, cfg, *, scope=None, principal=None, local_dev=False, principa
     # perk_tier + credentialed come from govd's OWN trusted registry + the blessed plan, never task data.
     perk_tier = delegate.perk_sandbox_tier(skill, perk)
     credentialed = bool((plan or {}).get("credential_ids"))
+    parameterized = bool(ledger.get("binds"))       # claim-declared dir binds -> params axis (values re-gated at the WS step)
     acl_ok, acl_problem = principals.acl_allows(scope, skill, perk, perk_tier, destructive, credentialed,
-                                                now=now, strict=strict)
+                                                parameterized=parameterized, now=now, strict=strict)
     if not acl_ok:
         problems.append(acl_problem)
 
@@ -636,7 +637,7 @@ def step_reauthorize(cfg, rec0, *, now=None):
         if sc is not None or strict:
             okv, pv = principals.acl_allows(sc, skill, perk, delegate.perk_sandbox_tier(skill, perk),
                                             rec0.get("destructive", False), bool(rec0.get("credential_ids")),
-                                            now=now, strict=strict)
+                                            parameterized=bool(rec0.get("binds")), now=now, strict=strict)
             if not okv:
                 return False, "acl:" + pv["id"]
     ps0 = reg0.get(rec0.get("principal")) or {}              # ACCESS-1: skill-intrinsic — registry-independent
@@ -1285,11 +1286,34 @@ class Handler(BaseHTTPRequestHandler):
                                     "reason": f"step {step} already executed or in flight — delegated runs are at-most-once"}))
                             continue
                         try:
+                            # PARAMETERIZED delegated run: caller VALUES ride the per-run WS (never the /govern
+                            # claim plane, which stays keys-only). Gate them on the actor's `params` ACL LIVE, and
+                            # forward ONLY keys that were DECLARED in the plan AND are non-secret — secret-named
+                            # keys (and the reserved CWS_SECRET_* vault namespace) never cross the wire.
+                            var_values = msg.get("var_values") or {}
+                            if var_values:
+                                _acl_strict = bool(self.server.cfg.get("acl_strict"))
+                                sc_p = principals.resolve_scope(reg0, (rec0 or {}).get("principal"))
+                                if sc_p is not None or _acl_strict:
+                                    okp, pp = principals.acl_allows(
+                                        sc_p, rec0.get("skill"), rec0.get("perk"),
+                                        delegate.perk_sandbox_tier(rec0.get("skill"), rec0.get("perk")),
+                                        rec0.get("destructive", False), bool(rec0.get("credential_ids")),
+                                        parameterized=True, now=time.time(), strict=_acl_strict)
+                                    if not okp:
+                                        ws_send(self.wfile, json.dumps({"type": "refuse", "step": msg.get("step"),
+                                                "reason": "acl:" + pp["id"]}))
+                                        continue
+                                declared = set(rec0.get("var_keys") or [])
+                                var_values = {k: str(v) for k, v in var_values.items()
+                                              if k in declared and not k.startswith("CWS_SECRET_")
+                                              and not (SECRET_KEY.search(k) and not k.endswith("_FILE"))}
                             d_reply, d_event = delegate.execute_step(
                                 rec0, step, psha, exod_socket=sock, grant_key=gk, exod_pub=epub,
                                 base=getattr(self.server, "exec_workspace", os.path.join(store.root, "_work")),
                                 attestation=msg.get("attestation"),   # ACL M1: agent-relayed operator attestation
-                                token_proof=msg.get("token_proof"))   # ACL M2: agent-relayed token-possession proof
+                                token_proof=msg.get("token_proof"),   # ACL M2: agent-relayed token-possession proof
+                                var_values=var_values)                # caller NON-secret values (declared subset, ACL-gated)
                             if d_event:
                                 store.append(bound, {**d_event, "ts": now(),
                                                      "span": tracing.child_span((rec0 or {}).get("traceparent"))})
