@@ -66,6 +66,7 @@ MAX_WS_FRAME = 1 << 20                                       # refuse a WebSocke
 SOCKET_TIMEOUT = 600                                         # per-read socket timeout (s) — kills slowloris
 SNAPSHOT_RUNS = 150  # most-recent runs the dashboard lists/aggregates
 DECISIONS_PER_PAGE = 200  # default page size for the paginated decisions feed (P5-T02)
+ERRORS_MAX = 200  # cap on the consolidated value-free error log carried in a snapshot (bounds payload)
 SSE_MAX_STREAMS = 32      # cap on concurrent /monitor/stream connections (P5-T02; bounds thread/socket use)
 _SSE_LOCK = threading.Lock()
 _SSE_ACTIVE = [0]         # live SSE stream count (list = a mutable box guarded by _SSE_LOCK)
@@ -588,11 +589,36 @@ class Store:
                 step_feed.append({"run_id": r["run_id"], "skill": r.get("skill"), "perk": r.get("perk"), **e})
         run_views.sort(key=lambda r: r["ts"] or "", reverse=True)
         step_feed.sort(key=lambda e: e.get("ts") or "", reverse=True)
+        # Consolidated ERROR log (value-free): every failure across the snapshot window collated into one
+        # newest-first feed for review — a step that ERRED (status/exit), a step the limb REFUSED or whose
+        # signed status failed to verify (reason), and a CLAIM govd REJECTED before any run (problem ids). This
+        # is status-level provenance ONLY — the same fields already in the per-run feed/ledger — NEVER command
+        # output (the value-free boundary holds; govd only ever sees names + status). Each row links to its run.
+        seq_of = {r["run_id"]: r.get("seq", []) for r in runs}
+        errors = []
+        for e in step_feed:                                  # step_feed = every event, already {run_id,skill,perk,**e}
+            et, step = e.get("type"), e.get("step")
+            seq = seq_of.get(e.get("run_id")) or []
+            tool = seq[int(step) - 1] if (str(step).isdigit() and 0 < int(step) <= len(seq)) else None
+            if et == "step_result" and e.get("status") not in (None, "ok"):
+                errors.append({"run_id": e.get("run_id"), "skill": e.get("skill"), "perk": e.get("perk"),
+                               "ts": e.get("ts"), "step": step, "tool": tool, "kind": "step_error",
+                               "status": e.get("status"), "exit": e.get("exit")})
+            elif et in ("step_refused", "step_delegation_refused", "forged_status_refused"):
+                errors.append({"run_id": e.get("run_id"), "skill": e.get("skill"), "perk": e.get("perk"),
+                               "ts": e.get("ts"), "step": step, "tool": tool, "kind": "refused",
+                               "etype": et, "reason": e.get("reason")})
+        for x in decisions:                                  # a CLAIM govd refused (no run, no plan) — problem ids only
+            if x.get("decision") == "reject":
+                errors.append({"run_id": x.get("run_id"), "skill": x.get("skill"), "perk": x.get("perk"),
+                               "ts": x.get("ts"), "kind": "reject", "problems": x.get("problems") or []})
+        errors.sort(key=lambda e: e.get("ts") or "", reverse=True)
         dec = feed.paginate(list(reversed(decisions)), dec_page, dec_limit)   # newest-first, one page
         return {"now": now(), "totals": dict(totals), "runs_live": len(allruns),
                 "decisions": dec["items"],
                 "decisions_page": {k: dec[k] for k in ("page", "pages", "total", "limit")},
-                "runs": run_views, "tools": tools, "feed": step_feed[:120]}
+                "runs": run_views, "tools": tools, "feed": step_feed[:120],
+                "errors": errors[:ERRORS_MAX], "errors_total": len(errors)}
 
 
 def authorize_step(store, run_id, step, plan_sha):
