@@ -164,3 +164,19 @@ def test_govern_does_not_propagate_cargo_past_a_reject():
     assert v["decision"] == "reject"
     assert any(p["id"] == "acl_cargo_denied" for p in v.get("problems", []))
     assert v.get("cargo") is None                            # NOT propagated on a non-allow (kills the == -> != mutant)
+
+
+def test_client_fetch_transmits_cargo_to_govern(monkeypatch):
+    """The client's /govern POST body MUST carry the ledger's cargo mode — else govd never sees the request,
+    the grant carries no cargo, and the bind never happens. This is the end-to-end wire link the direct
+    govern()/exod unit tests could not exercise (they injected cargo into the ledger/grant themselves)."""
+    from infra.govern import govd_client
+    seen = {}
+    monkeypatch.setattr(govd_client, "_post_json",
+                        lambda url, body: (seen.update(body=body), (200, {"decision": "allow"}))[1])
+    govd_client.fetch("http://x", {"skill": "general:fs", "perk": "find", "vars": {"A": "1"}, "cargo": "rw"})
+    assert seen["body"].get("cargo") == "rw"                     # cargo mode reaches /govern
+    assert seen["body"]["var_keys"] == ["A"]                     # (still value-free: only var KEYS)
+    seen.clear()
+    govd_client.fetch("http://x", {"skill": "general:fs", "perk": "find", "vars": {}})
+    assert "cargo" not in seen["body"]                           # no cargo in the ledger -> not sent (legacy unchanged)
