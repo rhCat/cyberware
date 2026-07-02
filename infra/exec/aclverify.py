@@ -25,7 +25,7 @@ def attestation_body(envelope):
 def attested_acl(body):
     # the actor ACL block reconstructed from the attestation's own fields (the ceiling exod re-enforces)
     return {"skills": body.get("skills"), "perks": body.get("perks"),
-            "max_tier": body.get("max_tier"), "secrets": body.get("secrets")}
+            "max_tier": body.get("max_tier"), "secrets": body.get("secrets"), "params": body.get("params")}
 
 
 def verify_acl_attestation(acl_issuer_pub, envelope, *, now, expect_acl_sha=None, skew=DEFAULT_SKEW):

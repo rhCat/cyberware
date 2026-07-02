@@ -70,7 +70,8 @@ def materialize_workspace(rec, base, registry=None):
 
 
 def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base, registry=None,
-                 request=exod.request_step, now=None, grant_ttl=60, attestation=None, token_proof=None):
+                 request=exod.request_step, now=None, grant_ttl=60, attestation=None, token_proof=None,
+                 var_values=None):
     """Delegate ONE step to exod. Returns (reply, event): `reply` is the status-only dict sent back to the
     agent; `event` is the ledger record to append (exod's signed step_result, or a refusal record, or None
     when nothing should be recorded). govd NEVER runs the step — exod does, confined.
@@ -80,6 +81,9 @@ def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base,
     a swap, so govd does not attest to its own copy — the integrity check is exod's, against the signed pin."""
     now = int(time.time()) if now is None else now
     ws, env, run_sh = materialize_workspace(rec, base, registry)
+    if var_values:                                   # caller NON-secret values (already declared-subset + secret-filtered
+        env.update({k: str(v) for k, v in var_values.items()      # by govd's WS handler); ride req["env"] -> exod --setenv
+                    if k not in ("PATH", "SNIP", "RECORD_STORE")})   # defense-in-depth: never clobber the fixed confined env
     nonce = secrets.token_urlsafe(18)
     # P2-T04 tier: a grant that carries credentials is minted at the TRUSTED tier (govd authorized those
     # credentials from the plan); a credential-free grant stays at the COMMUNITY floor. exod refuses to resolve

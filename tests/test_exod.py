@@ -497,3 +497,41 @@ def test_sandbox_tier_selftest_passes():
     from infra.exec.sandbox import tier_backend_selftest
     r = tier_backend_selftest()
     assert r["ok"], r
+
+
+def test_load_vault_dispatches_each_kind():
+    """load_vault: the spec KIND selects the backend — file->FileVault, sops->SopsAgeVault (age key split on
+    '#'), empty->None (fail-closed later, at secret resolution), unknown->SystemExit. Pins the kind
+    comparisons so a flipped == cannot silently mis-dispatch a vault spec."""
+    from infra.exec.exod import load_vault
+    assert load_vault(None) is None and load_vault("") is None
+    fv = load_vault("file:/run/secrets.json")
+    assert isinstance(fv, _vaultmod.FileVault) and fv.path == "/run/secrets.json"
+    sv = load_vault("sops:/run/enc.json#/run/age.key")
+    assert isinstance(sv, _vaultmod.SopsAgeVault) and sv.path == "/run/enc.json" and sv.age_key_file == "/run/age.key"
+    sv2 = load_vault("sops:/run/enc.json")                       # no '#': the age key file stays None
+    assert isinstance(sv2, _vaultmod.SopsAgeVault) and sv2.age_key_file is None
+    with pytest.raises(SystemExit):
+        load_vault("hashicorp:/whatever")
+
+
+def test_main_backend_floor_warning_tracks_the_selected_backend(tmp_path, monkeypatch, capsys):
+    """The startup floor check consults the availability probe FOR THE CONFIGURED backend (runsc floor ->
+    runsc_available, bwrap floor -> is_available). Pins the selector so a flipped comparison cannot warn on
+    the wrong probe (or stay silent when the actual floor is unenforceable)."""
+    from cryptography.hazmat.primitives import serialization as _ser
+    from infra.exec import exod as exod_mod
+    raw_priv = lambda k: k.private_bytes(_ser.Encoding.Raw, _ser.PrivateFormat.Raw, _ser.NoEncryption())
+    raw_pub = lambda k: k.public_key().public_bytes(_ser.Encoding.Raw, _ser.PublicFormat.Raw)
+    key = tmp_path / "exod.key"; key.write_bytes(raw_priv(Ed25519PrivateKey.generate()))
+    ipub = tmp_path / "issuer.pub"; ipub.write_bytes(raw_pub(Ed25519PrivateKey.generate()))
+    monkeypatch.setattr(exod_mod.Exod, "serve", lambda self, sock: None)   # never enter the UDS loop
+    argv = ["--key", str(key), "--issuer-pub", str(ipub), "--socket", str(tmp_path / "exod.sock")]
+    # runsc floor, runsc enforceable (bwrap NOT): the runsc probe answers -> NO warning
+    monkeypatch.setattr(exod_mod, "runsc_available", lambda: True)
+    monkeypatch.setattr(exod_mod, "is_available", lambda: False)
+    exod_mod.main(argv + ["--backend", "runsc"])
+    assert "NOT enforceable" not in capsys.readouterr().err
+    # bwrap floor on the same host: the bwrap probe answers -> warning (fail-closed refusals ahead)
+    exod_mod.main(argv + ["--backend", "bwrap"])
+    assert "NOT enforceable" in capsys.readouterr().err
