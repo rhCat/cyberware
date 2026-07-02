@@ -168,7 +168,11 @@ class Exod:
                 env = _vaultmod.inject_step_env(env, self._vault, creds)   # + the grant-authorized secrets
             except Exception:
                 return refuse("vault:resolve_failed")
-        prof = dataclasses.replace(prof, env=env)
+        # the ACL-granted cargo bind mode rides the grant (govd authorized it; _acl_check re-enforced it above).
+        # Only "ro"/"rw" ever reaches the profile; anything else => no bind (fail-safe). In audit mode the M0
+        # govd gate remains the live enforcer, so exod honors the grant's mode here exactly as for env/creds.
+        cargo_mode = gbody.get("cargo") if gbody.get("cargo") in ("ro", "rw") else None
+        prof = dataclasses.replace(prof, env=env, cargo=cargo_mode)
         # 6. P3-T11: the grant's sandbox TIER selects the confinement backend, as a MONOTONE floor over the
         #    operator's --backend. A community-tier grant (untrusted marketplace code) DEMANDS the gVisor (runsc)
         #    box; the trusted family (core/verified) runs in bwrap; an undeclared grant takes the operator floor.
@@ -217,11 +221,16 @@ class Exod:
         # value. exod derives this from what it ACTUALLY received (not a govd-asserted flag), so a govd that
         # injects caller values without a `params` grant is refused here, mirroring how the other axes re-run.
         parameterized = bool(set((req.get("env") or {})) - {"PATH", "SNIP", "RECORD_STORE"})
+        # CARGO axis, re-enforced OFF-NODE: the grant states the cargo bind MODE govd authorized ("ro"/"rw");
+        # exod re-runs acl_allows against the ATTESTED acl, so a compromised govd cannot bind /cyberware_cargo
+        # (or widen ro->rw) for an actor the operator did not grant it. The bind itself is added in run_step
+        # ONLY after this passes.
+        cargo = gbody.get("cargo") if isinstance(gbody, dict) else None
         # sandbox_tier is the perk's catalog tier, derived by govd from its OWN trusted registry (never task
         # data) and grant-bound — a govd that lowers it can only TIGHTEN the ceiling, never widen the actor.
         okv, prob = principals.acl_allows(acl, gbody.get("skill"), gbody.get("perk"),
                                           gbody.get("sandbox_tier"), gbody.get("destructive"),
-                                          bool(gbody.get("credentials")), parameterized=parameterized)
+                                          bool(gbody.get("credentials")), parameterized=parameterized, cargo=cargo)
         if not okv:
             return prob["id"]
         # M2: when the operator bound a client proof key into the attestation, REQUIRE a matching token-possession

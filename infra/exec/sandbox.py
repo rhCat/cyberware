@@ -54,6 +54,8 @@ class SandboxProfile:
     uid: int = 65534          # bwrap sets up the namespaces as userns-root, then drops the STEP to this
     gid: int = 65534          # unprivileged id ("nobody") before exec — an empty capability set + DAC
     mask_proc: bool = True    # mask the dangerous /proc paths read-only (the runc maskedPaths doctrine)
+    cargo: str | None = None  # the ACL-GRANTED shared-cargo bind mode ("ro"|"rw"|None). exod sets this ONLY after
+    cargo_path: str = "/cyberware_cargo"   # re-enforcing the cargo axis off-node; None => the dir is NOT bound.
 
     def bwrap_argv(self, argv: Sequence[str]) -> list[str]:
         """Render this profile + the step's argv into a complete bwrap command line. Pure: it builds the
@@ -80,6 +82,12 @@ class SandboxProfile:
         for t in self.tmpfs:
             cmd += ["--tmpfs", t]
         cmd += ["--bind", self.workspace, self.workspace]   # the one writable path — bound LAST
+        if self.cargo in ("ro", "rw") and os.path.exists(self.cargo_path):
+            # the ACL-granted shared cargo dir: rw => --bind, ro => --ro-bind. Bound only when exod set the mode
+            # (after off-node re-enforcement) AND the dir is actually mounted into the body container; absent =>
+            # the step simply doesn't see it (fail-safe: no silent widening of what a step can touch).
+            cmd += (["--bind", self.cargo_path, self.cargo_path] if self.cargo == "rw"
+                    else ["--ro-bind", self.cargo_path, self.cargo_path])
         if self.proc:
             cmd += ["--proc", "/proc"]        # a fresh /proc bound to the new pid namespace
             if self.mask_proc:
@@ -148,6 +156,9 @@ def oci_config(profile: SandboxProfile, argv: Sequence[str]) -> dict:
             mounts.append({"destination": p, "type": "bind", "source": p, "options": ["ro", "rbind", "nosuid"]})
     mounts.append({"destination": profile.workspace, "type": "bind", "source": profile.workspace,
                    "options": ["rw", "rbind", "nosuid"]})      # the one writable path
+    if profile.cargo in ("ro", "rw") and os.path.exists(profile.cargo_path):
+        mounts.append({"destination": profile.cargo_path, "type": "bind", "source": profile.cargo_path,
+                       "options": [profile.cargo, "rbind", "nosuid"]})   # ACL-granted shared cargo (mirrors bwrap)
     masked = [f for f in _MASKED_PROC if os.path.exists(f)]
     return {
         "ociVersion": "1.0.2",
