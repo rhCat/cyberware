@@ -128,6 +128,8 @@ def fetch(base_url, ledger, approve=()):
             "var_keys": sorted((ledger.get("vars") or {}).keys())}
     if approve:
         body["approve"] = list(approve)
+    if ledger.get("cargo"):                              # the ACL-gated /cyberware_cargo bind mode ("ro"/"rw") —
+        body["cargo"] = ledger["cargo"]                  # a NAME, not a value; govd gates it, exod binds the dir
     if ledger.get("traceparent"):                        # P5-T05: propagate the agent's W3C trace into the claim
         body["traceparent"] = ledger["traceparent"]
     _, verdict = _post_json(base_url.rstrip("/") + "/govern", body)
