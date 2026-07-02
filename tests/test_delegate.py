@@ -248,3 +248,26 @@ def test_acl_m2_delegated_end_to_end_token_proof(tmp_path):
     assert ok_reply.get("status") == "ok" and ok_event is not None       # valid proof → exod ran it
     no_reply, _ = run(None, tmp_path / "no")
     assert no_reply.get("status") == "refused"                           # proof bound but not relayed → refused
+
+
+def test_materialize_workspace_writes_the_wrapper_verbatim(tmp_path):
+    """run.sh must BE the blessed wrapper (byte-for-byte) — and an absent wrapper degrades to an empty file,
+    never a crash. Pins the `or ""` default so a flipped operator can't silently write an EMPTY run.sh for a
+    real wrapper (the confined step would no-op 'ok' without running its gated sequence)."""
+    from infra.govern.delegate import materialize_workspace
+    wrapper = "#!/usr/bin/env bash\nset -uo pipefail\nstep1() { echo x; }\n"
+    ws, env, run_sh = materialize_workspace({"run_id": "rw1", "wrapper": wrapper,
+                                             "skill": "nosuch", "perk": "nosuch"}, str(tmp_path))
+    assert open(run_sh).read() == wrapper
+    ws2, _, run_sh2 = materialize_workspace({"run_id": "rw2", "wrapper": None,
+                                             "skill": "nosuch", "perk": "nosuch"}, str(tmp_path))
+    assert open(run_sh2).read() == ""
+
+
+def test_perk_sandbox_tier_requires_both_names():
+    """A missing skill OR a missing perk short-circuits to None (undeclared -> operator floor) — neither may
+    reach the registry path join (a None name would raise, not refuse). Pins the `not skill or not perk` guard."""
+    from infra.govern.delegate import perk_sandbox_tier
+    assert perk_sandbox_tier(None, "read") is None
+    assert perk_sandbox_tier("cws-fs", None) is None
+    assert perk_sandbox_tier(None, None) is None

@@ -31,17 +31,20 @@ from infra.tool import skill_index   # the value-free catalog builder — shared
 
 # a var name that LOOKS secret must never ride the wire as a VALUE (delegated); it stays a *_FILE pointer or a
 # vault credential (node-local). Mirrors govd's SECRET_KEY — govd re-filters authoritatively, this is hygiene.
-_SECRET_KEY = re.compile(r"(?i)(password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key)")
+_SECRET_KEY = re.compile(r"(?i)(password|passwd|passphrase|secret|token|credential|mnemonic|seed[_-]?phrase"
+                         r"|bearer|api[_-]?key|access[_-]?key|private[_-]?key|priv[_-]?key"
+                         r"|ssh[_-]?key|gpg[_-]?key|signing[_-]?key)")   # mirrors govd.SECRET_KEY (govd re-filters; NOT session|jwt|cookie — metadata FPs)
+_POINTER_SUFFIX = ("_FILE", "_DIR", "_PATH")   # mirrors govd.POINTER_SUFFIX — a path pointer, not the secret itself
 
 
 def _wire_values(vars_dict):
     """The NON-secret subset of the ledger's var VALUES to send over the per-run WS for a delegated step: drop
-    any secret-named key (unless a *_FILE pointer) and the reserved CWS_SECRET_* vault namespace."""
+    any secret-named key (unless a *_FILE/_DIR/_PATH pointer) and the reserved CWS_SECRET_* vault namespace."""
     out = {}
     for k, v in (vars_dict or {}).items():
         if k.startswith("CWS_SECRET_"):
             continue
-        if _SECRET_KEY.search(k) and not k.endswith("_FILE"):
+        if _SECRET_KEY.search(k) and not k.endswith(_POINTER_SUFFIX):
             continue
         out[k] = str(v)
     return out

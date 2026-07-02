@@ -82,7 +82,8 @@ def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base,
     now = int(time.time()) if now is None else now
     ws, env, run_sh = materialize_workspace(rec, base, registry)
     if var_values:                                   # caller NON-secret values (already declared-subset + secret-filtered
-        env.update({k: str(v) for k, v in var_values.items()})   # by govd's WS handler); ride req["env"] -> exod --setenv
+        env.update({k: str(v) for k, v in var_values.items()      # by govd's WS handler); ride req["env"] -> exod --setenv
+                    if k not in ("PATH", "SNIP", "RECORD_STORE")})   # defense-in-depth: never clobber the fixed confined env
     nonce = secrets.token_urlsafe(18)
     # P2-T04 tier: a grant that carries credentials is minted at the TRUSTED tier (govd authorized those
     # credentials from the plan); a credential-free grant stays at the COMMUNITY floor. exod refuses to resolve

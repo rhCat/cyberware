@@ -212,11 +212,16 @@ class Exod:
             return why
         body = attestation_body(att)
         acl = attested_acl(body)
+        # PARAMS axis, re-enforced OFF-NODE and INDEPENDENTLY: a delegated run is "parameterized" iff exod's
+        # step env carries any key beyond the fixed govd-supplied set (PATH/SNIP/RECORD_STORE) — i.e. a caller
+        # value. exod derives this from what it ACTUALLY received (not a govd-asserted flag), so a govd that
+        # injects caller values without a `params` grant is refused here, mirroring how the other axes re-run.
+        parameterized = bool(set((req.get("env") or {})) - {"PATH", "SNIP", "RECORD_STORE"})
         # sandbox_tier is the perk's catalog tier, derived by govd from its OWN trusted registry (never task
         # data) and grant-bound — a govd that lowers it can only TIGHTEN the ceiling, never widen the actor.
         okv, prob = principals.acl_allows(acl, gbody.get("skill"), gbody.get("perk"),
                                           gbody.get("sandbox_tier"), gbody.get("destructive"),
-                                          bool(gbody.get("credentials")))
+                                          bool(gbody.get("credentials")), parameterized=parameterized)
         if not okv:
             return prob["id"]
         # M2: when the operator bound a client proof key into the attestation, REQUIRE a matching token-possession
