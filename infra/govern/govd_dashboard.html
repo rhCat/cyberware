@@ -78,6 +78,17 @@
   .tab.on{color:var(--accent);background:var(--panel);border-color:var(--line);box-shadow:inset 0 2px 0 var(--accent)}
   .flow{background:var(--panel2);border-radius:8px;padding:10px;text-align:center;overflow:auto}
   .flow svg{max-width:100%;height:auto;border-radius:6px}
+  .chip.err{cursor:pointer} .chip.err b{color:var(--reject)}
+  .errfilter{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+  .efbtn{font:10px var(--mono);text-transform:uppercase;letter-spacing:.08em;padding:4px 10px;background:var(--panel2);
+    border:1px solid var(--line);border-radius:6px;color:var(--dim);cursor:pointer}
+  .efbtn:hover{color:var(--ink)} .efbtn.on{color:var(--accent);border-color:var(--accent)}
+  tr.errrow{cursor:pointer} tr.errrow:hover td{background:var(--panel2)}
+  td.t{color:var(--dim);white-space:nowrap} td.errdet{color:var(--ink)}
+  .errkind{font-size:10px;border-radius:6px;padding:1px 7px;border:1px solid;white-space:nowrap}
+  .errkind.k-step_error{color:var(--reject);border-color:var(--reject)}
+  .errkind.k-refused{color:var(--push);border-color:var(--push)}
+  .errkind.k-reject{color:var(--destructive);border-color:var(--destructive)}
 </style>
 </head>
 <body>
@@ -93,7 +104,7 @@
 "use strict";
 const qs = new URLSearchParams(location.search);
 let token = qs.get("token") || sessionStorage.getItem("govd_monitor_token") || "";
-const state = { snap:null, selected:null, detail:null, tab:"Run" };
+const state = { snap:null, selected:null, detail:null, tab:"Run", view:"overview", errFilter:"all" };
 const flowCache = {};   // run_id -> task-blueprint svg (fetched once; the blueprint is static per run)
 let lastSig = "";       // signature of the last RENDERED view; an idle poll whose signature matches is a no-op
 let lastNav = "";       // navigation identity (run + tab + page) of the last render — tells an in-place refresh
@@ -142,12 +153,12 @@ async function refreshDetail(){
 function viewSig(){
   // everything the DOM is built from, EXCEPT the per-poll clock (snap.now) — so an idle poll is a no-op.
   const s = state.snap ? {...state.snap, now:0} : null;
-  return JSON.stringify([state.selected, state.tab, decPage, s, state.detail]);
+  return JSON.stringify([state.selected, state.view, state.errFilter, state.tab, decPage, s, state.detail]);
 }
 function viewNav(){
   // navigation identity: changes when the user opens a different run, switches tabs, or pages decisions — NOT on a
   // data refresh. A same-viewNav re-render is an in-place update, so the panes keep their scroll instead of jumping.
-  return state.selected + "|" + state.tab + "|" + decPage;
+  return state.selected + "|" + state.view + "|" + state.errFilter + "|" + state.tab + "|" + decPage;
 }
 
 function render(){
@@ -162,13 +173,18 @@ function render(){
   const mk=(c,l,n)=>{ const x=el("span","chip "+c); x.appendChild(el("b",null,String(n||0))); x.appendChild(document.createTextNode(" "+l)); return x; };
   chips.append(mk("","runs",s.runs_live), mk("allow","allow",t.allow), mk("push","push-back",t.push_back),
     mk("reject","reject",t.reject), mk("dest","destructive",(s.runs||[]).filter(r=>r.destructive).length));
+  const ec=mk("err","⚠ errors",s.errors_total); ec.title="review the error log"; ec.onclick=()=>{ state.view="errors"; select(null); };
+  chips.appendChild(ec);
 
   root.innerHTML="";
   const app=el("div","app"), nav=el("div","nav"), main=el("div","main");
 
   nav.appendChild(el("div","navhd","Review · select a run"));
-  const ov=el("div","navitem"+(state.selected===null?" sel":"")); ov.appendChild(el("span","nm","▤ Overview"));
-  ov.onclick=()=>select(null); nav.appendChild(ov);
+  const ov=el("div","navitem"+((state.selected===null&&state.view!=="errors")?" sel":"")); ov.appendChild(el("span","nm","▤ Overview"));
+  ov.onclick=()=>{ state.view="overview"; select(null); }; nav.appendChild(ov);
+  const ei=el("div","navitem"+((state.selected===null&&state.view==="errors")?" sel":"")); const eir=el("div","r1");
+  eir.appendChild(el("span","nm","⚠ Errors")); if(s.errors_total) eir.appendChild(el("span","tag-fail",String(s.errors_total)));
+  ei.appendChild(eir); ei.onclick=()=>{ state.view="errors"; select(null); }; nav.appendChild(ei);
   for(const r of (s.runs||[])){
     const it=el("div","navitem"+(state.selected===r.run_id?" sel":""));
     const r1=el("div","r1"); r1.appendChild(el("span","nm",(r.skill||"?")+" / "+(r.perk||"?"))); r1.appendChild(badge(r.decision));
@@ -179,7 +195,9 @@ function render(){
     it.append(r1,r2); it.onclick=()=>select(r.run_id); nav.appendChild(it);
   }
 
-  if(state.selected===null) overview(main, s); else detailView(main);
+  if(state.selected!==null) detailView(main);
+  else if(state.view==="errors") errorsView(main, s);
+  else overview(main, s);
   app.append(nav,main); root.appendChild(app);
   nav.scrollTop=_navTop;                               // the run list never jumps on an in-place refresh
   if(_sameView) main.scrollTop=_mainTop;              // the detail/overview pane keeps its scroll across a refresh
@@ -222,6 +240,41 @@ function overview(main, s){
     row.appendChild(el("span",null,txt)); tl.appendChild(row); }
   if(!(s.feed||[]).length) fd.b.appendChild(el("div","empty","no events yet")); else fd.b.appendChild(tl);
   main.appendChild(fd.s);
+}
+
+const ERR_KIND={step_error:"step error", refused:"refused", reject:"claim rejected"};
+function errDetail(e){
+  const at="step "+e.step+(e.tool?"·"+e.tool:"");
+  if(e.kind==="step_error") return at+" · "+(e.status||"error")+" (exit "+e.exit+")";
+  if(e.kind==="refused") return at+" · "+(e.reason||e.etype||"refused");
+  if(e.kind==="reject") return (e.problems&&e.problems.length)?e.problems.join(", "):"rejected";
+  return "";
+}
+function errorsView(main, s){
+  // A consolidated, value-free error log: failures collated newest-first from the snapshot window. Each row
+  // links to its run (the Run tab carries the per-step provenance). Status-level only — exit / refusal reason /
+  // claim problem ids — NEVER command output; govd holds none (the value-free boundary).
+  const all=s.errors||[], f=state.errFilter||"all";
+  const KIND={all:null, step:"step_error", refused:"refused", reject:"reject"}, LBL={all:"all",step:"step errors",refused:"refusals",reject:"rejects"};
+  const counts={all:all.length}; for(const k of ["step","refused","reject"]) counts[k]=all.filter(e=>e.kind===KIND[k]).length;
+  const rows=all.filter(e=> f==="all" || e.kind===KIND[f]);
+  const total=s.errors_total||all.length;   // errors[] is capped (ERRORS_MAX); errors_total is the true count
+  const shown=(total>all.length)?("showing "+all.length+" of "+total):String(total);   // be honest when truncated
+  const es=sect("Error log · "+shown+" across the last "+((s.runs||[]).length)+" runs");
+  const bar=el("div","errfilter");
+  for(const k of ["all","step","refused","reject"]){ const b=el("button","efbtn"+(f===k?" on":""),LBL[k]+" ("+counts[k]+")");
+    b.onclick=()=>{ state.errFilter=k; render(); }; bar.appendChild(b); }
+  es.b.appendChild(bar);
+  if(!rows.length){ es.b.appendChild(el("div","empty", all.length? ("no "+LBL[f]) : "no errors — every run is clean")); main.appendChild(es.s); return; }
+  const t=el("table");
+  for(const e of rows){ const tr=el("tr"); tr.className="errrow"; tr.onclick=()=>select(e.run_id);
+    tr.appendChild(el("td","t",fmt(e.ts)));
+    const c2=el("td"); c2.appendChild(el("span",null,(e.skill||"?")+" / "+(e.perk||"?"))); tr.appendChild(c2);
+    const c3=el("td"); c3.appendChild(el("span","errkind k-"+e.kind, ERR_KIND[e.kind]||e.kind)); tr.appendChild(c3);
+    tr.appendChild(el("td","errdet",errDetail(e))); t.appendChild(tr); }
+  es.b.appendChild(t);
+  es.b.appendChild(el("div","note","Status-level provenance only — exit codes, refusal reasons, claim problem ids. govd never receives command output (the value-free boundary). Click a row to open its run."));
+  main.appendChild(es.s);
 }
 
 const TABS=["Run","Ledger","Script","Flow"];

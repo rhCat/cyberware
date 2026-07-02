@@ -502,6 +502,43 @@ def test_run_view_failed_flag_tracks_the_error_state_exactly(tmp_path):
     assert views["badrun"]["failed"] is True           # an errored step -> failed
 
 
+def test_error_log_aggregates_every_failure_kind_and_stays_value_free(tmp_path):
+    """The dashboard error log (monitor_snapshot['errors']): one value-free feed collating every failure —
+    a step that erred, a step the limb refused / whose signed status failed to verify, and a claim govd
+    rejected before any run. A clean run contributes NOTHING; every row carries status-level fields only."""
+    st = govd.Store(str(tmp_path))
+    st.create("clean", {"run_id": "clean", "ts": "t1", "skill": "fs", "perk": "find", "seq": ["a"], "decision": "allow",
+                        "events": [{"type": "granted", "step": "1", "ts": "t1"},
+                                   {"type": "step_result", "step": "1", "status": "ok", "exit": 0, "ts": "t1"}]})
+    st.create("erred", {"run_id": "erred", "ts": "t2", "skill": "cws-mutate", "perk": "mutate", "seq": ["cws_mutate"],
+                        "decision": "allow",
+                        "events": [{"type": "granted", "step": "1", "ts": "t2"},
+                                   {"type": "step_result", "step": "1", "status": "error", "exit": 1, "ts": "t2"}]})
+    st.create("refused", {"run_id": "refused", "ts": "t3", "skill": "sh", "perk": "run", "seq": ["porter"],
+                          "decision": "allow",
+                          "events": [{"type": "step_refused", "step": "1", "reason": "plan_sha_mismatch",
+                                      "diff_lines": 3, "ts": "t3"}]})
+    st.create("forged", {"run_id": "forged", "ts": "t4", "skill": "sh", "perk": "run", "seq": ["porter"],
+                         "decision": "allow",
+                         "events": [{"type": "forged_status_refused", "step": "1", "reason": "exod_verify:bad_signature",
+                                     "authority": "exod", "ts": "t4"}]})
+    st.record_decision({"run_id": "rej", "ts": "t5", "skill": "pg", "perk": "query", "decision": "reject",
+                        "problems": ["plaintext_secret_key"], "var_keys": ["PGPASSWORD"]})
+    snap = st.monitor_snapshot()
+    errs = {e["run_id"]: e for e in snap["errors"]}
+    assert "clean" not in errs                                    # an all-ok run is NOT an error
+    assert snap["errors_total"] == 4 and len(snap["errors"]) == 4
+    assert errs["erred"]["kind"] == "step_error" and errs["erred"]["exit"] == 1 and errs["erred"]["tool"] == "cws_mutate"
+    assert errs["refused"]["kind"] == "refused" and errs["refused"]["reason"] == "plan_sha_mismatch"
+    assert errs["forged"]["kind"] == "refused" and errs["forged"]["etype"] == "forged_status_refused"
+    assert errs["rej"]["kind"] == "reject" and errs["rej"]["problems"] == ["plaintext_secret_key"]
+    assert snap["errors"][0]["run_id"] == "rej"                   # newest-first (t5 leads)
+    # value-free: an error row may carry ONLY status-level provenance — never a value, token, secret, or output
+    ALLOWED = {"run_id", "skill", "perk", "ts", "step", "tool", "kind", "status", "exit", "etype", "reason", "problems"}
+    for e in snap["errors"]:
+        assert set(e) <= ALLOWED, f"error row leaked non-value-free keys: {set(e) - ALLOWED}"
+
+
 def test_monitor_snapshot_is_value_free(server, tmp_path):
     base, store, _ = server
     sd = tmp_path / "d"; sd.mkdir(); (sd / "f").write_bytes(b"0" * 4096)
