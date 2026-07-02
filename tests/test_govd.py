@@ -906,3 +906,17 @@ def test_require_closed_auth_refuses_remote_without_principals(monkeypatch):
     govd.require_closed_auth({"mode": "local", "principals": {}})                            # loopback -> exempt
     monkeypatch.setenv("CYBERWARE_ALLOW_OPEN", "1")
     govd.require_closed_auth({"mode": "remote", "principals": {}})                           # explicit override -> ok
+
+
+def test_govern_propagates_cargo_only_on_allow_not_on_reject():
+    """govd.govern threads the ACL-authorized cargo bind mode into the verdict ONLY on an allow (the
+    `decision == 'allow'` guard); a rejected cargo claim carries cargo=None so no mode leaks past a reject.
+    In the govd.py enforcement-surface slice so the mutation ratchet (floor 1.0) covers the == comparison."""
+    from infra.tool import skill_index
+    skill = sorted(skill_index.all_skills())[0]
+    perk = json.load(open(os.path.join(registry.skill_dir(skill), "perks.json")))["perks"][0]["id"]
+    ledger = {"skill": skill, "perk": perk, "var_keys": [], "cargo": "rw"}
+    # scope grants the skill but NOT the cargo axis -> acl_cargo_denied -> reject -> cargo NOT propagated
+    v = govd.govern(ledger, {}, scope={"skills": ["*"]})
+    assert v["decision"] == "reject" and v.get("cargo") is None
+    assert any(p["id"] == "acl_cargo_denied" for p in v.get("problems", []))

@@ -189,6 +189,16 @@ Guarantees for shipping over the live fleet (Mac anchor, DGX bodies, runner-agen
    so it self-heals on the next re-mint. ROLLOUT RULE: when upgrading a fleet across the params boundary,
    RE-MINT every actor's attestation (issue.mint_attestation) immediately after the node upgrade — do not
    flip --acl-strict until the re-mint pass completes.
+7. CARGO-axis upgrade (v1.5, the ACL-gated /cyberware_cargo bind): IDENTICAL compat posture to `params` above
+   — folding `cargo` into acl_canonical shifts acl_sha for EVERY actor (cargo-less actors now canonicalize
+   `cargo: null`), so a pre-cargo attestation fails exod's re-derive on an upgraded node. Same bound (M1
+   provisioned + --acl-strict + within TTL), same fix: RE-MINT attestations on upgrade. IMPORTANT SCOPE NOTE:
+   like `params`/`secrets`, exod's OFF-NODE cargo re-enforcement (acl_cargo_denied / acl_cargo_rw_denied) is a
+   STRICT-MODE guarantee — under the default audit mode exod LOGS "would refuse" and honors the grant's mode,
+   so a compromised govd node (which holds the grant key) can still bind /cyberware_cargo. This is the
+   documented Phase-A posture (a compromised node stays in the ACL TCB); the off-node re-enforcement HARDENS
+   under --acl-strict, exactly as the other axes. The robust invariant that DOES hold in every mode: the
+   sandbox binds nothing unless exod set an explicit ro/rw mode AND the dir is mounted (no silent exposure).
 
 NEW observable behavior in Phase A: (a) a principal WITH an acl excluding the claimed skill/tier/destructive-perk/secret returns reject with an acl_* problem (dormant until an operator opts a token in); (b) a registry-configured /catalog now requires a Bearer and returns a scope-filtered roster; (c) an in-flight run whose token is revoked/expired halts at the next step. Tests are ADDITIONS plus the discovery-contract update: extend principals_selftest with acl_allows cases (no-acl unrestricted under strict=false; deny-all under strict=true; present-acl-absent-skills => deny-all; '*' sentinel; skill in/out; perk authoritative; bare-skill-all-perks documented; destructive-unlisted; secret-denied; tier under/over with self-owned None->community + unknown-ceiling->core; expired; revoked; canonicalization rejects of './x','x/','CASE'); a test_govd.py case threading scope + the WS-step re-check (revoked mid-run halts); an empty-registry-under-strict 503; a grant round-trip pinning acl_sha optionality + recompute-from-live equality. Per ci-merge-discipline (enforcement surface): run FULL pytest + FULL selfmonitor (not --no-mutation); per review-before-merge-discipline, COMMIT first then run the multi-agent adversarial review (subagents git-revert the submodule).
 

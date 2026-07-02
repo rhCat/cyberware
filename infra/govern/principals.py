@@ -90,7 +90,8 @@ def acl_canonical(pid: str, tok_sha: str, acl) -> str:
     with an identical ACL still get DISTINCT digests (their attestations are not interchangeable)."""
     a = acl or {}
     body = {"pid": pid, "token_sha": tok_sha, "skills": a.get("skills"), "perks": a.get("perks"),
-            "max_tier": a.get("max_tier"), "secrets": a.get("secrets"), "params": a.get("params")}
+            "max_tier": a.get("max_tier"), "secrets": a.get("secrets"), "params": a.get("params"),
+            "cargo": a.get("cargo")}
     return json.dumps(body, sort_keys=True, separators=(",", ":"))
 
 
@@ -137,7 +138,7 @@ def _pmap_entry(skill, pmap):
 
 
 def acl_allows(acl, skill, perk, perk_tier, destructive, credentialed, *, parameterized=False,
-               now=None, strict=False):
+               cargo=None, now=None, strict=False):
     """(ok, problem|None) for a CANONICAL (skill, perk) claim under an actor scope `acl`. Deny-by-default
     when an acl is present; under `strict` an absent acl denies too (the Phase-B end-state). Every branch
     fails CLOSED; the tier ceiling's fail-safes are SELF-OWNED here (None/unknown perk tier -> community, the
@@ -145,7 +146,12 @@ def acl_allows(acl, skill, perk, perk_tier, destructive, credentialed, *, parame
 
     `parameterized` is a govd-DERIVED flag (never task-supplied): the claim requests caller VALUES and/or dir
     binds into the confined step. Like `credentialed`/`secrets`, it is gated by its own capability axis
-    (`params`) — an un-granted token that parameterizes a delegated run is refused (`acl_params_denied`)."""
+    (`params`) — an un-granted token that parameterizes a delegated run is refused (`acl_params_denied`).
+
+    `cargo` is the mode ("ro"|"rw"|None) a claim requests to bind the shared /cyberware_cargo dir into the
+    confined step. Its own axis (`acl.cargo` = "ro"|"rw"|None): a request without a grant is refused
+    (`acl_cargo_denied`), and an rw request against an ro-only grant is refused (`acl_cargo_rw_denied`) — the
+    grant may only NARROW, never widen. exod re-enforces this off-node before it adds the bind."""
     if acl is None:
         return (False, {"id": "acl_unscoped"}) if strict else (True, None)
     if not isinstance(acl, dict):                       # a misauthored non-dict acl fails CLOSED, never raises
@@ -169,6 +175,14 @@ def acl_allows(acl, skill, perk, perk_tier, destructive, credentialed, *, parame
         return False, {"id": "acl_secret_denied", "detail": f"{skill}/{perk}"}
     if parameterized and not acl.get("params"):                  # the params axis: may this token pass values/binds?
         return False, {"id": "acl_params_denied", "detail": f"{skill}/{perk}"}
+    if cargo not in (None, "ro", "rw"):                          # a malformed cargo request fails CLOSED
+        return False, {"id": "acl_cargo_malformed", "detail": str(cargo)}
+    if cargo:                                                    # the cargo axis: may this token bind /cyberware_cargo?
+        granted = acl.get("cargo")
+        if granted not in ("ro", "rw"):
+            return False, {"id": "acl_cargo_denied", "detail": f"{skill}/{perk}"}
+        if cargo == "rw" and granted != "rw":                   # rw requested, only ro granted -> the grant never widens
+            return False, {"id": "acl_cargo_rw_denied", "detail": f"{skill}/{perk}"}
     ceiling = acl.get("max_tier")
     if ceiling is not None:
         want = _TIER_RANK.get(perk_tier, 2)                      # SELF-OWNED fail-safe: None/unknown -> community

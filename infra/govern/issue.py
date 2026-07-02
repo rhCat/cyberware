@@ -39,6 +39,7 @@ def mint_attestation(operator_key, *, pid, token_sha, acl, nbf, exp, attestation
             "acl_sha": principals.acl_sha(pid, token_sha, a),
             "skills": a.get("skills"), "perks": a.get("perks"),
             "max_tier": a.get("max_tier"), "secrets": a.get("secrets"), "params": a.get("params"),
+            "cargo": a.get("cargo"),
             "nbf": int(nbf), "exp": int(exp), "attestation_id": attestation_id}
     if proof_pubkey is not None:
         body["proof_pubkey"] = proof_pubkey

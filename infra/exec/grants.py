@@ -22,7 +22,7 @@ from infra.exec.grantverify import (  # noqa: F401  (single source of truth for 
 
 def mint_grant(private_key, *, run_id, plan_sha, nbf, exp, nonce,
                snippet_shas=None, capabilities=None, credentials=None, tier="community", sandbox_tier=None,
-               acl_sha=None, skill=None, perk=None, destructive=None):
+               acl_sha=None, skill=None, perk=None, destructive=None, cargo=None):
     """Issue a signed grant (a DSSE envelope). The body is the value-free capability claim; the signature
     binds it so any holder can verify it offline. The nonce MUST be a non-empty string (the replay key).
 
@@ -53,4 +53,6 @@ def mint_grant(private_key, *, run_id, plan_sha, nbf, exp, nonce,
         body["perk"] = perk
     if destructive is not None:
         body["destructive"] = bool(destructive)
+    if cargo is not None:                          # ACL cargo axis: the "ro"/"rw" bind mode govd authorized —
+        body["cargo"] = cargo                      # emitted only when set, so non-cargo grant bodies are unchanged
     return sign.sign(body, private_key, payload_type=GRANT_TYPE)
