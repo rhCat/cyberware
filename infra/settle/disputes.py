@@ -31,25 +31,35 @@ def open_dispute(entries: list, disputer: str, quote_sha: str, bond: Money) -> d
                               memo=f"dispute-open:{quote_sha[:16]}")
 
 
-def count_approvals(resolution_doc: dict, approvals: list) -> int:
-    """The number of DISTINCT arbiters whose WebAuthn approval over the resolution doc verifies offline."""
-    seen = set()
+def count_approvals(resolution_doc: dict, approvals: list, arbiters: dict) -> int:
+    """The number of DISTINCT REGISTERED arbiters whose WebAuthn approval over the resolution doc verifies
+    offline. `arbiters` is the operator-registered roster `{arb_id: credential_pubkey (raw-32 Ed25519)}`; an
+    approval from an unregistered arb_id, or one whose assertion is not signed by that arbiter's registered
+    key, does NOT count — so the m-of-n quorum cannot be forged with self-generated keys. Dedup is by both
+    arb_id AND credential key: an operator that registers the SAME key under two ids still yields ONE vote for
+    that physical signer, so a single key holder cannot inflate the quorum via aliases."""
+    seen_ids, seen_keys = set(), set()
     for arb_id, assertion in approvals:
-        if arb_id in seen:
+        if arb_id in seen_ids or arb_id not in arbiters:
             continue
-        if webauthn.verify_assertion(resolution_doc, assertion, ORIGIN, RP_ID)[0]:
-            seen.add(arb_id)
-    return len(seen)
+        key = arbiters[arb_id]
+        if key in seen_keys:                          # the SAME physical credential counts ONCE, even under aliases
+            continue
+        if webauthn.verify_assertion(resolution_doc, assertion, ORIGIN, RP_ID, key)[0]:
+            seen_ids.add(arb_id)
+            seen_keys.add(key)
+    return len(seen_ids)
 
 
 def resolve(entries: list, resolution_doc: dict, approvals: list, m: int, payee: str, disputer: str,
-            quote_sha: str, reputation: dict) -> dict:
-    """Resolve a dispute if ≥ m distinct arbiters approved the resolution doc. `resolution_doc.outcome` is
-    "upheld" or "rejected". Moves the bond + holdback accordingly (balanced) and applies a reputation delta.
-    Returns {resolved, outcome?, reason}."""
+            quote_sha: str, reputation: dict, arbiters: dict) -> dict:
+    """Resolve a dispute if ≥ m distinct REGISTERED arbiters approved the resolution doc. `arbiters` is the
+    operator-registered roster `{arb_id: credential_pubkey}`. `resolution_doc.outcome` is "upheld" or
+    "rejected". Moves the bond + holdback accordingly (balanced) and applies a reputation delta. Returns
+    {resolved, outcome?, reason}."""
     if m < 2:                                                 # quorum must be a real m-of-n, never a single arbiter
         return {"resolved": False, "reason": "quorum_too_small"}
-    approvals_n = count_approvals(resolution_doc, approvals)
+    approvals_n = count_approvals(resolution_doc, approvals, arbiters)
     if approvals_n < m:
         return {"resolved": False, "reason": "insufficient_approvals", "approvals": approvals_n}
 
@@ -59,7 +69,9 @@ def resolve(entries: list, resolution_doc: dict, approvals: list, m: int, payee:
     bal = reward_ledger.balances(entries)
     bond = bal.get((bond_acct, cur), Money.zero(cur))
     held = bal.get((hold_acct, cur), Money.zero(cur))
-    outcome = resolution_doc["outcome"]
+    outcome = resolution_doc.get("outcome")
+    if outcome not in ("upheld", "rejected"):      # quorum-approved yet no valid outcome -> clean refusal, not a KeyError
+        return {"resolved": False, "reason": "invalid_outcome", "approvals": approvals_n}
 
     if outcome == "upheld":                                   # disputer was right: claw back holdback + return bond
         postings = [reward_ledger._posting(hold_acct, -held), reward_ledger._posting(disputer, held),
@@ -77,7 +89,11 @@ def dispute_selftest() -> dict:
     holdback clawed back to the disputer + bond returned + payee reputation delta, all ledgered and the
     ledger stays zero-sum; a resolution with only m-1 distinct approvals does NOT resolve; the rejected path
     forfeits the bond to the payee. Needs nothing external (Ed25519 via cryptography)."""
+    from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    def _pub(k):
+        return k.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
 
     qsha = "q" * 32
     # seed a settled state: a holdback parked for this quote, funded by a treasury (balanced setup)
@@ -86,17 +102,18 @@ def dispute_selftest() -> dict:
                              reward_ledger._posting(f"hold:{qsha[:16]}", Money("10.0000"))], memo="seed-hold")
     open_dispute(led, "disputer", qsha, Money("5.0000"))
 
-    arbiters = {f"arb{i}": Ed25519PrivateKey.generate() for i in range(3)}
+    arb_keys = {f"arb{i}": Ed25519PrivateKey.generate() for i in range(3)}
+    arbiters = {aid: _pub(k) for aid, k in arb_keys.items()}   # the operator-REGISTERED roster {arb_id: pubkey}
     doc = {"quote_sha": qsha, "outcome": "upheld", "currency": "USD", "reason": "non-delivery"}
-    approvals = [(aid, webauthn.make_assertion(doc, key, ORIGIN, RP_ID)) for aid, key in arbiters.items()]
+    approvals = [(aid, webauthn.make_assertion(doc, key, ORIGIN, RP_ID)) for aid, key in arb_keys.items()]
 
     # m-1 approvals (only 1) must NOT resolve
     rep = {}
-    too_few = resolve(reward_ledger.open_ledger(), doc, approvals[:1], 2, "payee", "disputer", qsha, rep)
+    too_few = resolve(reward_ledger.open_ledger(), doc, approvals[:1], 2, "payee", "disputer", qsha, rep, arbiters)
     insufficient_blocked = too_few["resolved"] is False and too_few["reason"] == "insufficient_approvals"
 
     # 2-of-3 upheld → clawback + bond return + reputation delta, all ledgered & zero-sum
-    res = resolve(led, doc, approvals[:2], 2, "payee", "disputer", qsha, rep)
+    res = resolve(led, doc, approvals[:2], 2, "payee", "disputer", qsha, rep, arbiters)
     disputer_bal = reward_ledger.balances(led).get(("disputer", "USD"), Money.zero())
     upheld_ok = (res["resolved"] and res["outcome"] == "upheld"
                  and reward_ledger.global_zero(led) and rep.get("payee") == -1
@@ -105,20 +122,32 @@ def dispute_selftest() -> dict:
 
     # a tampered approval (over a DIFFERENT doc) does not count toward m
     other_doc = {**doc, "outcome": "rejected"}
-    mismatched = [(aid, webauthn.make_assertion(other_doc, key, ORIGIN, RP_ID)) for aid, key in arbiters.items()]
-    tamper_ignored = count_approvals(doc, mismatched) == 0
+    mismatched = [(aid, webauthn.make_assertion(other_doc, key, ORIGIN, RP_ID)) for aid, key in arb_keys.items()]
+    tamper_ignored = count_approvals(doc, mismatched, arbiters) == 0
+
+    # a FORGED quorum — approvals over the correct doc but signed by throwaway keys the operator never
+    # registered (whether reusing real arb_ids or inventing new ones) — must count ZERO: the quorum is not
+    # forgeable without the registered credential keys.
+    forger_keys = {f"arb{i}": Ed25519PrivateKey.generate() for i in range(3)}   # same ids, WRONG keys
+    forged_same_id = [(aid, webauthn.make_assertion(doc, key, ORIGIN, RP_ID)) for aid, key in forger_keys.items()]
+    forged_new_id = [(f"ghost{i}", webauthn.make_assertion(doc, Ed25519PrivateKey.generate(), ORIGIN, RP_ID))
+                     for i in range(3)]
+    forged_quorum_blocked = (count_approvals(doc, forged_same_id, arbiters) == 0
+                             and count_approvals(doc, forged_new_id, arbiters) == 0)
 
     # rejected path forfeits the bond to the payee
     led2 = reward_ledger.open_ledger()
     open_dispute(led2, "disputer", qsha, Money("5.0000"))
     rej_doc = {"quote_sha": qsha, "outcome": "rejected", "currency": "USD"}
-    rej_appr = [(aid, webauthn.make_assertion(rej_doc, key, ORIGIN, RP_ID)) for aid, key in arbiters.items()]
+    rej_appr = [(aid, webauthn.make_assertion(rej_doc, key, ORIGIN, RP_ID)) for aid, key in arb_keys.items()]
     rep2 = {}
-    rej = resolve(led2, rej_doc, rej_appr[:2], 2, "payee", "disputer", qsha, rep2)
+    rej = resolve(led2, rej_doc, rej_appr[:2], 2, "payee", "disputer", qsha, rep2, arbiters)
     rejected_ok = (rej["outcome"] == "rejected"
                    and reward_ledger.balances(led2).get(("payee", "USD"), Money.zero()) == Money("5.0000")
                    and rep2.get("disputer") == -1 and reward_ledger.global_zero(led2))
 
     return {"bond_posted_and_upheld_clawback": upheld_ok, "insufficient_approvals_blocked": insufficient_blocked,
-            "tampered_approval_ignored": tamper_ignored, "rejected_forfeits_bond": rejected_ok,
-            "ok": upheld_ok and insufficient_blocked and tamper_ignored and rejected_ok}
+            "tampered_approval_ignored": tamper_ignored, "forged_quorum_blocked": forged_quorum_blocked,
+            "rejected_forfeits_bond": rejected_ok,
+            "ok": upheld_ok and insufficient_blocked and tamper_ignored and forged_quorum_blocked
+            and rejected_ok}

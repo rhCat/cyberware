@@ -108,6 +108,7 @@ def execute_step(rec, step, plan_sha, *, exod_socket, grant_key, exod_pub, base,
                               perk=rec.get("perk") if acl_sha else None,
                               destructive=rec.get("destructive") if acl_sha else None,
                               cargo=rec.get("cargo"),   # the ACL-gated /cyberware_cargo bind mode ("ro"/"rw"), govd-authorized
+                              workspace=ws, argv=["bash", run_sh, "--step", step],   # bind the SOLE rw mount + the exact command
                               nbf=now - 5, exp=now + grant_ttl, nonce=nonce)
     # the operator attestation + the client token_proof (both held + relayed by the agent) ride verbatim to
     # exod. govd holds NEITHER the operator ACL-issuer key NOR any actor's proof key, so it cannot FORGE an

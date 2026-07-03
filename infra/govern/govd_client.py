@@ -340,6 +340,24 @@ def run_delegated(base_url, ledger, approve=(), attestation=None, proof_key=None
             "plan_sha": psha}
 
 
+def blocked_run(out) -> bool:
+    """True iff a run must NOT report success to a caller keying on the exit code. It reaches main() as
+    decision="allow" but was governance-blocked in one of THREE shapes:
+      (1) an UP-FRONT block (registry mismatch / authenticity drift / unauthorized oversight) — a top-level
+          `error`;
+      (2) a per-STEP refusal recorded with a `refused` key (cooperative snippet/oversight refusals, and a govd
+          that refused the step before execution) — keyed on the PRESENCE of the key, not the truthiness of the
+          reason (a peer could omit the reason);
+      (3) a DELEGATED per-step refusal that exod SIGNED off-node — it arrives as a `status == "refused"` result
+          (no `refused` key), for every fail-closed limb path: a grant workspace/argv mismatch, an off-node ACL
+          / params denial, the capability-manifest mount check, closure drift, an unreachable/unverifiable limb,
+          or a vault/sandbox-unavailable refusal. exod uses "refused" EXCLUSIVELY for a step that never ran; a
+          step it RAN carries "ok"/"error", so a faithful task failure (exit != 0) is NOT a governance block."""
+    results = out.get("results") or []
+    return bool(out.get("error")) or any(
+        isinstance(r, dict) and ("refused" in r or r.get("status") == "refused") for r in results)
+
+
 def main():
     ap = argparse.ArgumentParser(description="drive govd: discover the catalog, then fetch + run a governed script")
     ap.add_argument("--url", default=os.environ.get("GOVD_URL", "http://127.0.0.1:5773"),
@@ -383,10 +401,7 @@ def main():
     else:
         out = run_governed(a.url, ledger, a.approve, registry=a.registry)
     print(json.dumps(out, indent=2))
-    # a blocked run (registry mismatch / authenticity drift / unauthorized oversight) returns decision="allow"
-    # WITH an `error` and no results — it must NOT report success to a caller keying on the exit code.
-    blocked = bool(out.get("error"))
-    sys.exit(0 if out.get("decision") in ("allow", None) and not blocked else 2)
+    sys.exit(0 if out.get("decision") in ("allow", None) and not blocked_run(out) else 2)
 
 
 if __name__ == "__main__":

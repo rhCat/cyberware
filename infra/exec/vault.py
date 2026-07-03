@@ -35,12 +35,26 @@ class EnvStubVault:
 
 class FileVault:
     """A secret backend over a 0600 JSON store on disk (kernel-side). The store path is never handed to the
-    agent — the agent only ever names a credential_id."""
+    agent — the agent only ever names a credential_id. The 0600 confidentiality is ENFORCED, not merely
+    documented: a store readable or writable by group/other is refused at read time (fail-closed), so a
+    credential file left world-readable cannot be silently resolved."""
 
     def __init__(self, path: str):
         self.path = path
 
+    def _require_0600(self):
+        # fail CLOSED on a loose mode: a secrets store must not be group/other accessible. Enforced at
+        # time-of-use (the mode can change after construction), so the guard binds the actual read. Scope: this
+        # guards the store FILE's mode; the containing directory's mode (write access there lets a non-owner
+        # rename/replace the file) is the operator's responsibility, outside this file-mode invariant.
+        mode = os.stat(self.path).st_mode
+        if mode & 0o077:
+            raise PermissionError(
+                f"vault store {self.path} is group/other accessible (mode {oct(mode & 0o777)}); "
+                f"chmod 600 it — a secrets store must be 0600")
+
     def get(self, credential_id: str) -> str:
+        self._require_0600()
         store = json.load(open(self.path))
         if credential_id not in store:
             raise KeyError(f"no such credential: {credential_id}")

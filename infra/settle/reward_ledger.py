@@ -65,11 +65,13 @@ def fund_escrow(entries: list, funder: str, amount: Money, escrow_acct: str = ES
 
 
 def release(entries: list, payee: str, fee_account: str, amount: Money, fee_weight, payee_weight,
-            memo: str = "release") -> dict:
+            memo: str = "release", escrow_acct: str = ESCROW) -> dict:
     """Release an escrowed `amount` to a payee + a fee account, split EXACTLY by the given weights, draining
-    escrow by the full amount (so escrow nets to zero across fund→release)."""
+    the escrow account by the full amount (so escrow nets to zero across fund→release). `escrow_acct` defaults
+    to the generic pool for back-compat but SHOULD mirror the account that `fund_escrow` credited (e.g. the
+    per-quote sub-account `escrow_for(quote_sha)`) so a per-quote fund→release nets that account to zero."""
     fee_part, payee_part = split(amount, [fee_weight, payee_weight])
-    return post(entries, [_posting(ESCROW, -amount), _posting(fee_account, fee_part),
+    return post(entries, [_posting(escrow_acct, -amount), _posting(fee_account, fee_part),
                           _posting(payee, payee_part)], memo)
 
 

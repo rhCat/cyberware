@@ -132,7 +132,14 @@ _FLOW_CACHE = {}                                         # run_id -> the rendere
 
 
 def verify_skill(skill):
-    """Cached authenticity check: does the server's registry for `skill` match its committed index.json?"""
+    """Cached authenticity check: does the server's registry for `skill` match its committed index.json?
+
+    CACHE BOUNDARY (honest): this is a CLAIM-TIME cache keyed by skill name with NO invalidation for the
+    process lifetime — it assumes the registry is STATIC at runtime (the deployment model: a chip re-fetch
+    means a process restart). A post-start registry mutation would serve the cached verdict until restart, so
+    this is not the execution-integrity check. Execution integrity is re-derived at time-of-use every run: a
+    delegated run re-hashes the closure in exod (closure_decision), a cooperative run re-checks per step via
+    snippet_decision. Those, not this cache, are the binding integrity gates."""
     if skill not in _VERIFY_CACHE:
         _VERIFY_CACHE[skill] = skill_index.verify(skill)
     return _VERIFY_CACHE[skill]
