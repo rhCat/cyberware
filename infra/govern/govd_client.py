@@ -33,7 +33,7 @@ from infra.tool import skill_index   # the value-free catalog builder — shared
 # vault credential (node-local). Mirrors govd's SECRET_KEY — govd re-filters authoritatively, this is hygiene.
 _SECRET_KEY = re.compile(r"(?i)(password|passwd|passphrase|secret|token|credential|mnemonic|seed[_-]?phrase"
                          r"|bearer|api[_-]?key|access[_-]?key|private[_-]?key|priv[_-]?key"
-                         r"|ssh[_-]?key|gpg[_-]?key|signing[_-]?key)")   # mirrors govd.SECRET_KEY (govd re-filters authoritatively)
+                         r"|ssh[_-]?key|gpg[_-]?key|signing[_-]?key)")   # mirrors govd.SECRET_KEY (govd re-filters; NOT session|jwt|cookie — metadata FPs)
 _POINTER_SUFFIX = ("_FILE", "_DIR", "_PATH")   # mirrors govd.POINTER_SUFFIX — a path pointer, not the secret itself
 
 
@@ -128,6 +128,8 @@ def fetch(base_url, ledger, approve=()):
             "var_keys": sorted((ledger.get("vars") or {}).keys())}
     if approve:
         body["approve"] = list(approve)
+    if ledger.get("cargo"):                              # the ACL-gated /cyberware_cargo bind mode ("ro"/"rw") —
+        body["cargo"] = ledger["cargo"]                  # a NAME, not a value; govd gates it, exod binds the dir
     if ledger.get("traceparent"):                        # P5-T05: propagate the agent's W3C trace into the claim
         body["traceparent"] = ledger["traceparent"]
     _, verdict = _post_json(base_url.rstrip("/") + "/govern", body)

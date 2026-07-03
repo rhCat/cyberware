@@ -295,8 +295,9 @@ def govern(ledger, cfg, *, scope=None, principal=None, local_dev=False, principa
     perk_tier = delegate.perk_sandbox_tier(skill, perk)
     credentialed = bool((plan or {}).get("credential_ids"))
     parameterized = bool(ledger.get("binds"))       # claim-declared dir binds -> params axis (values re-gated at the WS step)
+    cargo = ledger.get("cargo") or None              # claim-declared shared-cargo bind mode ("ro"/"rw") -> cargo axis
     acl_ok, acl_problem = principals.acl_allows(scope, skill, perk, perk_tier, destructive, credentialed,
-                                                parameterized=parameterized, now=now, strict=strict)
+                                                parameterized=parameterized, cargo=cargo, now=now, strict=strict)
     if not acl_ok:
         problems.append(acl_problem)
 
@@ -333,6 +334,7 @@ def govern(ledger, cfg, *, scope=None, principal=None, local_dev=False, principa
     decision = "reject" if problems else ("push_back" if needs_approve else "allow")
     return {"decision": decision, "problems": problems, "destructive": destructive,
             "skill": skill,                              # the CANONICAL ns:name govern() resolved + gated on —
+            "cargo": cargo if decision == "allow" else None,   # the ACL-authorized /cyberware_cargo bind mode (ro/rw)
             "approved": [a for a in approve if a in (perk, "destructive")],  # the record persists THIS, so every
             "plan": plan, "plan_sha": psha, "seq": plan["sequence"],         # downstream re-check keys off it too
             "tlc": tlc_msg, "tlc_tla": tlc_tla, "tlc_log": tlc_out,   # the model-check spec + full log
@@ -679,7 +681,8 @@ def step_reauthorize(cfg, rec0, *, now=None):
         if sc is not None or strict:
             okv, pv = principals.acl_allows(sc, skill, perk, delegate.perk_sandbox_tier(skill, perk),
                                             rec0.get("destructive", False), bool(rec0.get("credential_ids")),
-                                            parameterized=bool(rec0.get("binds")), now=now, strict=strict)
+                                            parameterized=bool(rec0.get("binds")), cargo=rec0.get("cargo"),
+                                            now=now, strict=strict)
             if not okv:
                 return False, "acl:" + pv["id"]
     ps0 = reg0.get(rec0.get("principal")) or {}              # ACCESS-1: skill-intrinsic — registry-independent
@@ -1157,6 +1160,7 @@ class Handler(BaseHTTPRequestHandler):
                   "principal": pid, "cost": v.get("cost"), "token": token, "var_keys": var_keys, "decision": v["decision"],
                   "traceparent": traceparent,
                   "destructive": v.get("destructive", False), "approved": v.get("approved", []),
+                  "cargo": v.get("cargo"),                  # ACL-authorized /cyberware_cargo bind mode -> delegate grant
                   "acl_sha": acl_sha,                       # ACL M1: bound into the delegated grant (None = unscoped)
                   "skillacl_sha": skillacl_sha,             # ACCESS-1 provenance (skillacl_fold flag); exod-side = Step 7
                   "plan_sha": v.get("plan_sha"), "snippet_shas": (plan or {}).get("snippet_shas", {}),

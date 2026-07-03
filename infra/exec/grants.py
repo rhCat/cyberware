@@ -22,7 +22,7 @@ from infra.exec.grantverify import (  # noqa: F401  (single source of truth for 
 
 def mint_grant(private_key, *, run_id, plan_sha, nbf, exp, nonce,
                snippet_shas=None, capabilities=None, credentials=None, tier="community", sandbox_tier=None,
-               acl_sha=None, skill=None, perk=None, destructive=None, workspace=None, argv=None):
+               acl_sha=None, skill=None, perk=None, destructive=None, cargo=None, workspace=None, argv=None):
     """Issue a signed grant (a DSSE envelope). The body is the value-free capability claim; the signature
     binds it so any holder can verify it offline. The nonce MUST be a non-empty string (the replay key).
 
@@ -38,6 +38,9 @@ def mint_grant(private_key, *, run_id, plan_sha, nbf, exp, nonce,
     `acl_sha` / `skill` / `perk` / `destructive` (ACL M1) bind the per-actor ACL digest + the canonical claim
     into the grant, so exod can JOIN it against the operator attestation and re-enforce the actor's ceiling
     off-node. Like `sandbox_tier`, each is emitted only when set — a legacy (pre-ACL) grant body is unchanged.
+
+    `cargo` (ACL cargo axis) is the "ro"/"rw" bind mode govd authorized for the shared /cyberware_cargo dir;
+    emitted only when set, so non-cargo grant bodies are unchanged.
 
     `workspace` / `argv` bind the confined step's SOLE writable mount + its exact command into the grant, so a
     grant authorizes one workspace + one command and cannot be re-pointed (verify_grant re-checks them against
@@ -58,6 +61,8 @@ def mint_grant(private_key, *, run_id, plan_sha, nbf, exp, nonce,
         body["perk"] = perk
     if destructive is not None:
         body["destructive"] = bool(destructive)
+    if cargo is not None:                          # ACL cargo axis: the "ro"/"rw" bind mode govd authorized —
+        body["cargo"] = cargo                      # emitted only when set, so non-cargo grant bodies are unchanged
     if workspace is not None:
         body["workspace"] = workspace
     if argv is not None:

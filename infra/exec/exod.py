@@ -159,13 +159,14 @@ class Exod:
         #    is exactly what govd signed into the grant (credentials=), so it is authorized + run-bound.
         prof = self._profile(req["workspace"])
         # 5a. wire the (previously call-site-less) capability-manifest catcher onto the LIVE path, BEFORE any
-        #     secret is resolved: prove the sandbox we are about to run mounts EXACTLY the GRANT-authorized
-        #     workspace (the sole rw bind, grant-bound in step 1) plus the fixed core read-only tree, NOTHING
-        #     more. The manifest is derived from an INDEPENDENT source — the GRANT's workspace plus the default
-        #     core ro-set — NOT from prof's own fields, so a profile that renders a different workspace, an
-        #     extra/injected bind, the network the grant did not authorize fails closed HERE (a _profile bug
-        #     or tamper cannot widen the mount past what was granted). Runs before secret resolution, so a
-        #     mismatch never touches the vault.
+        #     secret is resolved: prove the BASE confinement mounts EXACTLY the GRANT-authorized workspace (the
+        #     sole rw bind, grant-bound in step 1) plus the fixed core read-only tree — nothing else in the base
+        #     profile. The manifest is derived from an INDEPENDENT source — the GRANT's workspace plus the
+        #     default core ro-set — NOT from prof's own fields, so a profile that renders a different workspace,
+        #     an extra/injected bind, or the network the grant did not authorize fails closed HERE (a _profile
+        #     bug or tamper cannot widen the base mount). Runs before secret resolution, so a mismatch never
+        #     touches the vault. The ACL-gated /cyberware_cargo bind is added AFTER this (below), authorized by
+        #     its own cargo axis (_acl_check) — orthogonal to this base-mount check.
         _gws = gbody.get("workspace") or req.get("workspace")
         _okm, _whym = _capmanifest.verify_materialized(prof, _capmanifest.CapabilityManifest(workspace=_gws))
         if not _okm:
@@ -189,7 +190,11 @@ class Exod:
                 env = _vaultmod.inject_step_env(env, self._vault, creds)   # + the grant-authorized secrets
             except Exception:
                 return refuse("vault:resolve_failed")
-        prof = dataclasses.replace(prof, env=env)
+        # the ACL-granted cargo bind mode rides the grant (govd authorized it; _acl_check re-enforced it above).
+        # Only "ro"/"rw" ever reaches the profile; anything else => no bind (fail-safe). In audit mode the M0
+        # govd gate remains the live enforcer, so exod honors the grant's mode here exactly as for env/creds.
+        cargo_mode = gbody.get("cargo") if gbody.get("cargo") in ("ro", "rw") else None
+        prof = dataclasses.replace(prof, env=env, cargo=cargo_mode)
         # 6. P3-T11: the grant's sandbox TIER selects the confinement backend, as a MONOTONE floor over the
         #    operator's --backend. A community-tier grant (untrusted marketplace code) DEMANDS the gVisor (runsc)
         #    box; the trusted family (core/verified) runs in bwrap; an undeclared grant takes the operator floor.
@@ -238,6 +243,11 @@ class Exod:
         # value. exod derives this from what it ACTUALLY received (not a govd-asserted flag), so a govd that
         # injects caller values without a `params` grant is refused here, mirroring how the other axes re-run.
         parameterized = bool(set((req.get("env") or {})) - {"PATH", "SNIP", "RECORD_STORE"})
+        # CARGO axis, re-enforced OFF-NODE: the grant states the cargo bind MODE govd authorized ("ro"/"rw");
+        # exod re-runs acl_allows against the ATTESTED acl, so a compromised govd cannot bind /cyberware_cargo
+        # (or widen ro->rw) for an actor the operator did not grant it. The bind itself is added in run_step
+        # ONLY after this passes.
+        cargo = gbody.get("cargo") if isinstance(gbody, dict) else None
         # sandbox_tier is the perk's catalog tier, derived by govd from its OWN trusted registry (never task
         # data) and grant-bound. HONEST CAVEAT: exod cannot independently re-derive the perk's real tier (that
         # needs govd's registry), so a COMPROMISED govd that sets sandbox_tier below the perk's true tier would
@@ -245,7 +255,7 @@ class Exod:
         # max_tier is still the ceiling; only the *claimed* perk_tier is grant-supplied.
         okv, prob = principals.acl_allows(acl, gbody.get("skill"), gbody.get("perk"),
                                           gbody.get("sandbox_tier"), gbody.get("destructive"),
-                                          bool(gbody.get("credentials")), parameterized=parameterized)
+                                          bool(gbody.get("credentials")), parameterized=parameterized, cargo=cargo)
         if not okv:
             return prob["id"]
         # M2: when the operator bound a client proof key into the attestation, REQUIRE a matching token-possession
