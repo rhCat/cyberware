@@ -157,6 +157,21 @@ def test_post_bless_snippet_mutation_refuses_exactly_that_step(tmp_path):
     assert runs[-1]["event"] == "snippet_refused"                                  # the step did NOT run after refusal
 
 
+def test_present_but_unblessed_porter_fails_closed(tmp_path):
+    """The fail-open the review found: a real perk whose porter EXISTS and is sourced, but whose authenticity
+    index no longer blesses it (a corrupt/emptied index — _blessed_snippets returns {}), must be REFUSED at
+    that step, NOT run with the per-step re-hash silently skipped. Keep the manifesto blessed so the plan still
+    declares the step; drop only the porter's src digest."""
+    run, store, _porter, _blessed = _compiled_with_snippet(tmp_path)
+    idx = tmp_path / "chip" / "sk" / "index.json"
+    files = json.loads(idx.read_text())["files"]
+    idx.write_text(json.dumps({"files": {"perks/pk/manifesto.json": files["perks/pk/manifesto.json"]}}))
+    r = run_cli("executor", "--script", run, "--step", "1")
+    assert r.returncode == 8 and "SNIPPET" in r.stdout and "UNBLESSED" in r.stdout
+    ev = [x for x in ledger(store)["runs"] if x.get("event") == "snippet_refused"]
+    assert len(ev) == 1 and ev[0]["step"] == "1" and ev[0]["expected"] is None    # present porter, no blessing
+
+
 def test_snippet_refused_is_evidence_not_corruption(tmp_path):
     """A recorded snippet_refused is a PASS to cws-ledgercheck/verify (meta-rule M4) — the redemption path."""
     import importlib.util

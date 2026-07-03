@@ -14,14 +14,18 @@ def sha256_full(b):
 
 
 def snippet_decision(snip_verify, st, step_tool, blessed, snip):
-    # the per-step snippet check: returns (refuse, fname, want, found). refuse iff the step's blessed digest
-    # exists, the on-disk porter no longer matches it (a post-bless mutation). A no-op when verification is
-    # off, the step has no tool, the file is not blessed.
+    # the per-step snippet check: returns (refuse, fname, want, found). refuse iff the porter's on-disk digest
+    # does NOT equal the step's blessed digest. That single equality covers every drift class: a post-bless
+    # MUTATION (blessed digest exists but differs); a blessed porter that is MISSING (found None vs a digest);
+    # an UNBLESSED-but-PRESENT porter (a digest vs None — an emptied/corrupt index, a smuggled sibling, which
+    # the old `want is not None` guard let run UNVERIFIED). It stays a no-op only when nothing needs verifying
+    # while nothing is blessed (found None, want None → equal): verification off; the step has no tool; an
+    # inline step whose on-disk porter is absent, whose blessed digest is absent (the porter-less channel case).
     if not (snip_verify and st in step_tool):
         return False, None, None, None
     fname = step_tool[st] + ".sh"
     want = blessed.get(fname)
     fp = os.path.join(snip, fname)
     found = sha256_full(open(fp, "rb").read()) if os.path.isfile(fp) else None
-    refuse = want is not None and found != want
+    refuse = found != want
     return refuse, fname, want, found

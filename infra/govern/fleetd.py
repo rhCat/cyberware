@@ -13,7 +13,8 @@ Design invariants (see deploy/FLEET-VALIDATION.md):
   * SAME TRUST ROOT — /fleet/* reuse govd's principals registry (the SHARED cfg['principals']): Bearer-gated,
     deny-by-default, rate-limited, no new credential, no node keypair. A token revoked in the registry is
     denied here on the next request. govd.serve() refuses to START this plane on a non-loopback bind with no
-    registry (the require_closed_auth equivalent), so the auth-disabled path is loopback-only.
+    registry (the require_closed_auth equivalent), so the auth-disabled path is loopback-only UNLESS the
+    operator sets CYBERWARE_ALLOW_OPEN=1 (an explicit, startup-logged escape that opens it deliberately).
   * NO SHARED WRITTEN STATE — there is NO register/gossip write surface. Each node only ever reports what it
     itself scrapes LIVE from peers' ungated :5773 /health + /catalog, so a fleet-token holder cannot forge
     "I run skill X at «attacker:5773»" and have it propagate (no roster-poisoning amplification).
@@ -288,8 +289,12 @@ class FleetHandler(BaseHTTPRequestHandler):
 
     def _auth(self):
         """Reuse govd's EXACT trust root — the SHARED principals registry. Returns the principal id, or None
-        (-> 401). With NO registry, auth is disabled and returns the sentinel "local"; govd.serve() refuses to
-        start this plane on a non-loopback bind without a registry, so that open path is loopback-only."""
+        (-> 401). With NO registry, auth is disabled and returns the sentinel "local". govd.serve() refuses to
+        start this plane on a non-loopback bind without a registry, so that open path is loopback-only — EXCEPT
+        when the operator sets CYBERWARE_ALLOW_OPEN=1, which overrides that refusal (logged loudly at startup).
+        Under that escape a non-loopback plane with no registry serves every request as "local" with
+        rate-limiting skipped (it gates on registry presence): a deliberate, operator-visible open mode, not a
+        silent gap. Do not set it on an untrusted network."""
         reg = self.server.cfg.get("principals") or {}
         if not reg:
             return "local"

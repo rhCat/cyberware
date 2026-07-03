@@ -10,7 +10,11 @@ The agent never runs the compiled bash directly — it calls executor.py, which:
     visibility, but the executor re-checks regardless — the gate cannot be skipped);
   * RE-VERIFIES each step's snippet (the perk porter) against its blessed authenticity digest at the
     instant of execution — a perk source mutated AFTER blessing but BEFORE the step runs refuses exactly
-    that step (snippet_refused, expected-vs-found recorded), closing the time-of-check-to-time-of-use gap;
+    that step (snippet_refused, expected-vs-found recorded), closing the time-of-check-to-time-of-use gap.
+    A porter that is PRESENT on disk but carries NO matching blessed digest (a corrupt/emptied authenticity
+    index, a smuggled unblessed sibling) is refused too — the check is NOT silently disabled when blessing is
+    unavailable. A step with no on-disk porter (an inline step) has nothing to source, so it stays a no-op.
+    This is cooperative-parity with the delegated (exod) path, which re-hashes the closure at time-of-use;
   * REFUSES a step whose upstream steps have not been recorded as run (require_upstream);
   * registers every run — ts, step, exit, duration, output hash, output tail — to a persistent
     `run-ledger.json` under the record_store (the provenance chain);
@@ -152,7 +156,13 @@ def main():
     # (the same structure govd blessed as plan["sequence"]); the script is never executed to discover them.
     blessed, snip = _blessed_snippets(script)                              # {} / None for non-compiler scripts
     declared, step_tool = plan_steps(snip)                                 # step -> tool, for snippet verify
-    snip_verify = bool(snip and blessed and step_tool)
+    # verify whenever there IS a materialized SNIP closure with a step→tool map — NOT only when `blessed` is
+    # non-empty. Gating on `blessed` would SILENTLY DISABLE the per-step check when the authenticity index is
+    # corrupt/emptied (returns {}), running the perk unverified. Instead snippet_decision refuses any step whose
+    # porter is PRESENT on disk but has no matching blessed digest (an emptied index, a smuggled sibling); a
+    # step with no on-disk porter (an inline step / the porter-less channel case) has nothing to source, so it
+    # stays a no-op. This is cooperative-parity with exod's time-of-use closure re-hash.
+    snip_verify = bool(snip and step_tool)
     if not declared:
         # fail CLOSED, never SILENT: a compiled script whose blessed plan (perk manifesto) is missing,
         # empty, unblessed, or tampered declares no steps — refuse the run rather than `--all`-succeeding
@@ -186,8 +196,9 @@ def main():
         #     source refuses EXACTLY this step, with expected-vs-found digests recorded as evidence)
         refuse, fname, want, found = snippet_decision(snip_verify, st, step_tool, blessed, snip)
         if refuse:
-            print(f"  [SNIPPET] step {st} ({step_tool[st]}) snippet drift — REFUSED "
-                  f"(expected {want[:16]}…, found {(found or 'MISSING')[:16]}…)")
+            reason = "snippet drift" if want is not None else "porter present but UNBLESSED"
+            print(f"  [SNIPPET] step {st} ({step_tool[st]}) {reason} — REFUSED "
+                  f"(expected {(want or 'UNBLESSED')[:16]}…, found {(found or 'MISSING')[:16]}…)")
             ledger["runs"].append({"ts": now(), "event": "snippet_refused", "step": str(st),
                                    "tool": step_tool[st], "file": fname, "expected": want, "found": found})
             json.dump(ledger, open(lpath, "w"), indent=2)

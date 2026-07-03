@@ -60,7 +60,16 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 DEFAULT_CONFIG = os.path.join(HERE, "govd_config.json")
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"             # RFC 6455 magic
 VALID_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")          # a safe shell var name
-SECRET_KEY = re.compile(r"(?i)(password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key)")
+SECRET_KEY = re.compile(r"(?i)(password|passwd|passphrase|secret|token|credential|mnemonic|seed[_-]?phrase"
+                        r"|bearer|api[_-]?key|access[_-]?key|private[_-]?key|priv[_-]?key"
+                        r"|ssh[_-]?key|gpg[_-]?key|signing[_-]?key)")   # a key that must ride *_FILE/vault, never a plaintext value
+# NOT session|jwt|cookie as bare substrings: those over-reject non-secret METADATA (SESSION_ID, SESSION_TIMEOUT,
+# JWT_ALG, JWT_ISSUER, COOKIE_NAME) whose genuine secret forms are ALREADY caught above (SESSION_TOKEN via token,
+# JWT_SECRET via secret). `bearer` stays — a bearer is a token and has no non-secret metadata vocabulary.
+POINTER_SUFFIX = ("_FILE", "_DIR", "_PATH")                 # a key naming WHERE something lives (a path pointer, read at
+                                                            # runtime) — not the secret itself; SSH_KEY_PATH/BEARER_DIR
+                                                            # pass, a bare SSH_KEY/BEARER stays refused
+RESERVED_ENV = ("PATH", "SNIP", "RECORD_STORE")             # the fixed confined-step env — a caller value must NEVER override these
 MAX_BODY = 1 << 20                                           # cap a /govern request body at 1 MiB (keys only)
 MAX_WS_FRAME = 1 << 20                                       # refuse a WebSocket frame larger than 1 MiB
 SOCKET_TIMEOUT = 600                                         # per-read socket timeout (s) — kills slowloris
@@ -123,7 +132,14 @@ _FLOW_CACHE = {}                                         # run_id -> the rendere
 
 
 def verify_skill(skill):
-    """Cached authenticity check: does the server's registry for `skill` match its committed index.json?"""
+    """Cached authenticity check: does the server's registry for `skill` match its committed index.json?
+
+    CACHE BOUNDARY (honest): this is a CLAIM-TIME cache keyed by skill name with NO invalidation for the
+    process lifetime — it assumes the registry is STATIC at runtime (the deployment model: a chip re-fetch
+    means a process restart). A post-start registry mutation would serve the cached verdict until restart, so
+    this is not the execution-integrity check. Execution integrity is re-derived at time-of-use every run: a
+    delegated run re-hashes the closure in exod (closure_decision), a cooperative run re-checks per step via
+    snippet_decision. Those, not this cache, are the binding integrity gates."""
     if skill not in _VERIFY_CACHE:
         _VERIFY_CACHE[skill] = skill_index.verify(skill)
     return _VERIFY_CACHE[skill]
@@ -224,7 +240,7 @@ def govern(ledger, cfg, *, scope=None, principal=None, local_dev=False, principa
     if bad:
         problems.append({"id": "bad_var_key", "detail": bad,
                          "reason": "var keys must match ^[A-Za-z_][A-Za-z0-9_]*$ (shell-injection guard)"})
-    secretish = [k for k in var_keys if SECRET_KEY.search(k) and not k.endswith("_FILE")]
+    secretish = [k for k in var_keys if SECRET_KEY.search(k) and not k.endswith(POINTER_SUFFIX)]
     if secretish:
         problems.append({"id": "plaintext_secret_key", "detail": secretish,
                          "reason": "secrets must be passed as a *_FILE pointer (read via cat at runtime), "
@@ -278,8 +294,9 @@ def govern(ledger, cfg, *, scope=None, principal=None, local_dev=False, principa
     # perk_tier + credentialed come from govd's OWN trusted registry + the blessed plan, never task data.
     perk_tier = delegate.perk_sandbox_tier(skill, perk)
     credentialed = bool((plan or {}).get("credential_ids"))
+    parameterized = bool(ledger.get("binds"))       # claim-declared dir binds -> params axis (values re-gated at the WS step)
     acl_ok, acl_problem = principals.acl_allows(scope, skill, perk, perk_tier, destructive, credentialed,
-                                                now=now, strict=strict)
+                                                parameterized=parameterized, now=now, strict=strict)
     if not acl_ok:
         problems.append(acl_problem)
 
@@ -662,7 +679,7 @@ def step_reauthorize(cfg, rec0, *, now=None):
         if sc is not None or strict:
             okv, pv = principals.acl_allows(sc, skill, perk, delegate.perk_sandbox_tier(skill, perk),
                                             rec0.get("destructive", False), bool(rec0.get("credential_ids")),
-                                            now=now, strict=strict)
+                                            parameterized=bool(rec0.get("binds")), now=now, strict=strict)
             if not okv:
                 return False, "acl:" + pv["id"]
     ps0 = reg0.get(rec0.get("principal")) or {}              # ACCESS-1: skill-intrinsic — registry-independent
@@ -1311,11 +1328,39 @@ class Handler(BaseHTTPRequestHandler):
                                     "reason": f"step {step} already executed or in flight — delegated runs are at-most-once"}))
                             continue
                         try:
+                            # PARAMETERIZED delegated run: caller VALUES ride the per-run WS (never the /govern
+                            # claim plane, which stays keys-only). Gate them on the actor's `params` ACL LIVE, and
+                            # forward ONLY keys that were DECLARED in the plan AND are non-secret — secret-named
+                            # keys (and the reserved CWS_SECRET_* vault namespace) never cross the wire.
+                            var_values = msg.get("var_values") or {}
+                            if var_values:
+                                # gate the `params` axis on EVERY path — an unscoped actor (sc_p None) still runs
+                                # acl_allows(None,...), which allows non-strict (back-compat) yet keeps the axis
+                                # real for any scoped actor. Not gated only "when scoped" (that inverted deny-by-default).
+                                _acl_strict = bool(self.server.cfg.get("acl_strict"))
+                                sc_p = principals.resolve_scope(reg0, (rec0 or {}).get("principal"))
+                                okp, pp = principals.acl_allows(
+                                    sc_p, rec0.get("skill"), rec0.get("perk"),
+                                    delegate.perk_sandbox_tier(rec0.get("skill"), rec0.get("perk")),
+                                    rec0.get("destructive", False), bool(rec0.get("credential_ids")),
+                                    parameterized=True, now=time.time(), strict=_acl_strict)
+                                if not okp:
+                                    ws_send(self.wfile, json.dumps({"type": "refuse", "step": msg.get("step"),
+                                            "reason": "acl:" + pp["id"]}))
+                                    continue
+                                declared = set(rec0.get("var_keys") or [])
+                                # forward ONLY declared, non-secret keys, and NEVER a reserved fixed-env name — a
+                                # caller value must not overwrite the confined step's PATH/SNIP/RECORD_STORE.
+                                var_values = {k: str(v) for k, v in var_values.items()
+                                              if k in declared and k not in RESERVED_ENV
+                                              and not k.startswith("CWS_SECRET_")
+                                              and not (SECRET_KEY.search(k) and not k.endswith(POINTER_SUFFIX))}
                             d_reply, d_event = delegate.execute_step(
                                 rec0, step, psha, exod_socket=sock, grant_key=gk, exod_pub=epub,
                                 base=getattr(self.server, "exec_workspace", os.path.join(store.root, "_work")),
                                 attestation=msg.get("attestation"),   # ACL M1: agent-relayed operator attestation
-                                token_proof=msg.get("token_proof"))   # ACL M2: agent-relayed token-possession proof
+                                token_proof=msg.get("token_proof"),   # ACL M2: agent-relayed token-possession proof
+                                var_values=var_values)                # caller NON-secret values (declared subset, ACL-gated)
                             if d_event:
                                 store.append(bound, {**d_event, "ts": now(),
                                                      "span": tracing.child_span((rec0 or {}).get("traceparent"))})

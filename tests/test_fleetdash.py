@@ -456,6 +456,206 @@ def test_home_links_to_accounting():
     assert 'href="/accounting"' in html
 
 
+# ── the UX pass: topbar, polite refresh, row links, filters, approval plumbing, supersession ──
+def test_needs_approve_survives_both_allowlists_and_the_decision_carry(node_and_mirror, monkeypatch):
+    """`needs_approve` is what makes the risk queue actionable (WHAT to approve). It must survive the
+    value-free detail allowlist AND the compact index row (the dual-allowlist trap that ate `cost`), and be
+    carried from the decision feed when the run has no detail record (a push_back usually has none)."""
+    assert "needs_approve" in F._RUN_KEYS and "needs_approve" in F._INDEX_KEYS
+    node, mdir = node_and_mirror
+
+    def with_needs(url, token=None, timeout=6):
+        out = _fake_get(url, token, timeout)
+        if "/monitor/state" in url:
+            for d in out["decisions"]:
+                if d["decision"] == "push_back":
+                    d["needs_approve"] = ["rm", "destructive"]
+        return out
+
+    monkeypatch.setattr(F, "_get", with_needs)
+    F.mirror_node(node, mdir)
+    idx = json.load(open(os.path.join(mdir, "body-1", "index.json")))
+    assert idx["r1"]["needs_approve"] == ["rm", "destructive"]     # carried from the feed into the index row
+    r1 = json.load(open(os.path.join(mdir, "body-1", "runs", "r1.json")))
+    assert r1["needs_approve"] == ["rm", "destructive"]            # and into the durable detail
+
+
+def test_mark_superseded_answers_the_approval_queue():
+    """A later `allow` of the same node+principal+skill+perk carrying an approval IS the operator's answer —
+    the banner stops counting that push_back as actionable, but it stays in the bucket for audit."""
+    stale = {"node": "n1", "principal": "a", "skill": "fs", "perk": "rm", "decision": "push_back",
+             "destructive": True, "ts": "2026-01-01T00:00:01"}
+    fresh = {"node": "n1", "principal": "a", "skill": "fs", "perk": "rm", "decision": "push_back",
+             "destructive": True, "ts": "2026-01-03T00:00:01"}
+    answer = {"node": "n1", "principal": "a", "skill": "fs", "perk": "rm", "decision": "allow",
+              "destructive": True, "approved": ["rm"], "ts": "2026-01-02T00:00:00"}
+    other = {"node": "n2", "principal": "a", "skill": "fs", "perk": "rm", "decision": "push_back",
+             "destructive": True, "ts": "2026-01-01T00:00:02"}
+    feed = [stale, fresh, answer, other]
+    risk = F.mark_superseded(feed, F.risk_summary(feed))
+    assert stale["_superseded"] is True                            # answered by the later allow
+    assert fresh["_superseded"] is False                           # NEWER than the allow — still pending
+    assert other["_superseded"] is False                           # different node — untouched
+    assert F._risk_pending(risk) == 2
+    html = F.render_risk(feed, risk)
+    assert "superseded" in html
+
+
+def test_supersession_never_hides_a_second_pending_claim():
+    """SAFETY (the blocker the review found): two DISTINCT pending push_backs of the same value-free tuple with
+    only ONE approval must leave ONE pending — a single approval must not clear the whole tuple, or a genuinely
+    unanswered destructive claim would vanish behind a false 'queue clear'. Count-based (FIFO), not any-later."""
+    p1 = {"node": "n", "principal": "a", "skill": "fs", "perk": "rm", "decision": "push_back",
+          "destructive": True, "ts": "2026-01-01T10:00:00"}
+    p2 = {"node": "n", "principal": "a", "skill": "fs", "perk": "rm", "decision": "push_back",
+          "destructive": True, "ts": "2026-01-01T10:05:00"}
+    approve = {"node": "n", "principal": "a", "skill": "fs", "perk": "rm", "decision": "allow",
+               "destructive": True, "approved": ["rm"], "ts": "2026-01-01T10:10:00"}
+    feed = [p1, p2, approve]
+    risk = F.mark_superseded(feed, F.risk_summary(feed))
+    assert F._risk_pending(risk) == 1                              # ONE approval answers ONE claim, not both
+    assert p1["_superseded"] is True and p2["_superseded"] is False  # oldest answered FIFO, newest stays pending
+    # a second approval drains the second
+    feed.append(dict(approve, ts="2026-01-01T10:12:00"))
+    assert F._risk_pending(F.mark_superseded(feed, F.risk_summary(feed))) == 0
+
+
+def test_failed_run_page_is_static_not_a_refresh_loop():
+    """A govd run whose middle step errored never results the rest (govd blocks downstream), so keying 'live'
+    off the step count alone reloads the page forever. A failed/errored allow run must render static."""
+    failed = {"run_id": "r1", "_node": "n", "skill": "fs", "perk": "cp", "decision": "allow", "seq": ["a", "b", "c"],
+              "events": [{"type": "step_result", "step": "1", "status": "ok", "authority": "exod"},
+                         {"type": "step_result", "step": "2", "status": "error", "exit": 1, "authority": "exod"}]}
+    assert F._run_live(failed) is False                           # errored step → terminal
+    assert 'data-refresh="' not in F.render_run("n", "r1", failed, refresh=5)
+    flagged = {"run_id": "r2", "_node": "n", "skill": "fs", "perk": "cp", "decision": "allow", "seq": ["a", "b"],
+               "failed": True, "events": [{"type": "step_result", "step": "1", "status": "ok", "authority": "exod"}]}
+    assert F._run_live(flagged) is False                          # the derived `failed` flag also makes it static
+
+
+def test_mirror_derives_failed_and_progress_from_events(node_and_mirror, monkeypatch):
+    """`failed`/`progress` are computed by the CENTER from the value-free events — govd emits them only in its
+    own monitor snapshot, never in the decision feed or /monitor/run detail, so the board's tag would be inert
+    without this derivation (the same dual-allowlist trap that once ate `cost`, one level upstream)."""
+    node, mdir = node_and_mirror
+
+    def errored(url, token=None, timeout=6):
+        if "/monitor/run/" in url and url.endswith("r2"):
+            return {"run_id": "r2", "skill": "fs", "perk": "wipe", "decision": "allow", "destructive": True,
+                    "seq": ["s1", "s2"], "events": [
+                        {"type": "step_result", "step": "1", "status": "ok", "authority": "exod"},
+                        {"type": "step_result", "step": "2", "status": "error", "exit": 1, "authority": "exod"}]}
+        return _fake_get(url, token, timeout)
+
+    monkeypatch.setattr(F, "_get", errored)
+    F.mirror_node(node, mdir)
+    idx = json.load(open(os.path.join(mdir, "body-1", "index.json")))
+    assert idx["r2"]["failed"] is True and idx["r2"]["progress"] == "1/2"   # derived, in the compact index row
+
+
+def test_rows_navigate_by_delegation_not_inline_onclick():
+    """Row nav is a delegated data-href click, NOT an inline onclick — that keeps a hostile node's run_id out of
+    a JS-in-HTML-attribute context (the XSS sink) and lets modifier/middle clicks open runs in a new tab."""
+    html = F.render_html(_NODES, _FEED, F.risk_summary(_FEED))
+    assert 'data-href="/run/mini/r"' in html and "onclick=" not in html
+    # the delegated handler is present and guards modifier/middle clicks + links
+    assert "closest('tr.run[data-href]')" in html and "e.metaKey" in html and "e.button!==0" in html
+    for page in (F.render_accounting(_ACCT_FEED), F.render_principal("alice", _ACCT_FEED),
+                 F.render_risk(_FEED, F.mark_superseded(_FEED, F.risk_summary(_FEED)))):
+        assert "onclick=" not in page                             # no inline JS-in-attribute sink on any page
+
+
+def test_malformed_node_record_does_not_500_the_run_page():
+    """A hostile/malformed node sending a scalar where a list is expected (needs_approve=5, problems detail as
+    non-strings) must not crash a render — every join goes through _as_list."""
+    bad = {"run_id": "r1", "_node": "n", "node": "n", "skill": "fs", "perk": "rm", "decision": "push_back",
+           "destructive": True, "needs_approve": 5, "var_keys": 7, "seq": [], "events": [],
+           "problems": [{"id": "x", "detail": [1, 2]}]}
+    html = F.render_run("n", "r1", bad)                            # must not raise
+    assert "awaiting operator approval" in html and "5" in html
+    risk = F.render_risk([bad], F.mark_superseded([bad], F.risk_summary([bad])))  # approve_of over the scalar
+    assert "needs approval" in risk
+
+
+def test_principal_totals_are_not_windowed_by_the_render_limit():
+    """REGRESSION: /principal used to accumulate spend inside the [:300] render slice, so a busy actor's
+    total silently disagreed with /accounting's full-feed rollup."""
+    feed = [{"node": "n", "role": "body", "principal": "busy", "skill": "fs", "perk": "find",
+             "decision": "allow", "cost": "1.0000", "ts": f"2026-06-29T{i // 3600:02d}:{i // 60 % 60:02d}:{i % 60:02d}",
+             "run_id": f"r{i}", "authority": "exod"} for i in range(310)]
+    html = F.render_principal("busy", feed)
+    assert "spent across the fleet: <b>310.0000</b>" in html       # all 310, not the newest 300
+    assert "showing newest 300 of 310 runs" in html                # honest about the window
+    assert 'data-utc="2026-06-29' in html                          # timestamps go through the tz control now
+
+
+def test_rows_are_real_links():
+    """Feed rows carry a real <a href> (middle-click / keyboard / copy-link work), not just tr onclick."""
+    html = F.render_html(_NODES, _FEED, F.risk_summary(_FEED))
+    assert 'href="/run/mini/r"' in html and 'class="rowlink"' in html
+    acct = F.render_accounting(_ACCT_FEED)
+    assert 'href="/principal/alice"' in acct
+
+
+def test_pages_refresh_politely_not_via_bare_meta():
+    """The auto-refresh is an interruptible JS reload (skipped while typing/selecting/hovering a row/paused),
+    with the plain meta refresh only as the <noscript> fallback."""
+    html = F.render_html(_NODES, _FEED, F.risk_summary(_FEED), refresh=5)
+    assert 'data-refresh="5"' in html and "<noscript><meta http-equiv=\"refresh\"" in html
+    assert "location.reload" in html and "cw-pause" in html and 'id="pausebtn"' in html
+    # the guard set: never stomp a focused input, a selection, an open details, or a hovered row
+    for needle in ("document.hidden", "INPUT|SELECT|TEXTAREA", "getSelection", "details[open]", "tr.run:hover"):
+        assert needle in html, needle
+
+
+def test_run_page_refreshes_only_while_the_run_can_still_change():
+    live = {"run_id": "r1", "_node": "n", "skill": "fs", "perk": "cp", "decision": "allow", "seq": ["a", "b"],
+            "events": [{"type": "step_result", "step": "1", "status": "ok", "authority": "exod"}]}
+    done = {"run_id": "r1", "_node": "n", "skill": "fs", "perk": "cp", "decision": "allow", "seq": ["a"],
+            "events": [{"type": "step_result", "step": "1", "status": "ok", "authority": "exod"}]}
+    pushed = {"run_id": "r1", "_node": "n", "skill": "fs", "perk": "rm", "decision": "push_back",
+              "destructive": True, "seq": [], "events": []}
+    assert 'data-refresh="5"' in F.render_run("n", "r1", live, refresh=5)      # steps pending → live page
+    assert 'data-refresh="' not in F.render_run("n", "r1", done, refresh=5)    # finished → static ledger
+    assert 'data-refresh="' not in F.render_run("n", "r1", pushed, refresh=5)  # immutable record → static
+
+
+def test_push_back_run_page_shows_the_resubmit_callout():
+    pushed = {"run_id": "r1", "_node": "n", "skill": "fs", "perk": "rm", "decision": "push_back",
+              "destructive": True, "seq": [], "events": [], "var_keys": ["TARGET"],
+              "needs_approve": ["rm", "destructive"]}
+    html = F.render_run("n", "r1", pushed)
+    assert "awaiting operator approval" in html and "govd never auto-approves" in html
+    assert "&quot;approve&quot;" in html and "rm" in html          # the value-free re-submit claim, tokens listed
+
+
+def test_topbar_and_viewport_on_every_page():
+    html = F.render_html(_NODES, _FEED, F.risk_summary(_FEED))
+    assert 'class="topnav"' in html and 'href="/risk"' in html and '<html lang="en">' in html
+    assert '<meta name="viewport"' in html and 'rel="icon" href="data:image/svg+xml' in html
+    assert 'class="topnav"' in F.render_accounting(_ACCT_FEED)     # persistent — not just the home page
+
+
+def test_feed_filter_bar_is_client_side_and_value_free():
+    html = F.render_html(_NODES, _FEED, F.risk_summary(_FEED))
+    assert 'id="feedsearch"' in html and 'class="fchip"' in html
+    assert 'data-search="mini anchor mini fs find allow r' in html # the haystack: rendered metadata only
+    assert 'data-decision="allow"' in html
+
+
+def test_copy_affordance_carries_the_full_hash():
+    detail = {"run_id": "r1", "_node": "n", "skill": "fs", "perk": "cp", "decision": "allow",
+              "plan_sha": "p" * 64, "seq": [], "events": []}
+    html = F.render_run("n", "r1", detail)
+    assert f'data-full="{"p" * 64}"' in html and 'class="cp"' in html   # truncated display, full value on copy
+
+
+def test_sidebar_surfaces_a_sweep_error():
+    nodes = [dict(_NODES[0], sweep_error="HTTPError (bad token?)")]
+    html = F.render_html(nodes, _FEED, F.risk_summary(_FEED))
+    assert "bad token?" in html and 'class="swarn"' in html        # auth-rot is visible even when /health is green
+
+
 def test_serve_does_not_block_on_a_slow_node(node_and_mirror, monkeypatch):
     """REGRESSION: every page serves from the background-refreshed SNAPSHOT, NEVER a live /health probe — so a
     slow/unreachable node cannot hold the whole dashboard down. The bug: fleet_from_mirror's live_health overlay

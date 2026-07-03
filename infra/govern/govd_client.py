@@ -21,13 +21,33 @@ read from the file/env, never argv. An open/local govd (no registry) needs none.
 P1-T08: the token + the endpoint are all the agent holds; every action is a governed syscall over this.
 """
 from __future__ import annotations
-import argparse, base64, collections, hashlib, json, os, socket, subprocess, sys, urllib.error, urllib.parse, urllib.request
+import argparse, base64, collections, hashlib, json, os, re, socket, subprocess, sys, urllib.error, urllib.parse, urllib.request
 
 from infra import registry as _reg   # the agent's `registry` arg = its skillChip; default = the bundled chip
 from infra.exec import aclverify     # ACL M2: mint_token_proof + read the attestation's token_sha (client side)
 from infra.govern import compiler
 from infra.govern import runlog
 from infra.tool import skill_index   # the value-free catalog builder — shared with govd, so the two can't drift
+
+# a var name that LOOKS secret must never ride the wire as a VALUE (delegated); it stays a *_FILE pointer or a
+# vault credential (node-local). Mirrors govd's SECRET_KEY — govd re-filters authoritatively, this is hygiene.
+_SECRET_KEY = re.compile(r"(?i)(password|passwd|passphrase|secret|token|credential|mnemonic|seed[_-]?phrase"
+                         r"|bearer|api[_-]?key|access[_-]?key|private[_-]?key|priv[_-]?key"
+                         r"|ssh[_-]?key|gpg[_-]?key|signing[_-]?key)")   # mirrors govd.SECRET_KEY (govd re-filters authoritatively)
+_POINTER_SUFFIX = ("_FILE", "_DIR", "_PATH")   # mirrors govd.POINTER_SUFFIX — a path pointer, not the secret itself
+
+
+def _wire_values(vars_dict):
+    """The NON-secret subset of the ledger's var VALUES to send over the per-run WS for a delegated step: drop
+    any secret-named key (unless a *_FILE/_DIR/_PATH pointer) and the reserved CWS_SECRET_* vault namespace."""
+    out = {}
+    for k, v in (vars_dict or {}).items():
+        if k.startswith("CWS_SECRET_"):
+            continue
+        if _SECRET_KEY.search(k) and not k.endswith(_POINTER_SUFFIX):
+            continue
+        out[k] = str(v)
+    return out
 
 
 def _auth_headers():
@@ -293,6 +313,9 @@ def run_delegated(base_url, ledger, approve=(), attestation=None, proof_key=None
     results = []
     for st in steps:
         msg = {"type": "step_request", "step": st, "plan_sha": psha}
+        _vv = _wire_values(ledger.get("vars"))          # caller NON-secret VALUES for a parameterized delegated step
+        if _vv:                                         # (govd re-gates on the `params` ACL + declared-subset)
+            msg["var_values"] = _vv
         if attestation is not None:                     # ACL M1: relay the operator attestation to exod (the
             msg["attestation"] = attestation            # agent holds it; govd only relays, it cannot forge it)
         if proof_key is not None and token_sha is not None:   # ACL M2: prove possession of THIS token's proof key
@@ -313,6 +336,24 @@ def run_delegated(base_url, ledger, approve=(), attestation=None, proof_key=None
     sock.close()
     return {"run_id": verdict["run_id"], "decision": "allow", "mode": "delegated", "results": results,
             "plan_sha": psha}
+
+
+def blocked_run(out) -> bool:
+    """True iff a run must NOT report success to a caller keying on the exit code. It reaches main() as
+    decision="allow" but was governance-blocked in one of THREE shapes:
+      (1) an UP-FRONT block (registry mismatch / authenticity drift / unauthorized oversight) — a top-level
+          `error`;
+      (2) a per-STEP refusal recorded with a `refused` key (cooperative snippet/oversight refusals, and a govd
+          that refused the step before execution) — keyed on the PRESENCE of the key, not the truthiness of the
+          reason (a peer could omit the reason);
+      (3) a DELEGATED per-step refusal that exod SIGNED off-node — it arrives as a `status == "refused"` result
+          (no `refused` key), for every fail-closed limb path: a grant workspace/argv mismatch, an off-node ACL
+          / params denial, the capability-manifest mount check, closure drift, an unreachable/unverifiable limb,
+          or a vault/sandbox-unavailable refusal. exod uses "refused" EXCLUSIVELY for a step that never ran; a
+          step it RAN carries "ok"/"error", so a faithful task failure (exit != 0) is NOT a governance block."""
+    results = out.get("results") or []
+    return bool(out.get("error")) or any(
+        isinstance(r, dict) and ("refused" in r or r.get("status") == "refused") for r in results)
 
 
 def main():
@@ -358,10 +399,7 @@ def main():
     else:
         out = run_governed(a.url, ledger, a.approve, registry=a.registry)
     print(json.dumps(out, indent=2))
-    # a blocked run (registry mismatch / authenticity drift / unauthorized oversight) returns decision="allow"
-    # WITH an `error` and no results — it must NOT report success to a caller keying on the exit code.
-    blocked = bool(out.get("error"))
-    sys.exit(0 if out.get("decision") in ("allow", None) and not blocked else 2)
+    sys.exit(0 if out.get("decision") in ("allow", None) and not blocked_run(out) else 2)
 
 
 if __name__ == "__main__":

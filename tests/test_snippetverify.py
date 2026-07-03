@@ -42,10 +42,21 @@ def test_step_not_in_tool_is_noop(tmp_path):
     assert snippet_decision(True, "9", {"1": "tool"}, {}, str(tmp_path)) == (False, None, None, None)
 
 
-def test_unblessed_file_not_refused(tmp_path):
+def test_unblessed_present_porter_is_refused(tmp_path):
+    """A porter that is PRESENT on disk but carries NO blessed digest (want is None) is REFUSED — it would
+    otherwise run UNVERIFIED (an emptied/corrupt index, or a smuggled sibling). This closes the fail-open the
+    old `want is not None` guard left: found != want (a digest != None) → refuse."""
     _write(tmp_path, "tool.sh", b"BODY")
     refuse, _f, want, found = snippet_decision(True, "1", {"1": "tool"}, {}, str(tmp_path))
-    assert refuse is False and want is None and found == sha256_full(b"BODY")
+    assert refuse is True and want is None and found == sha256_full(b"BODY")
+
+
+def test_absent_porter_with_no_blessing_is_noop(tmp_path):
+    """The genuine no-op the fail-open change must PRESERVE: a step with no on-disk porter AND no blessed digest
+    (an inline step / the porter-less channel case) has nothing to source — found is None, want is None →
+    equal → no refuse. (Contrast test_missing_file_refused, where the porter IS blessed but missing.)"""
+    refuse, _f, want, found = snippet_decision(True, "1", {"1": "tool"}, {}, str(tmp_path))
+    assert refuse is False and want is None and found is None
 
 
 def test_concat_builds_the_right_key(tmp_path):

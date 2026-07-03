@@ -90,7 +90,7 @@ def acl_canonical(pid: str, tok_sha: str, acl) -> str:
     with an identical ACL still get DISTINCT digests (their attestations are not interchangeable)."""
     a = acl or {}
     body = {"pid": pid, "token_sha": tok_sha, "skills": a.get("skills"), "perks": a.get("perks"),
-            "max_tier": a.get("max_tier"), "secrets": a.get("secrets")}
+            "max_tier": a.get("max_tier"), "secrets": a.get("secrets"), "params": a.get("params")}
     return json.dumps(body, sort_keys=True, separators=(",", ":"))
 
 
@@ -136,11 +136,16 @@ def _pmap_entry(skill, pmap):
     return None, None
 
 
-def acl_allows(acl, skill, perk, perk_tier, destructive, credentialed, *, now=None, strict=False):
+def acl_allows(acl, skill, perk, perk_tier, destructive, credentialed, *, parameterized=False,
+               now=None, strict=False):
     """(ok, problem|None) for a CANONICAL (skill, perk) claim under an actor scope `acl`. Deny-by-default
     when an acl is present; under `strict` an absent acl denies too (the Phase-B end-state). Every branch
     fails CLOSED; the tier ceiling's fail-safes are SELF-OWNED here (None/unknown perk tier -> community, the
-    least-trusted; unknown ceiling -> core, the tightest), never inherited from perk_sandbox_tier's default."""
+    least-trusted; unknown ceiling -> core, the tightest), never inherited from perk_sandbox_tier's default.
+
+    `parameterized` is a govd-DERIVED flag (never task-supplied): the claim requests caller VALUES and/or dir
+    binds into the confined step. Like `credentialed`/`secrets`, it is gated by its own capability axis
+    (`params`) — an un-granted token that parameterizes a delegated run is refused (`acl_params_denied`)."""
     if acl is None:
         return (False, {"id": "acl_unscoped"}) if strict else (True, None)
     if not isinstance(acl, dict):                       # a misauthored non-dict acl fails CLOSED, never raises
@@ -162,6 +167,8 @@ def acl_allows(acl, skill, perk, perk_tier, destructive, credentialed, *, now=No
         return False, {"id": "acl_destructive_unlisted", "detail": f"{skill}/{perk}"}
     if credentialed and not acl.get("secrets"):                  # the secret axis: may this token reach creds?
         return False, {"id": "acl_secret_denied", "detail": f"{skill}/{perk}"}
+    if parameterized and not acl.get("params"):                  # the params axis: may this token pass values/binds?
+        return False, {"id": "acl_params_denied", "detail": f"{skill}/{perk}"}
     ceiling = acl.get("max_tier")
     if ceiling is not None:
         want = _TIER_RANK.get(perk_tier, 2)                      # SELF-OWNED fail-safe: None/unknown -> community

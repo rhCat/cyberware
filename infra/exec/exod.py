@@ -28,6 +28,7 @@ from cryptography.hazmat.primitives import serialization
 
 from infra.cwp import sign
 from infra.exec import vault as _vaultmod
+from infra.exec import capmanifest as _capmanifest   # the over-wide-bind catcher, wired onto the LIVE path below
 from infra.exec.closureverify import closure_decision
 from infra.exec.grantverify import _issuer, grant_body, verify_grant
 from infra.exec.sandbox import (
@@ -117,9 +118,13 @@ class Exod:
             return self._sign_result(run_id=run_id, plan_sha=plan_sha, step=step, exit_code=None,
                                      status="refused", output_sha=_sha(tag), nonce=rnonce)
 
-        # 1. authentic + in-window + minted FOR THIS run/plan
+        # 1. authentic + in-window + minted FOR THIS run/plan, AND (when the grant pins them) minted for THIS
+        #    request's workspace + argv — so a grant authorizes exactly one writable mount + one command and a
+        #    stolen/relayed grant cannot be re-pointed at a different mount or a different command (the mount is
+        #    the sole rw bind, the argv is what bwrap execs). Inert for a grant that does not pin them.
         ok, reason = verify_grant(self._issuer_pub, req["grant"], now=now,
-                                  expect_run_id=run_id, expect_plan_sha=plan_sha)
+                                  expect_run_id=run_id, expect_plan_sha=plan_sha,
+                                  expect_workspace=req.get("workspace"), expect_argv=req.get("argv"))
         if not ok:
             return refuse("grant:" + reason)
         # 1b. ACL M1 — re-enforce the actor's ceiling OFF-NODE. When the grant carries an acl_sha (an ACL'd
@@ -153,7 +158,23 @@ class Exod:
         #    --setenv AFTER --clearenv, so the secret reaches the porter yet never the host/agent env. The set
         #    is exactly what govd signed into the grant (credentials=), so it is authorized + run-bound.
         prof = self._profile(req["workspace"])
-        env = {**prof.env, **(req.get("env") or {})}   # govd-supplied NON-secret step env (SNIP, RECORD_STORE)
+        # 5a. wire the (previously call-site-less) capability-manifest catcher onto the LIVE path, BEFORE any
+        #     secret is resolved: prove the sandbox we are about to run mounts EXACTLY the GRANT-authorized
+        #     workspace (the sole rw bind, grant-bound in step 1) plus the fixed core read-only tree, NOTHING
+        #     more. The manifest is derived from an INDEPENDENT source — the GRANT's workspace plus the default
+        #     core ro-set — NOT from prof's own fields, so a profile that renders a different workspace, an
+        #     extra/injected bind, the network the grant did not authorize fails closed HERE (a _profile bug
+        #     or tamper cannot widen the mount past what was granted). Runs before secret resolution, so a
+        #     mismatch never touches the vault.
+        _gws = gbody.get("workspace") or req.get("workspace")
+        _okm, _whym = _capmanifest.verify_materialized(prof, _capmanifest.CapabilityManifest(workspace=_gws))
+        if not _okm:
+            return refuse("mount:" + _whym)
+        # the govd-supplied NON-secret step env: the fixed set (PATH/SNIP/RECORD_STORE) PLUS any caller values a
+        # `params`-granted delegated run carries. It is NOT a fixed allowlist — extra keys are permitted, but
+        # they are what _acl_check derives `parameterized` from, so a run that carries caller values without a
+        # `params` grant is refused there (under --acl-strict). Secrets never ride this channel (added below).
+        env = {**prof.env, **(req.get("env") or {})}
         creds = gbody.get("credentials") or []
         if creds:
             # P2-T04 no-secrets floor, enforced where secrets RESOLVE: the COMMUNITY tier (the default) may
@@ -212,11 +233,19 @@ class Exod:
             return why
         body = attestation_body(att)
         acl = attested_acl(body)
+        # PARAMS axis, re-enforced OFF-NODE and INDEPENDENTLY: a delegated run is "parameterized" iff exod's
+        # step env carries any key beyond the fixed govd-supplied set (PATH/SNIP/RECORD_STORE) — i.e. a caller
+        # value. exod derives this from what it ACTUALLY received (not a govd-asserted flag), so a govd that
+        # injects caller values without a `params` grant is refused here, mirroring how the other axes re-run.
+        parameterized = bool(set((req.get("env") or {})) - {"PATH", "SNIP", "RECORD_STORE"})
         # sandbox_tier is the perk's catalog tier, derived by govd from its OWN trusted registry (never task
-        # data) and grant-bound — a govd that lowers it can only TIGHTEN the ceiling, never widen the actor.
+        # data) and grant-bound. HONEST CAVEAT: exod cannot independently re-derive the perk's real tier (that
+        # needs govd's registry), so a COMPROMISED govd that sets sandbox_tier below the perk's true tier would
+        # loosen this ceiling check — a compromised-node residual, NOT an honest-node widening. The attested
+        # max_tier is still the ceiling; only the *claimed* perk_tier is grant-supplied.
         okv, prob = principals.acl_allows(acl, gbody.get("skill"), gbody.get("perk"),
                                           gbody.get("sandbox_tier"), gbody.get("destructive"),
-                                          bool(gbody.get("credentials")))
+                                          bool(gbody.get("credentials")), parameterized=parameterized)
         if not okv:
             return prob["id"]
         # M2: when the operator bound a client proof key into the attestation, REQUIRE a matching token-possession

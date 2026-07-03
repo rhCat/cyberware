@@ -4,9 +4,14 @@
 The agent-mode capstone. Today's run_governed executes client-side; this is the server-side model the
 deployment needs: the agent POSTs a **value-free claim** (skill, perk, credential NAMES) to govd; govd
 authenticates the principal, resolves the granted secrets **server-side** via the Vault, runs the step on the
-worker under a **faithful, non-root** identity with the secret injected into the STEP env only, and returns
-**only governed status + a ledger reference** — never the step's output, never a secret. The cognition holds
-no limb: its only handle is intent-in, status-out.
+worker under a **non-root** identity with the secret injected into the STEP env only, and returns **only
+governed status + a ledger reference** — never the step's output, never a secret. The cognition holds no limb:
+its only handle is intent-in, status-out.
+
+HONEST SCOPE: "non-root" is enforced (a root euid is refused); a per-PRINCIPAL uid-drop / assumed-role is a
+later milestone. Today the step runs under the govd-process euid, so `principal` in the return is an AUDIT
+LABEL, not a distinct OS identity — two principals execute under the same uid. The kernel-namespace confinement
+(bwrap/exod, SV-3) is the isolation boundary; this module is control-flow, not per-principal OS identity.
 
 The kernel-namespace isolation (bwrap/exod, SV-3) composes UNDER this on a Linux node; this module is the
 control-flow — the agent never spawns the porter, govd does.
@@ -20,11 +25,12 @@ from infra.exec import vault as _vault
 
 def serve(claim: dict, vault, step_argv=None, euid=None, allow_root=None) -> dict:
     """Server-side execution of an authenticated claim. Resolves the claim's credential NAMES via the Vault
-    (server-side), runs the step under the caller's (non-root) uid with secrets injected into the STEP env
+    (server-side), runs the step under the govd-process (non-root) euid with secrets injected into the STEP env
     only, and returns ONLY {status, exit, principal, uid} — never the step's output, never a secret. A root
-    euid is refused (faithful execution is never root; CYBERWARE_ALLOW_ROOT=1 is the operator/CI escape).
-    `euid`/`allow_root` default to the live process + env, but are injectable so the refusal path is testable
-    deterministically (independent of who runs the suite)."""
+    euid is refused (execution is never root; CYBERWARE_ALLOW_ROOT=1 is the operator/CI escape). NOTE: `uid` is
+    the process euid, NOT a per-principal uid — a per-principal uid-drop/assumed-role is not yet implemented, so
+    `principal` is an audit label. `euid`/`allow_root` default to the live process + env, but are injectable so
+    the refusal path is testable deterministically (independent of who runs the suite)."""
     principal = claim.get("principal", "local")
     euid = os.geteuid() if euid is None else euid
     allow_root = (os.environ.get("CYBERWARE_ALLOW_ROOT") == "1") if allow_root is None else allow_root
@@ -58,12 +64,14 @@ def govd_executor_selftest() -> dict:
     info_only_return = ("stdout" not in result and "output" not in result
                         and _vault.secret_bytes_in(result, secret) == 0
                         and "STEP_OUTPUT_" not in str(result))   # neither the secret nor the output crossed
-    # faithful: the step runs under the CALLER's uid (not elevated/impersonated) — true whether the suite
-    # runs as 501 or as root-in-CI. never-root is a SEPARATE invariant: euid 0 without the escape is refused
-    # (tested deterministically by injecting euid=0, allow_root=False, so the result holds for any runner).
+    # the enforced invariant is NEVER-ROOT, tested deterministically by injecting euid=0/allow_root=False (a
+    # root euid is refused) and euid=0/allow_root=True (the operator escape runs). The `ran_under_caller_uid`
+    # field is HONESTLY the process euid: the step runs under the govd-process uid, NOT a distinct per-principal
+    # identity (that uid-drop is a later milestone; see serve()'s docstring). It is NOT a proof that two
+    # principals get two uids — they do not today; the field name is legacy, the check is the process-euid one.
     ran_under_caller_uid = result.get("uid") == os.geteuid()
     root_refused = govd_root_refused()
-    faithful_uid = ran_under_caller_uid and root_refused
+    faithful_uid = ran_under_caller_uid and root_refused        # composite: never-root AND runs-under-process-euid
     agent_zero_secret_bytes = _vault.secret_bytes_in(dict(os.environ), secret) == 0
 
     ok = (agent_claim_zero_secret and agent_holds_no_limb and info_only_return and faithful_uid

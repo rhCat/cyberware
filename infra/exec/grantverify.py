@@ -41,11 +41,17 @@ class NonceCache:
 
 
 def verify_grant(public_key, envelope, *, now, nonce_cache=None, skew=DEFAULT_SKEW,
-                 expect_run_id=None, expect_plan_sha=None):
+                 expect_run_id=None, expect_plan_sha=None, expect_workspace=None, expect_argv=None):
     # verify a grant OFFLINE. Returns (ok, reason). Signature is checked FIRST (a forged grant never reaches
     # the time/replay checks); the grant's bound run_id/plan_sha must match the caller's expectation when one
     # is supplied (a grant minted for one run never authorizes another); a fresh nonce is spent only after
     # every other check passes (a grant that fails to match its run is NOT consumed).
+    #
+    # request<->grant binding: a grant that PINS a workspace, an argv, both, authorizes ONLY that exact
+    # writable mount / command. exod passes the REQUEST's workspace/argv as the expectation; a grant that
+    # omits the field (legacy; a non-run capability) is unaffected, yet a grant that pins it refuses the
+    # moment the request strays — so a stolen/relayed grant cannot be re-pointed at a different mount
+    # (workspace), a different command (argv). The binding stays inert unless the minter chose to set it.
     if not sign.verify(envelope, public_key):
         return False, "bad_signature"
     if envelope.get("payloadType") != GRANT_TYPE:
@@ -62,6 +68,10 @@ def verify_grant(public_key, envelope, *, now, nonce_cache=None, skew=DEFAULT_SK
         return False, "wrong_run"
     if expect_plan_sha is not None and body.get("plan_sha") != expect_plan_sha:
         return False, "wrong_plan"
+    if expect_workspace is not None and body.get("workspace") not in (None, expect_workspace):
+        return False, "wrong_workspace"    # the grant pins one workspace; the request asks for a different one
+    if expect_argv is not None and body.get("argv") not in (None, expect_argv):
+        return False, "wrong_argv"         # the grant pins one argv; the request asks to run a different one
     nonce = body.get("nonce")
     if not (isinstance(nonce, str) and nonce):
         return False, "malformed_nonce"

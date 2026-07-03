@@ -10,6 +10,11 @@ The engine never trusts a cartridge it hasn't checked. Two acquisition modes, ON
     repo) at `CLOUD_SOURCE_TAG` (a branch, tag, or commit sha; default `main`). A private source
     authenticates with `CLOUD_SOURCE_TOKEN`. The clone lands at `CLOUD_CHIP_DIR` (default
     `~/.cyberware/skillChip-cloud`), fresh each boot.
+    MULTI-SOURCE — `CLOUD_SOURCE` may name SEVERAL chips (whitespace/comma-separated; each optionally
+    `URL|NAMESPACE`): they are each cloned and then COMPOSED (`infra.tool.compose`) into one served,
+    namespace-partitioned registry — the base skillChip plus a product chip like skillchipMO, both governed
+    by one govd. Compose validates every source and the composed result, and REFUSES on a cross-source skill
+    collision, so a multi-chip registry is either authentic-and-unambiguous or govd never starts.
 
 Either way the resolved chip must pass the SAME authenticity gate — every skill's `index.json` plus the
 chip-level manifest (`chip_sha`) — or this process exits non-zero and govd never starts. Provenance
@@ -27,10 +32,10 @@ its environment, so the long-running server (and its TLC `java` children) never 
   python3 -m infra.govern.chipfetch --exec CMD ARG...        # then exec CMD with CYBERWARE_SKILLCHIP set
 """
 from __future__ import annotations
-import argparse, json, os, shutil, stat, subprocess, sys, tempfile, urllib.parse
+import argparse, json, os, re, shutil, stat, subprocess, sys, tempfile, urllib.parse
 
 from infra import registry
-from infra.tool import skill_index
+from infra.tool import compose, skill_index
 
 DEFAULT_SOURCE = "https://github.com/rhCat/skillChip.git"
 DEFAULT_TAG = "main"
@@ -108,12 +113,78 @@ def fetch_cloud(source, tag, token=None, dest=None):
     return dest, {"mode": "cloud", "source": clean, "ref": tag, "commit": commit.strip()}
 
 
+def _sources():
+    """Parse CLOUD_SOURCE into an ordered list of {url, namespace}. A single URL is the common case; MULTIPLE
+    chips (e.g. the base skillChip + a product chip) are given as several entries separated by whitespace,
+    newlines, or commas. An entry may carry an explicit namespace as `URL|NS` to re-home that source's skills
+    (rarely needed — a published chip is already namespaced). Empty -> the default source."""
+    raw = (os.environ.get("CLOUD_SOURCE") or DEFAULT_SOURCE).strip()
+    out = []
+    for e in re.split(r"[\s,]+", raw):
+        if not e:
+            continue
+        url, sep, ns = e.partition("|")                          # split on the FIRST '|' only (URLs have no '|')
+        out.append({"url": url, "namespace": (ns.strip() if sep else None) or None})
+    return out or [{"url": DEFAULT_SOURCE, "namespace": None}]
+
+
+def _relabel(msg, specs, provs):
+    """Rewrite compose's internal staging-path labels (`.sources/srcN`) back to the operator's SANITISED source
+    URLs, so a refusal names the actual chips that collided / failed — not chipfetch's temp dirs."""
+    for spec, prov in zip(specs, provs):
+        msg = msg.replace(spec["path"], _sanitize(prov["source"]))
+    return msg
+
+
+def fetch_cloud_multi(sources, tag, token=None):
+    """Clone EACH cloud source, then COMPOSE them into ONE namespace-partitioned chip that govd serves. One
+    shared ref + token cover every source (chips published under one owner; a token works on a public source
+    too). Returns (composed_chip_dir, provenance). Compose validates every source's authenticity AND the
+    composed result, and HARD-FAILS on a cross-source `ns:name` collision — so a multi-chip registry is either
+    authentic and unambiguous, or govd never starts. A declared source that contributes ZERO skills (a wrong
+    ref / empty repo) is refused too — a multi-source deploy must get every chip it named, not silently fewer.
+    Staged per-source clones (with their `.git`) are dropped on EVERY exit, success or refusal — nothing
+    lingers on disk."""
+    base = os.environ.get("CLOUD_CHIP_DIR") or os.path.expanduser("~/.cyberware/skillChip-cloud")
+    if os.path.exists(base):
+        shutil.rmtree(base)                                      # fresh each boot, like the single-source path
+    stage = os.path.join(base, ".sources")
+    os.makedirs(stage, exist_ok=True)
+    try:
+        specs, provs = [], []
+        for i, s in enumerate(sources):
+            dest = os.path.join(stage, f"src{i}")
+            _, prov = fetch_cloud(s["url"], tag, token=token, dest=dest)
+            if not skill_index.scan_skills(dest):                # a named-but-empty chip is a misconfig, not a no-op
+                sys.exit(f"chipfetch: REFUSED — declared source {_sanitize(s['url'])} contributed 0 skills "
+                         f"(wrong ref, or an empty repo)")
+            specs.append({"path": dest, "namespace": s["namespace"]})
+            provs.append({"source": prov["source"], "ref": prov["ref"], "commit": prov["commit"],
+                          "namespace": s["namespace"]})
+        out = os.path.join(base, "composed")
+        try:
+            result = compose.compose(specs, out)                 # authenticity gate + conflict gate, atomic swap
+        except compose.ComposeConflict as e:
+            sys.exit("chipfetch: REFUSED — sources collide on a skill id (cannot compose):\n  "
+                     + _relabel(str(e), specs, provs))
+        except (ValueError, OSError) as e:
+            sys.exit("chipfetch: REFUSED — compose failed: " + _relabel(str(e), specs, provs))
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)                 # staged clones (+ their .git) never linger
+    return out, {"mode": "cloud-multi", "ref": tag, "sources": provs, "chip_sha": result["chip_sha"],
+                 "source": ", ".join(_sanitize(p["source"]) for p in provs)}
+
+
 def resolve():
-    """The chip dir + its provenance, per the acquisition mode (CLOUD_MODE env)."""
+    """The chip dir + its provenance, per the acquisition mode (CLOUD_MODE env). CLOUD mode serves ONE source
+    directly (unchanged) or, when CLOUD_SOURCE names several chips, composes them into one served registry."""
     if _truthy(os.environ.get("CLOUD_MODE")):
-        source = os.environ.get("CLOUD_SOURCE") or DEFAULT_SOURCE
         tag = os.environ.get("CLOUD_SOURCE_TAG") or DEFAULT_TAG
-        return fetch_cloud(source, tag, token=os.environ.get("CLOUD_SOURCE_TOKEN"))
+        token = os.environ.get("CLOUD_SOURCE_TOKEN")
+        sources = _sources()
+        if len(sources) == 1 and not sources[0]["namespace"]:
+            return fetch_cloud(sources[0]["url"], tag, token=token)   # single-source: serve the clone directly
+        return fetch_cloud_multi(sources, tag, token=token)
     return registry.SKILLCHIP, {"mode": "local", "source": registry.SKILLCHIP}
 
 
@@ -155,7 +226,13 @@ def main():
         sys.exit(1)
     prov["chip_sha"] = chip_sha(chip)
     prov["skills"] = len(skill_index.all_skills(chip))
-    src = prov["source"] if prov["mode"] == "local" else f"{prov['source']} @ {prov['ref']} ({prov['commit'][:12]})"
+    if prov["mode"] == "local":
+        src = prov["source"]
+    elif prov["mode"] == "cloud-multi":
+        src = " + ".join(f"{p['source'].rstrip('/').rsplit('/', 1)[-1]}@{p['commit'][:8]}"
+                         for p in prov["sources"]) + f" ({prov['ref']})"
+    else:
+        src = f"{prov['source']} @ {prov['ref']} ({prov['commit'][:12]})"
     print(f"chipfetch: chip VALID — {prov['skills']} skills · chip_sha {prov['chip_sha'][:16]} · {prov['mode']}: {src}")
     print(json.dumps(prov))
 
