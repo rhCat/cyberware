@@ -159,11 +159,16 @@ def make_rail(name: str = "ledger", entries: list = None, config: dict = None):
     config = config or {}
     if name == "stripe":
         return StripeRail(config)
-    if name == "credit":
-        return CreditRail(entries if entries is not None else reward_ledger.open_ledger(),
-                          config.get("operator", "operator"))
-    if name == "ledger":
-        return LedgerRail(entries if entries is not None else reward_ledger.open_ledger())
+    if name in ("credit", "ledger"):
+        # a money-recording rail posts a double-entry into `entries` (mutated in place by reward_ledger.post),
+        # so it MUST be handed the persistent reward chain to record into. Refusing None fails closed: silently
+        # substituting a throwaway in-memory ledger would discard every posting AND break the documented
+        # plan_sha idempotency (each fresh call can never see a prior collection). A caller that truly wants an
+        # ephemeral ledger passes one explicitly (reward_ledger.open_ledger()).
+        if entries is None:
+            raise ValueError(f"the {name!r} rail records money into a ledger — pass `entries` (the reward "
+                             "chain to post into); refusing a throwaway whose postings would be discarded")
+        return CreditRail(entries, config.get("operator", "operator")) if name == "credit" else LedgerRail(entries)
     raise ValueError(f"unknown rail: {name}")
 
 

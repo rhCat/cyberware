@@ -41,3 +41,19 @@ def test_govd_as_executor_agent_holds_no_limb():
     assert r["agent_claim_zero_secret"] is True and r["agent_holds_no_limb"] is True
     assert r["info_only_return"] is True and r["faithful_uid"] is True
     assert r["agent_zero_secret_bytes"] is True
+
+
+def test_inject_step_env_refuses_colliding_credential_ids():
+    """step_env_var is many-to-one (api-key / api_key / API-KEY all -> CWS_SECRET_API_KEY). Two DISTINCT
+    granted ids that collide on one env var are REFUSED (fail closed) — a silent last-wins overwrite would
+    drop one granted secret and hand the confined step the wrong bytes with no error."""
+    class V:
+        def get(self, cid):
+            return "secret-for-" + cid
+    with pytest.raises(ValueError):                              # distinct ids, same env var -> refused
+        vault.inject_step_env({}, V(), ["api-key", "api_key"])
+    env = vault.inject_step_env({}, V(), ["api-key", "db-pass"])  # no collision -> each under its own var
+    assert env["CWS_SECRET_API_KEY"] == "secret-for-api-key"
+    assert env["CWS_SECRET_DB_PASS"] == "secret-for-db-pass"
+    same = vault.inject_step_env({}, V(), ["api-key", "api-key"])  # the SAME id twice is not a collision
+    assert same["CWS_SECRET_API_KEY"] == "secret-for-api-key"

@@ -14,6 +14,29 @@ def test_rails_selftest_all_true():
     assert all(rails.rails_selftest().values())
 
 
+def test_make_rail_refuses_none_entries_for_money_rails():
+    """A ledger/credit rail posts money into `entries` (mutated in place by reward_ledger.post), so make_rail
+    fails closed on None rather than substituting a throwaway ledger whose postings would be silently
+    discarded (and whose fresh state would break the documented plan_sha idempotency)."""
+    with pytest.raises(ValueError):
+        rails.make_rail("ledger", entries=None)
+    with pytest.raises(ValueError):
+        rails.make_rail("credit", entries=None)
+    led = reward_ledger.open_ledger()                            # an explicit persistent ledger -> builds
+    assert isinstance(rails.make_rail("ledger", entries=led), rails.LedgerRail)
+    assert isinstance(rails.make_rail("credit", entries=led), rails.CreditRail)
+    assert rails.make_rail("stripe").name == "stripe"            # stripe records nothing locally -> unaffected
+
+
+def test_collect_run_tax_without_rail_or_entries_fails_closed():
+    """The footgun end to end: no explicit rail AND no ledger_entries would have posted the tax into a
+    throwaway ledger. It now fails closed via make_rail."""
+    pricing = price.load_pricing()
+    pricing = {**pricing, "rails": {**(pricing.get("rails") or {}), "default": "ledger"}}   # force the ledger rail
+    with pytest.raises(ValueError):
+        rails.collect_run_tax("http", "get", "PSHA", pricing=pricing)
+
+
 def test_charge_is_transparent_named_split_that_balances():
     ch = rails.charge_from_price(price.price_plan("http", "get"), "PSHA")
     assert [b["account"] for b in ch["breakdown"]] == ["substrate", "skill_author", "marketplace"]

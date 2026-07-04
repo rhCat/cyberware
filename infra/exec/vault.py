@@ -86,10 +86,21 @@ def step_env_var(credential_id: str) -> str:
 
 def inject_step_env(base_env: dict, vault, credential_ids) -> dict:
     """Resolve the granted credentials and add them to the STEP's environment ONLY — the returned env is for
-    the exod/step subprocess, never the agent. Each credential lands as CWS_SECRET_<ID>; no `*_FILE` path."""
+    the exod/step subprocess, never the agent. Each credential lands as CWS_SECRET_<ID>; no `*_FILE` path.
+
+    step_env_var is many-to-one (`api-key`, `api_key`, `API-KEY` all normalize to CWS_SECRET_API_KEY), so two
+    DISTINCT granted credential ids that collide on the same env var are REFUSED here — fail closed. A silent
+    last-wins overwrite would drop one granted secret and hand the step the wrong bytes with no error; refusing
+    the run is the only safe outcome on the secrets boundary."""
     env = dict(base_env)
+    claimed = {}
     for cid in credential_ids:
-        env[step_env_var(cid)] = vault.get(cid)
+        var = step_env_var(cid)
+        if claimed.get(var, cid) != cid:
+            raise ValueError(f"credential-id collision: {claimed[var]!r} and {cid!r} both map to {var} — "
+                             "refusing to inject (a silent clobber would drop one granted secret)")
+        claimed[var] = cid
+        env[var] = vault.get(cid)
     return env
 
 
