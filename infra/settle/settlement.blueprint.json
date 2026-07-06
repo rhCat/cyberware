@@ -1,6 +1,12 @@
 {
   "name": "Settlement",
   "doc": "The canonical settlement lifecycle (P4-T06 model-checked, P6-T07 bisimilar to the engine). The implemented lifecycle (infra/settle/engine.py, modelled by workflow.settlement_workflow) must map transition-for-transition onto this blueprint.",
+  "reviewed_against": {
+    "enforcement_surface": "v1.6.0 (ecabe1f, incl. #217 fail-closed vault/rails)",
+    "date": "2026-07-06",
+    "verdict": "model CURRENT — re-proven bisimilar to the engine (cws-modelcheck/bisimulation: ok=true, bisimilar=true, seeded-extra-transition still fails). The v1.6.0 changes (fail-closed rails/vault footguns, budget-key hygiene) tighten enforcement within existing transitions; no state or transition added.",
+    "h0_rule": "self-blueprint must be no older than the last enforcement-surface commit (ci-codeqc/gate)"
+  },
   "states": ["quoted", "funded", "checked", "settled", "cancelled"],
   "entry": "quoted",
   "terminal": ["settled", "cancelled"],
