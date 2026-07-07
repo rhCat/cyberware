@@ -96,6 +96,9 @@ def plan_diff(blessed_text, submitted_text):
 # ───────────────────────── config ─────────────────────────
 
 def load_config(path=None):
+    """Load and normalize govd's config, filling the mode defaults (local binds 127.0.0.1;
+    remote binds 0.0.0.0:5773) and letting env vars override file values for the record root,
+    node name, and monitor token. The returned dict is the single source of truth serve() binds to."""
     p = path or os.environ.get("GOVD_CONFIG") or DEFAULT_CONFIG
     cfg = json.load(open(p)) if os.path.isfile(p) else {}
     cfg.setdefault("mode", "local")
@@ -547,6 +550,9 @@ class Store:
                     self._inflight.pop(run_id, None)
 
     def record_decision(self, summary):
+        """Durably append one govern verdict to the decisions log under the lock — EVERY decision
+        including rejects and push-backs, so the audit survives a restart even though only ALLOW
+        runs get a full per-run ledger dir. The chain and index mirror runs async, off this path."""
         with self.lock:
             self.decisions.append(summary)
             try:                                             # durable audit: append EVERY verdict (incl. rejects/

@@ -23,12 +23,19 @@ def skill_dir(skill): return registry.skill_dir(skill)   # flat OR source-groupe
 
 
 def check(name, ok, detail="", gating=True):
+    """Print one check line and fold its result into the caller's running verdict. A gating
+    check that fails fails the whole validation; a non-gating check only warns and always
+    returns True — used for soft, flappy conditions such as host reachability."""
     tag = ("PASS" if ok else "FAIL") if gating else ("ok" if ok else "warn")
     print(f"  [{tag}] {name}" + (f" — {detail}" if detail else ""))
     return ok or not gating
 
 
 def main():
+    """Validate a task-ledger's claims before anything is composed or compiled — a read-only
+    preflight. Confirms the run dir is writable, the perk's required binaries and python3 are
+    reachable, every contract-required input is present and concrete rather than a placeholder,
+    and (soft) the declared DB host answers. Exit 0 only if every gating check passed."""
     ap = argparse.ArgumentParser(description="validate a task-ledger's claims")
     ap.add_argument("--ledger", required=True)
     a = ap.parse_args()
