@@ -185,3 +185,34 @@ def test_delegated_without_exod_fails_closed(tmp_path):
         assert r["results"][0].get("refused")               # no exod -> every step refused, never run unconfined
     finally:
         httpd.shutdown(); httpd.server_close()
+
+
+def test_delegated_client_names_the_mode_mismatch_on_a_cooperative_server(tmp_path):
+    """A --delegated claim answered by the COOPERATIVE branch (the server grants and waits for the CALLER
+    to run) must surface a NAMED exec-mode mismatch — not the baffling {"refused": "granted"} and a run
+    wedged at 'granted' (the live mac-coop failure this pins)."""
+    cfg = govd.load_config()
+    cfg["mode"] = "local"
+    cfg["local"] = {"host": "127.0.0.1", "ports": [0]}
+    cfg["record_root"] = str(tmp_path / "rr")                # node default: cooperative, no exod at all
+    govd.ensure_monitor_token(cfg)
+    httpd, _ = govd.bind_server("127.0.0.1", [0])
+    httpd.daemon_threads = True
+    httpd.cfg, httpd.store, httpd.rate_buckets = cfg, govd.Store(cfg["record_root"]), {}
+    govd._load_exec_mode(cfg, httpd)
+    threading.Thread(target=httpd.serve_forever, kwargs={"poll_interval": 0.02}, daemon=True).start()
+    base = f"http://127.0.0.1:{httpd.server_address[1]}"
+    for _ in range(100):
+        try:
+            urllib.request.urlopen(base + "/health", timeout=1); break
+        except OSError:
+            time.sleep(0.02)
+    try:
+        r = govd_client.run_delegated(base, {"skill": "fs", "perk": "find_large",
+                                             "vars": {"SEARCH_DIR": "/tmp"}})
+        assert r["results"], "the client must report the step outcome"
+        refused = r["results"][0].get("refused") or ""
+        assert "exec-mode mismatch" in refused
+        assert refused != "granted"
+    finally:
+        httpd.shutdown(); httpd.server_close()

@@ -30,9 +30,15 @@ def closure_decision(pinned, snip_dir):
     # runnable while an empty-pin run that staged a file is fail-closed.
     files = []
     if os.path.isdir(snip_dir):
-        for name in sorted(os.listdir(snip_dir)):
-            if os.path.isfile(os.path.join(snip_dir, name)):
-                files.append(name)
+        # RECURSIVE: the pin keys are relpaths (a nested closure member reads as example/x.py), so the
+        # smuggle scan must see nested staged members too. A top-level-only listing let a staged file in a
+        # subdir escape the smuggled-sibling check while the identical file at top level was refused.
+        for base, _dirs, names in os.walk(snip_dir):
+            for name in sorted(names):
+                fp = os.path.join(base, name)
+                if os.path.isfile(fp):
+                    files.append(os.path.relpath(fp, snip_dir))
+        files.sort()
     if not pinned:
         for name in files:
             if name == UNPINNED_BY_DESIGN:

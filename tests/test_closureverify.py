@@ -120,3 +120,20 @@ def test_nested_pinned_member_not_staged_fails_closed(tmp_path):
     sha = _write(str(tmp_path), "a.sh", "echo a\n")
     assert C.closure_decision({"a.sh": sha, "lib/helper.py": "deadbeef"}, str(tmp_path)) \
         == (True, "closure:missing:lib/helper.py")
+
+
+def test_nested_pinned_member_is_verified(tmp_path):
+    a = _write(str(tmp_path), "a.sh", "echo a\n")
+    os.makedirs(os.path.join(str(tmp_path), "example"))
+    nested = _write(str(tmp_path), os.path.join("example", "svc.py"), "def f(): pass\n")
+    assert C.closure_decision({"a.sh": a, "example/svc.py": nested}, str(tmp_path)) == (False, "ok")
+
+
+def test_nested_smuggled_sibling_is_refused(tmp_path):
+    """The recursive smuggle scan must catch an unpinned file in a SUBDIR, not only at top level — else the
+    identical file refused at top level slips through one directory down (the gap the recursive staging
+    newly makes reachable)."""
+    a = _write(str(tmp_path), "a.sh", "echo a\n")
+    os.makedirs(os.path.join(str(tmp_path), "example"))
+    _write(str(tmp_path), os.path.join("example", "evil.py"), "import os\n")
+    assert C.closure_decision({"a.sh": a}, str(tmp_path)) == (True, "closure:smuggled:example/evil.py")

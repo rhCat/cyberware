@@ -328,6 +328,14 @@ def run_delegated(base_url, ledger, approve=(), attestation=None, proof_key=None
         if raw is None:
             results.append({"step": st, "refused": "server closed the oversight channel"}); break
         resp = json.loads(raw)
+        if resp.get("type") == "grant":
+            # the server took the COOPERATIVE branch: this principal's exec_mode is cooperative (a per-
+            # principal override beats the node default), so nothing server-side will ever run the step —
+            # without this check the run wedges at 'granted' and the caller sees the baffling
+            # {"refused": "granted"}. Name the mismatch and stop.
+            results.append({"step": st, "refused": "exec-mode mismatch: this principal is COOPERATIVE on "
+                            "this node — rerun without --delegated, or claim with a delegated principal"})
+            break
         if resp.get("type") != "executed":              # the limb ran it server-side, or govd refused
             results.append({"step": st, "refused": resp.get("reason")}); break
         results.append({"step": st, "status": resp.get("status"), "exit": resp.get("exit"),

@@ -3,6 +3,12 @@
   "id": "pipeline",
   "name": "cyberware governance pipeline",
   "description": "The infra's OWN blueprint \u2014 the path every task-ledger takes through the governed runtime: validate -> compose -> compile -> oversee -> execute. The same L++ formalism the skills use, turned on the framework itself (the ouroboros). Each gate's failure route is the stage refusing and logging.",
+  "reviewed_against": {
+    "enforcement_surface": "v1.6.0 (ecabe1f)",
+    "date": "2026-07-06",
+    "verdict": "model CURRENT \u2014 the lifecycle shape (states/gates/transitions) is unchanged. The changes since the prior review (v1.6.0 enforcement hardening: per-snippet integrity via snippetverify, grantverify hardening, fail-closed vault/rails; the cargo + params ACL axes) are WITHIN-GATE enforcement inside g_governed, not new stages. Confirmed by module-mapping (validator/composer/compiler/oversight/executor present, unchanged shape).",
+    "h0_rule": "self-blueprint must be no older than the last enforcement-surface commit (ci-codeqc/gate)"
+  },
   "entry_state": "submitted",
   "states": {
     "submitted": {
@@ -51,7 +57,7 @@
     "g_governed": {
       "type": "expression",
       "expression": "tamper_check_pass /\\ oversight_cleared /\\ upstream_recorded",
-      "description": "no drift; oversight re-checked in-channel; predecessors recorded"
+      "description": "no drift (tamper-check incl. per-snippet integrity via snippetverify); oversight re-checked in-channel; on a delegated step the per-actor ACL (skill/tier/secret/params/cargo axes) is re-enforced off-node by exod; predecessors recorded"
     }
   },
   "actions": {
