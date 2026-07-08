@@ -6,6 +6,7 @@ limb fails closed; a replayed result nonce is caught. The channel is proven here
 runner (the real bwrap confinement runs on the exec image)."""
 from __future__ import annotations
 
+import os
 import subprocess
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -271,3 +272,31 @@ def test_perk_sandbox_tier_requires_both_names():
     assert perk_sandbox_tier(None, "read") is None
     assert perk_sandbox_tier("cws-fs", None) is None
     assert perk_sandbox_tier(None, None) is None
+
+
+def test_materialize_workspace_stages_exactly_the_pinned_closure_set(tmp_path, monkeypatch):
+    """Staging must reproduce EXACTLY the set skill_index pins into snippet_shas (recursive, same excludes),
+    because exod's closure_decision refuses BOTH a pinned member missing from snip AND a staged member the
+    pin never covered. So: subdir files ARE staged (a flat copy fail-closed a bundled example tree), and the
+    same members skill_index drops — __pycache__/*.pyc, .DS_Store — are NOT staged (stale bytecode / an
+    unpinned smuggled sibling). Cross-checked against infra.tool.skill_index._index_files on the same tree."""
+    from infra.govern import delegate as d
+    from infra.tool import skill_index as si
+    src = tmp_path / "chip" / "uni" / "perks" / "extract" / "src"
+    (src / "example_src").mkdir(parents=True)
+    (src / "__pycache__").mkdir()
+    (src / "tool.py").write_text("print('x')\n")
+    (src / "example_src" / "service.py").write_text("def f(): pass\n")
+    (src / "example_src" / "README.md").write_text("demo\n")
+    (src / "__pycache__" / "tool.cpython-39.pyc").write_bytes(b"\x00stale")
+    (src / ".DS_Store").write_bytes(b"\x00")
+    monkeypatch.setattr(d._reg, "skill_dir", lambda skill, registry=None: str(tmp_path / "chip" / "uni"))
+    ws, env, _ = d.materialize_workspace({"run_id": "rec1", "wrapper": "", "skill": "uni",
+                                          "perk": "extract"}, str(tmp_path / "work"))
+    snip = env["SNIP"]
+    staged = {os.path.relpath(os.path.join(b, f), snip)
+              for b, _dd, ff in os.walk(snip) for f in ff}
+    pinned = {os.path.relpath(ap, str(src)) for ap in si.skill_files(str(src)).values()}
+    assert staged == pinned, (staged, pinned)
+    assert "example_src/service.py" in staged and "tool.py" in staged
+    assert not any(".pyc" in s or "__pycache__" in s or ".DS_Store" in s for s in staged)

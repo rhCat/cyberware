@@ -61,10 +61,23 @@ def materialize_workspace(rec, base, registry=None):
     os.chmod(run_sh, 0o755)
     src = os.path.join(_reg.skill_dir(rec["skill"], registry), "perks", rec["perk"], "src")
     if os.path.isdir(src):
-        for name in os.listdir(src):
-            sp = os.path.join(src, name)
-            if os.path.isfile(sp):
-                shutil.copy2(sp, os.path.join(snip, name))
+        # Stage the SAME recursive set skill_index pinned into snippet_shas (infra/tool/skill_index.py
+        # _index_files): exod's closure_decision refuses BOTH a pinned member missing from snip AND a staged
+        # member the pin never covered ("smuggled sibling"), so staging must reproduce the blessed set
+        # exactly. A flat top-level copy fail-closed every perk whose src/ carries a subdir (e.g. a bundled
+        # example tree); staging __pycache__/*.pyc (which the pin excludes) would leave stale bytecode in the
+        # confined box. Mirror _index_files' walk + excludes; copy2 dereferences a symlinked file exactly as
+        # skill_index hashes through it, so a post-bless target swap still fails exod's digest check.
+        for root, dirs, files in os.walk(src):          # NB: not `base` — that is this fn's workspace param
+            dirs[:] = [d for d in dirs if d != "__pycache__"]
+            for name in files:
+                if name.endswith(".pyc") or name == ".DS_Store":
+                    continue
+                sp = os.path.join(root, name)
+                dp = os.path.join(snip, os.path.relpath(sp, src))
+                os.makedirs(os.path.dirname(dp), exist_ok=True)
+                shutil.copyfile(sp, dp)                  # bytes only, then a fixed readable mode so exod's
+                os.chmod(dp, 0o644)                      # nobody can read every staged member (digest_file)
     env = {"PATH": "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin", "SNIP": snip, "RECORD_STORE": store}   # /usr/local/bin: slim-image python3
     return ws, env, run_sh
 
