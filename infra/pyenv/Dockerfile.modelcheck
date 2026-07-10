@@ -34,13 +34,15 @@ RUN set -eux; \
     fi
 
 # --- backbone prover toolchain (general:backbone — the L++ preflight gate) ---
-# lpp EDITABLE from a full source clone (NOT the wheel): the TLAPS proof-generator lives at the repo's
-# top-level utils/tlaps_prover/ and is reached by a src-layout-relative path; a flat wheel drops it and the
-# AXIOMATIC layer fails-closed. Plus the standard `tlc` wrapper over the already-present tla2tools.jar.
+# lpp is stdlib-only → put its SOURCE TREE on PYTHONPATH (not a wheel, not `pip install -e`). The TLAPS
+# proof-generator lives at the repo's top-level utils/tlaps_prover/ and lpp's generate compute reaches it by a
+# path relative to the package's real location; a wheel drops utils/, and an editable finder's __file__ varies
+# by setuptools version so the 5-parents hop can miss utils/ (AXIOMATIC layer fails-closed). PYTHONPATH pins
+# __file__ = /opt/lpp/src/lpp/... deterministically. Plus the tlc wrapper over the present tla2tools.jar.
 ARG LPP_REF=311b5f1b3d4a20cff2f3727e88a0b109f89283e9
+ENV PYTHONPATH=/opt/lpp/src
 RUN git clone --quiet https://github.com/rhCat/lpp /opt/lpp \
  && git -C /opt/lpp checkout --quiet "${LPP_REF}" \
- && pip install --no-cache-dir -e /opt/lpp \
  && printf '#!/bin/sh\nexec java -XX:+UseParallelGC -cp %s tlc2.TLC "$@"\n' "${TLA2TOOLS_JAR:-/opt/tla2tools.jar}" > /usr/local/bin/tlc \
  && chmod +x /usr/local/bin/tlc \
  && python3 -c "from lpp.core import load_blueprint; from lpp.core.validators.tla import generate_tla; from lpp.util.tlaps_prover import run; print('lpp chain OK')" \
@@ -51,6 +53,14 @@ WORKDIR /app
 COPY infra/ ./infra/
 COPY skillChip/ ./skillChip/
 RUN python3 -m infra.tool.skill_index --check --all      # fail the build on chip drift
+# backbone AXIOMATIC smoke — GENERATE a proof spec (not just import), so a broken utils/tlaps_prover path
+# fails the build here rather than shipping an image whose TLAPS layer silently fails-closed.
+RUN python3 -c "from lpp.util.tlaps_prover import run; \
+import tempfile, os; d=tempfile.mkdtemp(); \
+r=run({'blueprintPath':'/app/skillChip/general/backbone/perks/validate/test/fixture/good.blueprint.json','outputDir':d,'verify':False}); \
+s=r.get('context',{}).get('tlaSpec'); \
+assert s and os.path.isfile(s), 'TLAPS proof generation broken (utils/tlaps_prover unreachable): '+repr(r.get('context',{}).get('error')); \
+print('lpp TLAPS-generate OK ->', os.path.basename(s))"
 ENV GOVD_CONFIG=/app/infra/govern/govd_config.json \
     GOVD_RECORD_ROOT=/data/govd \
     PYTHONUNBUFFERED=1

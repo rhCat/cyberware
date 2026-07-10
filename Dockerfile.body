@@ -25,15 +25,17 @@ ENV TLA2TOOLS_JAR=/opt/tla2tools.jar
 RUN pip install --no-cache-dir cryptography==49.0.0
 
 # --- the backbone prover toolchain (general:backbone — the L++ preflight gate) ---
-# lpp: stdlib-only core (blueprint loader + TLA+ generator + TLAPS proof generator), pinned by commit.
-# EDITABLE install from a full source clone, NOT the wheel: the TLAPS proof-generator lives at the repo's
-# top-level utils/tlaps_prover/ and lpp's generate compute reaches it by a src-layout-relative path
-# (compute.py -> 5 parents -> repo root -> utils/). A flat wheel drops utils/, so the AXIOMATIC layer would
-# fail-closed ("proof generation failed"). Cloning the tree keeps utils/ reachable.
+# lpp is stdlib-only, so we put its SOURCE TREE on PYTHONPATH rather than pip-installing it. Two reasons the
+# tree (not a wheel or editable install) is required: (1) the TLAPS proof-generator lives at the repo's
+# top-level utils/tlaps_prover/ and lpp's generate compute reaches it by a path relative to the package's real
+# location (compute.py -> 5 parents -> repo root -> utils/); a flat wheel drops utils/. (2) a `pip install -e`
+# resolves compute.py's __file__ through a PEP 660 editable finder whose location varies by setuptools version
+# — on some it lands where the 5-parents hop can't see utils/, so the AXIOMATIC layer fails-closed. Pinning the
+# tree on PYTHONPATH makes __file__ = /opt/lpp/src/lpp/... deterministically, independent of pip/setuptools.
 ARG LPP_REF=311b5f1b3d4a20cff2f3727e88a0b109f89283e9
 RUN git clone --quiet https://github.com/rhCat/lpp /opt/lpp \
- && git -C /opt/lpp checkout --quiet "${LPP_REF}" \
- && pip install --no-cache-dir -e /opt/lpp
+ && git -C /opt/lpp checkout --quiet "${LPP_REF}"
+ENV PYTHONPATH=/opt/lpp/src
 # `tlc` wrapper: lpp's validate_with_tlc (and backbone's bb_tlc) shell out to a `tlc` binary; the jar is
 # already here — give it the standard wrapper (same convention as the DGX worker image).
 RUN printf '#!/bin/sh\nexec java -XX:+UseParallelGC -cp /opt/tla2tools.jar tlc2.TLC "$@"\n' > /usr/local/bin/tlc \
