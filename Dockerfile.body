@@ -24,6 +24,37 @@ ENV TLA2TOOLS_JAR=/opt/tla2tools.jar
 # cryptography: govd + exod import Ed25519 at startup (grants, exod identity). manylinux wheel — no compiler.
 RUN pip install --no-cache-dir cryptography==49.0.0
 
+# --- the backbone prover toolchain (general:backbone — the L++ preflight gate) ---
+# lpp: stdlib-only core (blueprint loader + TLA+ generator + TLAPS proof generator), pinned by commit.
+# EDITABLE install from a full source clone, NOT the wheel: the TLAPS proof-generator lives at the repo's
+# top-level utils/tlaps_prover/ and lpp's generate compute reaches it by a src-layout-relative path
+# (compute.py -> 5 parents -> repo root -> utils/). A flat wheel drops utils/, so the AXIOMATIC layer would
+# fail-closed ("proof generation failed"). Cloning the tree keeps utils/ reachable.
+ARG LPP_REF=311b5f1b3d4a20cff2f3727e88a0b109f89283e9
+RUN git clone --quiet https://github.com/rhCat/lpp /opt/lpp \
+ && git -C /opt/lpp checkout --quiet "${LPP_REF}" \
+ && pip install --no-cache-dir -e /opt/lpp
+# `tlc` wrapper: lpp's validate_with_tlc (and backbone's bb_tlc) shell out to a `tlc` binary; the jar is
+# already here — give it the standard wrapper (same convention as the DGX worker image).
+RUN printf '#!/bin/sh\nexec java -XX:+UseParallelGC -cp /opt/tla2tools.jar tlc2.TLC "$@"\n' > /usr/local/bin/tlc \
+ && chmod +x /usr/local/bin/tlc
+# tlapm (AXIOMATIC layer): the maintainers' Linux distribution is the x86_64-only rolling tarball — install on
+# amd64; on arm64 tlapm stays absent and backbone's tlaps/preflight perks refuse fail-closed (missing_tool),
+# never a false pass. Same recipe as infra/pyenv/Dockerfile.modelcheck (libgmp10 + procps are its runtime deps).
+ARG TARGETARCH
+ARG TLAPS_TAG=1.6.0-pre
+RUN set -eux; \
+    if [ "${TARGETARCH:-amd64}" = "amd64" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends libgmp10 procps curl && rm -rf /var/lib/apt/lists/*; \
+      curl -fsSL "https://github.com/tlaplus/tlapm/releases/download/${TLAPS_TAG}/tlapm-${TLAPS_TAG}-x86_64-linux-gnu.tar.gz" -o /tmp/tlapm.tgz; \
+      mkdir -p /opt/tlaps && tar -C /opt/tlaps -xzf /tmp/tlapm.tgz && rm /tmp/tlapm.tgz; \
+      TLAPM="$(find /opt/tlaps -type f -name tlapm | head -1)"; ln -s "$TLAPM" /usr/local/bin/tlapm; \
+      tlapm --version; \
+      apt-get purge -y curl && apt-get autoremove -y; \
+    else \
+      echo "tlapm skipped on ${TARGETARCH:-unknown} (tarball is x86_64-linux only; backbone tlaps/preflight fail closed here)"; \
+    fi
+
 WORKDIR /app
 
 # the engine + the baked cartridge + the body boot
@@ -36,6 +67,16 @@ COPY deploy/body-entrypoint.sh /usr/local/bin/body-entrypoint.sh
 RUN python3 -m infra.tool.skill_index --check --all \
  && python3 -c "import infra.govern.govd, infra.govern.delegate, infra.exec.exod, infra.exec.sandbox, infra.govern.fleetd; print('body import chain OK')" \
  && chmod +x /usr/local/bin/body-entrypoint.sh
+# backbone toolchain smoke — the L++ chain must load, the tlc wrapper must resolve, AND the TLAPS proof
+# GENERATOR must actually emit a spec (arch-independent) against the baked backbone fixture. Generation-not-
+# just-import catches the wheel-drops-utils/ regression that leaves the AXIOMATIC layer silently broken.
+RUN python3 -c "from lpp.util.tlaps_prover import run; \
+import tempfile, os; d=tempfile.mkdtemp(); \
+r=run({'blueprintPath':'/app/skillChip/general/backbone/perks/validate/test/fixture/good.blueprint.json','outputDir':d,'verify':False}); \
+s=r.get('context',{}).get('tlaSpec'); \
+assert s and os.path.isfile(s), 'TLAPS proof generation broken (utils/tlaps_prover unreachable): '+repr(r.get('context',{}).get('error')); \
+print('lpp TLAPS-generate OK ->', os.path.basename(s))" \
+ && command -v tlc
 
 # non-root principal — govd AND exod run under a scoped service identity, NEVER root (exec-never-root: the
 # executor refuses uid 0; exod drops each STEP to nobody on top). chown BEFORE VOLUME so a fresh named volume
