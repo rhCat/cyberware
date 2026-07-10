@@ -59,8 +59,8 @@ def test_scan_seeds_a_fresh_chip(tmp_path):
     assert sorted(si.permitted_skills(str(chip))) == ["fs", "git_ops", "markdown"]
 
 
-def test_the_real_chip_is_42_and_authentic():
-    assert len(si.all_skills()) == 42
+def test_the_real_chip_is_43_and_authentic():
+    assert len(si.all_skills()) == 43
     assert set(si.all_skills()) == set(si.permitted_skills())    # permitted == present, no drift
 
 
