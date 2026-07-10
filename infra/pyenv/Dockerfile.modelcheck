@@ -34,16 +34,18 @@ RUN set -eux; \
     fi
 
 # --- backbone prover toolchain (general:backbone — the L++ preflight gate) ---
-# lpp is stdlib-only → put its SOURCE TREE on PYTHONPATH (not a wheel, not `pip install -e`). The TLAPS
-# proof-generator lives at the repo's top-level utils/tlaps_prover/ and lpp's generate compute reaches it by a
-# path relative to the package's real location; a wheel drops utils/, and an editable finder's __file__ varies
-# by setuptools version so the 5-parents hop can miss utils/ (AXIOMATIC layer fails-closed). PYTHONPATH pins
-# __file__ = /opt/lpp/src/lpp/... deterministically. Plus the tlc wrapper over the present tla2tools.jar.
+# lpp under /usr/local/lib (bound into exod's confined sandbox via /usr), imported via a .pth in site-packages
+# — NOT /opt + PYTHONPATH, which is invisible inside a confined delegated step (only /usr /bin /lib* /etc +
+# workspace + cargo are bound, and the step env carries no PYTHONPATH). The tlc wrapper references a jar copied
+# under /usr/local/lib so it too resolves confined. (Apalache/tlapm from the compute base stay at /opt — a
+# separate cws-modelcheck confined concern, not backbone's.)
 ARG LPP_REF=311b5f1b3d4a20cff2f3727e88a0b109f89283e9
-ENV PYTHONPATH=/opt/lpp/src:/opt/lpp/utils/tlaps_prover
-RUN git clone --quiet https://github.com/rhCat/lpp /opt/lpp \
- && git -C /opt/lpp checkout --quiet "${LPP_REF}" \
- && printf '#!/bin/sh\nexec java -XX:+UseParallelGC -cp %s tlc2.TLC "$@"\n' "${TLA2TOOLS_JAR:-/opt/tla2tools.jar}" > /usr/local/bin/tlc \
+RUN git clone --quiet https://github.com/rhCat/lpp /usr/local/lib/lpp \
+ && git -C /usr/local/lib/lpp checkout --quiet "${LPP_REF}" \
+ && printf '/usr/local/lib/lpp/src\n/usr/local/lib/lpp/utils/tlaps_prover\n' \
+      > "$(python3 -c 'import site;print(site.getsitepackages()[0])')/lpp_src.pth" \
+ && cp "${TLA2TOOLS_JAR:-/opt/tla2tools.jar}" /usr/local/lib/tla2tools.jar \
+ && printf '#!/bin/sh\nexec java -XX:+UseParallelGC -cp /usr/local/lib/tla2tools.jar tlc2.TLC "$@"\n' > /usr/local/bin/tlc \
  && chmod +x /usr/local/bin/tlc \
  && python3 -c "from lpp.core import load_blueprint; from lpp.core.validators.tla import generate_tla; from lpp.util.tlaps_prover import run; print('lpp chain OK')" \
  && command -v tlc
@@ -57,7 +59,7 @@ RUN python3 -m infra.tool.skill_index --check --all      # fail the build on chi
 # broken toolchain fails the build here rather than shipping an image whose TLAPS layer silently fails-closed.
 RUN python3 -c "from lpp.util.tlaps_prover import run; \
 import tempfile, os; d=tempfile.mkdtemp(); \
-r=run({'blueprintPath':'/opt/lpp/src/lpp/util/tlaps_prover/blueprint.json','outputDir':d,'verify':False}); \
+r=run({'blueprintPath':'/usr/local/lib/lpp/src/lpp/util/tlaps_prover/blueprint.json','outputDir':d,'verify':False}); \
 s=r.get('context',{}).get('tlaSpec'); \
 assert s and os.path.isfile(s), 'TLAPS proof generation broken: '+repr(r.get('context',{}).get('error')); \
 print('lpp TLAPS-generate OK ->', os.path.basename(s))"
