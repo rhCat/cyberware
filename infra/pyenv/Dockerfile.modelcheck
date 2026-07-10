@@ -33,6 +33,19 @@ RUN set -eux; \
       echo "TLAPS skipped on ${TARGETARCH:-unknown} (tarball is x86_64-linux only)"; \
     fi
 
+# --- backbone prover toolchain (general:backbone — the L++ preflight gate) ---
+# lpp EDITABLE from a full source clone (NOT the wheel): the TLAPS proof-generator lives at the repo's
+# top-level utils/tlaps_prover/ and is reached by a src-layout-relative path; a flat wheel drops it and the
+# AXIOMATIC layer fails-closed. Plus the standard `tlc` wrapper over the already-present tla2tools.jar.
+ARG LPP_REF=311b5f1b3d4a20cff2f3727e88a0b109f89283e9
+RUN git clone --quiet https://github.com/rhCat/lpp /opt/lpp \
+ && git -C /opt/lpp checkout --quiet "${LPP_REF}" \
+ && pip install --no-cache-dir -e /opt/lpp \
+ && printf '#!/bin/sh\nexec java -XX:+UseParallelGC -cp %s tlc2.TLC "$@"\n' "${TLA2TOOLS_JAR:-/opt/tla2tools.jar}" > /usr/local/bin/tlc \
+ && chmod +x /usr/local/bin/tlc \
+ && python3 -c "from lpp.core import load_blueprint; from lpp.core.validators.tla import generate_tla; from lpp.util.tlaps_prover import run; print('lpp chain OK')" \
+ && command -v tlc
+
 # --- the govd server itself — engine + baked chip + boot-time authenticity gate (same as the lean image) ---
 WORKDIR /app
 COPY infra/ ./infra/
