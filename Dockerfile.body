@@ -13,47 +13,50 @@ FROM python:3.11-slim
 
 # Java + tla2tools.jar — govd's compose model-checks the blueprint for deadlock via the real TLC (same as the
 # govd image). git stays for CLOUD_MODE chip clone-at-boot. bubblewrap/uidmap = exod's confinement boundary.
+# The jar lives UNDER /usr/local/lib (bound into exod's confined sandbox via the /usr ro-bind), NOT /opt —
+# a confined delegated step only sees /usr /bin /lib* /etc + its workspace + cargo, so any toolchain under
+# /opt is invisible to backbone's confined tlc/tlaps steps. (/usr/local is under the bound /usr.)
 ARG TLA_VERSION=v1.8.0
 RUN apt-get update \
  && apt-get install -y --no-install-recommends default-jre-headless ca-certificates curl git bubblewrap uidmap \
- && curl -fsSL -o /opt/tla2tools.jar \
+ && mkdir -p /usr/local/lib \
+ && curl -fsSL -o /usr/local/lib/tla2tools.jar \
       "https://github.com/tlaplus/tlaplus/releases/download/${TLA_VERSION}/tla2tools.jar" \
  && apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
-ENV TLA2TOOLS_JAR=/opt/tla2tools.jar
+ENV TLA2TOOLS_JAR=/usr/local/lib/tla2tools.jar
 
 # cryptography: govd + exod import Ed25519 at startup (grants, exod identity). manylinux wheel — no compiler.
 RUN pip install --no-cache-dir cryptography==49.0.0
 
 # --- the backbone prover toolchain (general:backbone — the L++ preflight gate) ---
-# lpp is stdlib-only, so we put its SOURCE TREE on PYTHONPATH rather than pip-installing it. Two reasons the
-# tree (not a wheel or editable install) is required: (1) the TLAPS proof-generator lives at the repo's
-# top-level utils/tlaps_prover/ and lpp's generate compute reaches it by a path relative to the package's real
-# location (compute.py -> 5 parents -> repo root -> utils/); a flat wheel drops utils/. (2) a `pip install -e`
-# resolves compute.py's __file__ through a PEP 660 editable finder whose location varies by setuptools version
-# — on some it lands where the 5-parents hop can't see utils/, so the AXIOMATIC layer fails-closed. Pinning the
-# tree on PYTHONPATH makes __file__ = /opt/lpp/src/lpp/... deterministically, independent of pip/setuptools.
-# PYTHONPATH carries BOTH the lpp package root (src/) AND the generator's own dir (utils/tlaps_prover/), so
-# `from tlaps_proof_generator import ...` inside lpp's generate compute resolves directly — independent of the
-# compute's fragile __file__-relative discovery, which resolved differently under the CI builder.
+# lpp is stdlib-only. It lives UNDER /usr/local/lib (bound into exod's confined sandbox via /usr), NOT /opt,
+# and `import lpp` is wired via a .pth in site-packages — NOT PYTHONPATH. Why: a confined delegated step gets
+# only the fixed env {PATH,SNIP,RECORD_STORE} (no PYTHONPATH) and binds only /usr /bin /lib* /etc + workspace
+# + cargo. A PYTHONPATH=/opt/lpp/src toolchain is therefore INVISIBLE inside confinement (the fleet's actual
+# path), so backbone's confined steps failed `ModuleNotFoundError: lpp`. A .pth under the bound site-packages
+# is read by site.py automatically, so `import lpp` works EVERYWHERE incl. the confined step. The full repo at
+# /usr/local/lib/lpp keeps utils/tlaps_prover reachable by lpp's generate compute (compute.__file__ -> 5
+# parents -> /usr/local/lib/lpp -> utils/), so the AXIOMATIC layer works too.
 ARG LPP_REF=311b5f1b3d4a20cff2f3727e88a0b109f89283e9
-RUN git clone --quiet https://github.com/rhCat/lpp /opt/lpp \
- && git -C /opt/lpp checkout --quiet "${LPP_REF}"
-ENV PYTHONPATH=/opt/lpp/src:/opt/lpp/utils/tlaps_prover
-# `tlc` wrapper: lpp's validate_with_tlc (and backbone's bb_tlc) shell out to a `tlc` binary; the jar is
-# already here — give it the standard wrapper (same convention as the DGX worker image).
-RUN printf '#!/bin/sh\nexec java -XX:+UseParallelGC -cp /opt/tla2tools.jar tlc2.TLC "$@"\n' > /usr/local/bin/tlc \
+RUN git clone --quiet https://github.com/rhCat/lpp /usr/local/lib/lpp \
+ && git -C /usr/local/lib/lpp checkout --quiet "${LPP_REF}" \
+ && printf '/usr/local/lib/lpp/src\n/usr/local/lib/lpp/utils/tlaps_prover\n' \
+      > "$(python3 -c 'import site;print(site.getsitepackages()[0])')/lpp_src.pth"
+# `tlc` wrapper: lpp's validate_with_tlc (and backbone's bb_tlc) shell out to a `tlc` binary. /usr/local/bin is
+# bound in confinement (under /usr); the jar it references must be too — hence /usr/local/lib/tla2tools.jar.
+RUN printf '#!/bin/sh\nexec java -XX:+UseParallelGC -cp /usr/local/lib/tla2tools.jar tlc2.TLC "$@"\n' > /usr/local/bin/tlc \
  && chmod +x /usr/local/bin/tlc
-# tlapm (AXIOMATIC layer): the maintainers' Linux distribution is the x86_64-only rolling tarball — install on
-# amd64; on arm64 tlapm stays absent and backbone's tlaps/preflight perks refuse fail-closed (missing_tool),
-# never a false pass. Same recipe as infra/pyenv/Dockerfile.modelcheck (libgmp10 + procps are its runtime deps).
+# tlapm (AXIOMATIC): x86_64-only rolling tarball, amd64 only; arm64 leaves it absent (backbone tlaps/preflight
+# fail closed, never a false pass). Extracted UNDER /usr/local/lib/tlaps (bound in confinement), NOT /opt, and
+# the /usr/local/bin/tlapm symlink points at the bound target so tlaps resolves inside a confined step.
 ARG TARGETARCH
 ARG TLAPS_TAG=1.6.0-pre
 RUN set -eux; \
     if [ "${TARGETARCH:-amd64}" = "amd64" ]; then \
       apt-get update && apt-get install -y --no-install-recommends libgmp10 procps curl && rm -rf /var/lib/apt/lists/*; \
       curl -fsSL "https://github.com/tlaplus/tlapm/releases/download/${TLAPS_TAG}/tlapm-${TLAPS_TAG}-x86_64-linux-gnu.tar.gz" -o /tmp/tlapm.tgz; \
-      mkdir -p /opt/tlaps && tar -C /opt/tlaps -xzf /tmp/tlapm.tgz && rm /tmp/tlapm.tgz; \
-      TLAPM="$(find /opt/tlaps -type f -name tlapm | head -1)"; ln -s "$TLAPM" /usr/local/bin/tlapm; \
+      mkdir -p /usr/local/lib/tlaps && tar -C /usr/local/lib/tlaps -xzf /tmp/tlapm.tgz && rm /tmp/tlapm.tgz; \
+      TLAPM="$(find /usr/local/lib/tlaps -type f -name tlapm | head -1)"; ln -s "$TLAPM" /usr/local/bin/tlapm; \
       tlapm --version; \
       apt-get purge -y curl && apt-get autoremove -y; \
     else \
@@ -78,7 +81,7 @@ RUN python3 -m infra.tool.skill_index --check --all \
 # the `core` channel tag, which is advanced separately from this repo). Generation-not-just-import catches the
 # generator-unreachable class of regression.
 RUN python3 -c "from lpp.util.tlaps_prover import run; import os, tempfile; d=tempfile.mkdtemp(); \
-r=run({'blueprintPath':'/opt/lpp/src/lpp/util/tlaps_prover/blueprint.json','outputDir':d,'verify':False}); \
+r=run({'blueprintPath':'/usr/local/lib/lpp/src/lpp/util/tlaps_prover/blueprint.json','outputDir':d,'verify':False}); \
 s=r.get('context',{}).get('tlaSpec'); \
 assert s and os.path.isfile(s), 'TLAPS proof generation broken: '+repr(r.get('context',{}).get('error')); \
 print('lpp TLAPS-generate OK ->', os.path.basename(s))" \
