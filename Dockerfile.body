@@ -32,10 +32,13 @@ RUN pip install --no-cache-dir cryptography==49.0.0
 # resolves compute.py's __file__ through a PEP 660 editable finder whose location varies by setuptools version
 # — on some it lands where the 5-parents hop can't see utils/, so the AXIOMATIC layer fails-closed. Pinning the
 # tree on PYTHONPATH makes __file__ = /opt/lpp/src/lpp/... deterministically, independent of pip/setuptools.
+# PYTHONPATH carries BOTH the lpp package root (src/) AND the generator's own dir (utils/tlaps_prover/), so
+# `from tlaps_proof_generator import ...` inside lpp's generate compute resolves directly — independent of the
+# compute's fragile __file__-relative discovery, which resolved differently under the CI builder.
 ARG LPP_REF=311b5f1b3d4a20cff2f3727e88a0b109f89283e9
 RUN git clone --quiet https://github.com/rhCat/lpp /opt/lpp \
  && git -C /opt/lpp checkout --quiet "${LPP_REF}"
-ENV PYTHONPATH=/opt/lpp/src
+ENV PYTHONPATH=/opt/lpp/src:/opt/lpp/utils/tlaps_prover
 # `tlc` wrapper: lpp's validate_with_tlc (and backbone's bb_tlc) shell out to a `tlc` binary; the jar is
 # already here — give it the standard wrapper (same convention as the DGX worker image).
 RUN printf '#!/bin/sh\nexec java -XX:+UseParallelGC -cp /opt/tla2tools.jar tlc2.TLC "$@"\n' > /usr/local/bin/tlc \
@@ -72,11 +75,13 @@ RUN python3 -m infra.tool.skill_index --check --all \
 # backbone toolchain smoke — the L++ chain must load, the tlc wrapper must resolve, AND the TLAPS proof
 # GENERATOR must actually emit a spec (arch-independent) against the baked backbone fixture. Generation-not-
 # just-import catches the wheel-drops-utils/ regression that leaves the AXIOMATIC layer silently broken.
-RUN python3 -c "from lpp.util.tlaps_prover import run; \
-import tempfile, os; d=tempfile.mkdtemp(); \
+RUN python3 -c "import lpp.util.tlaps_prover.compute as C, os; \
+print('compute:', C.__file__, '| generator dir exists:', os.path.isdir('/opt/lpp/utils/tlaps_prover')); \
+import tlaps_proof_generator; print('generator importable:', tlaps_proof_generator.__file__); \
+from lpp.util.tlaps_prover import run; import tempfile; d=tempfile.mkdtemp(); \
 r=run({'blueprintPath':'/app/skillChip/general/backbone/perks/validate/test/fixture/good.blueprint.json','outputDir':d,'verify':False}); \
 s=r.get('context',{}).get('tlaSpec'); \
-assert s and os.path.isfile(s), 'TLAPS proof generation broken (utils/tlaps_prover unreachable): '+repr(r.get('context',{}).get('error')); \
+assert s and os.path.isfile(s), 'TLAPS proof generation broken: '+repr(r.get('context',{}).get('error')); \
 print('lpp TLAPS-generate OK ->', os.path.basename(s))" \
  && command -v tlc
 

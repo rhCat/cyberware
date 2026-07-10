@@ -40,7 +40,7 @@ RUN set -eux; \
 # by setuptools version so the 5-parents hop can miss utils/ (AXIOMATIC layer fails-closed). PYTHONPATH pins
 # __file__ = /opt/lpp/src/lpp/... deterministically. Plus the tlc wrapper over the present tla2tools.jar.
 ARG LPP_REF=311b5f1b3d4a20cff2f3727e88a0b109f89283e9
-ENV PYTHONPATH=/opt/lpp/src
+ENV PYTHONPATH=/opt/lpp/src:/opt/lpp/utils/tlaps_prover
 RUN git clone --quiet https://github.com/rhCat/lpp /opt/lpp \
  && git -C /opt/lpp checkout --quiet "${LPP_REF}" \
  && printf '#!/bin/sh\nexec java -XX:+UseParallelGC -cp %s tlc2.TLC "$@"\n' "${TLA2TOOLS_JAR:-/opt/tla2tools.jar}" > /usr/local/bin/tlc \
