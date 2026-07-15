@@ -8,7 +8,7 @@ uses — oversight scan, contract check, run-ledger), then checks the declared e
 DATA pinned in the skill's index, not prose — so the proof can't drift from the skill.
 
   case.json:
-    { "vars": {"K":"v", "DIR":"${FIXTURE}"},   # ${FIXTURE} = the fixture dir, ${RECORD} = the run dir
+    { "vars": {"K":"v", "DIR":"${FIXTURE}"},   # ${FIXTURE} = per-perk fixture, ${SKILL_FIXTURE} = skill-level shared fixture, ${RECORD} = run dir
       "requires": ["sqlite3"],                 # skip the test if any of these binaries is absent
       "skip": "needs a live Postgres",         # OR: always skip (a perk that can't run hermetically)
       "setup": ["sqlite3 demo.db 'CREATE …'"], # optional shell lines, run with cwd = the fixture dir
@@ -77,8 +77,12 @@ def run(skill, perk, root=ROOT):
         src_fix = os.path.join(registry.skill_dir(skill), "perks", perk, "test", "fixture")
         if os.path.isdir(src_fix):
             shutil.copytree(src_fix, fixture, dirs_exist_ok=True)
+        skill_fixture = os.path.join(work, "skill-fixture")   # ${SKILL_FIXTURE}: a fixture SHARED by a skill's perks
+        src_skill_fix = os.path.join(registry.skill_dir(skill), "test", "fixture")
+        if os.path.isdir(src_skill_fix):
+            shutil.copytree(src_skill_fix, skill_fixture, dirs_exist_ok=True)
         record = os.path.join(work, "out")
-        env = {"FIXTURE": fixture, "RECORD": record}
+        env = {"FIXTURE": fixture, "SKILL_FIXTURE": skill_fixture, "RECORD": record}
 
         for cmd in case.get("setup", []):
             s = subprocess.run(_resolve(cmd, env), shell=True, cwd=fixture, capture_output=True, text=True)
@@ -100,7 +104,7 @@ def run(skill, perk, root=ROOT):
                            cwd=root, capture_output=True, text=True)
 
         exp = case.get("expect", {})
-        env = {"FIXTURE": fixture, "RECORD": record, **vars_}   # so ${VAR} in expect paths resolves (deliverables)
+        env = {"FIXTURE": fixture, "SKILL_FIXTURE": skill_fixture, "RECORD": record, **vars_}   # so ${VAR} in expect paths resolves (deliverables)
         fails = []
         if x.returncode != exp.get("exit", 0):
             fails.append(f"exit {x.returncode} != {exp.get('exit', 0)}\n{x.stdout}{x.stderr}")
