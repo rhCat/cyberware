@@ -75,6 +75,12 @@ exod is the authority. You run **nothing** and hold no porter. Requires the node
 exod attached, else each step is refused (fail-closed). This is the same wire any external agent uses by default
 — see [`SKILL.md`](../SKILL.md).
 
+Two things a delegated run needs that a cooperative one doesn't: (1) **values** ride the WS, not the claim —
+`--ledger`'s `vars` are forwarded as `var_values` on each `step_request` (non-secret, plan-declared keys only;
+re-gated on the actor's `params` ACL axis). (2) a perk's **output** lands in a server-side workspace you cannot
+read, so to get DATA back add `"cargo":"ro"|"rw"` to the ledger and set the perk's output var (e.g. `OUT`) under
+`/cyberware_cargo/…`; read the artifact off that shared mount. The wire stays status-only.
+
 If your principal carries a **per-actor ACL**, a scoped claim on a body also rides an operator-signed
 **attestation** (`--attestation <file>`) and a one-time possession **proof** (`--proof-key <file>`) that exod
 re-checks off-node. When the operator runs exod in **enforce** mode (an ACL-issuer key pinned, `--acl-strict`),
