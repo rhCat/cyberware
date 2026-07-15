@@ -14,18 +14,28 @@ description: >-
 # cyberware — the governed channel for an agent
 
 cyberware is a **verifiable governance runtime**. You do not run commands ad-hoc. You make a **claim**;
-**govd** (the governance server) governs it and blesses a **value-free, code-free plan**; the plan runs under
-live oversight and you read back a signed verdict. The loop below is the *entire* contract — follow it, do not
-improvise around it.
+**govd** governs it and blesses a **value-free, code-free plan**; **exod** runs the plan confined and signs the
+result; you read back a signed verdict. The loop below is the *entire* contract — follow it, do not improvise
+around it.
+
+**The pieces:**
+- **govd** — the governance server (`:5773`). Takes your claim, checks it against its own registry, model-checks
+  the plan, and blesses a value-free plan. It **never executes** — it only governs and records.
+- **exod** — the confined executor (govd's limb). On a governed step it runs the blessed code in a sandbox
+  (isolated, no network, dropped privileges) and Ed25519-signs the authoritative status. The agent runs nothing.
+- **skillChip** — the registry of governed **skills** (each a set of **perks**), blessed by hash and baked into
+  the node. The code is the chip's, never yours; you only ever name a skill + perk and pass var KEYS.
+- **fleet** — many nodes, each running govd+exod. A discovery plane (`:8773`) points you to the right node; you
+  then claim + govern on that node's `:5773`. Nodes carry a `fleet_tier` (mothership > edge > subagent > …).
 
 > **The one principle: no data crosses the boundary, and neither does code you wrote.** govd sees only the
-> *claim* (names + var KEYS) and *status*. The skill code is the registry's, blessed by hash — never yours to
+> *claim* (names + var KEYS) and *status*. The skill code is the chip's, blessed by hash — never yours to
 > author. Your only output is the claim and the calls.
 
 **You talk to the governing node over plain HTTP + one WebSocket on `:5773`** — three calls, no SDK (the loop
-below). Set `BASE` to the node, e.g. `http://127.0.0.1:5773`. The repo's `./govd-client` is **only a local-dev
-convenience** that wraps these same calls for a machine that has the skillChip on disk — its CLI is documented
-separately in [`cyberware_dev/SKILL.md`](cyberware_dev/SKILL.md). By default, go through the protocol.
+below). Set `BASE` to the node, e.g. `http://127.0.0.1:5773`. *(Building or testing cyberware locally on a
+machine that has the skillChip on disk? A convenience wrapper is documented in
+[`cyberware_dev/SKILL.md`](cyberware_dev/SKILL.md) — an external agent never needs it; go through the protocol.)*
 
 **In a fleet?** Any node's discovery plane (`:8773`) tells you *which* node to use — then that node's `:5773`
 is your `BASE`:
@@ -153,9 +163,9 @@ review. Once merged and govd's image is rebuilt (the build re-checks every index
 
 ## More
 
-The **local-dev `./govd-client` wrapper** (the `task-ledger.json` form, the cooperative `grant`/`step_result`
-run from an on-disk registry, the in-container exec, the ACL attestation/proof flags) is in
-[`cyberware_dev/SKILL.md`](cyberware_dev/SKILL.md) — the local method an external agent never needs.
+**Developing or testing cyberware locally?** The local-dev convenience path — the `task-ledger.json` form, the
+cooperative `grant`/`step_result` run from an on-disk registry, the in-container exec, the ACL attestation/proof
+flags — is in [`cyberware_dev/SKILL.md`](cyberware_dev/SKILL.md). An external agent never needs it.
 The govd-less local pipeline (validator → composer → compiler → oversight → executor) is in
 [`cyberware.md`](cyberware.md); the service internals (HTTP, WebSocket, authenticity, dashboard) are in
 [`docs/governance-service.md`](docs/governance-service.md); the live [dashboard](https://cyberware.systems/)
