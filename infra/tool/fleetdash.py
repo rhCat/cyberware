@@ -514,6 +514,18 @@ _STYLE = """
  .asof{color:var(--dim);font-size:11px;white-space:nowrap} .asof .lag{color:var(--push)}
  .pausebtn{font:12px var(--mono);padding:2px 9px;background:var(--panel);border:1px solid var(--line);
    border-radius:6px;color:var(--dim);cursor:pointer} .pausebtn.on{color:var(--push);border-color:var(--push)}
+ /* tier-2 tool-use reveal: a themed action button + high-contrast decrypted-value rows */
+ .cwbtn{font:12px var(--mono);padding:5px 13px;background:rgba(57,208,216,.07);border:1px solid var(--accent);
+   border-radius:6px;color:var(--accent);cursor:pointer;letter-spacing:.03em;transition:background .15s,box-shadow .15s}
+ .cwbtn:hover{background:rgba(57,208,216,.15);box-shadow:0 0 0 1px var(--accent),0 0 12px rgba(57,208,216,.22)}
+ .cwvals{margin-top:8px}
+ .cwvals .cwstep{margin:12px 0 3px;color:var(--accent);font-weight:600;letter-spacing:.03em}
+ .cwvals .cwsha{color:var(--dim);font-weight:400;margin-left:6px;font-size:11px}
+ .cwvals .cwerr{color:var(--reject);margin:2px 0}
+ .cwvals table{width:100%;border-collapse:collapse}
+ .cwvals td{padding:3px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+ .cwvals .cwk{color:var(--ink);white-space:nowrap;padding-right:18px}
+ .cwvals .cwv{color:#eaf2f9;font-weight:600;text-align:right;word-break:break-all}
  .tzwrap{color:var(--dim);font-size:11px;display:flex;align-items:center;gap:5px}
  .tzwrap select{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:5px;
    font:11px var(--mono);padding:2px 4px}
@@ -1142,15 +1154,19 @@ def _values_reveal_script():
             'out.textContent="";var steps=(d&&d.steps)||[];'
             'if(!steps.length){out.textContent="no recorded values for this run";return}'
             'steps.forEach(function(s){'
-            'var h=document.createElement("div");h.style.marginTop="8px";'
-            'var t=document.createElement("b");t.textContent="step "+s.step+" · "+(s.values_sha||"").slice(0,16);'
-            'h.appendChild(t);'
-            'var tbl=document.createElement("table");var body=document.createElement("tbody");'
-            'var vv=s.values||{};if(s.error){var er=document.createElement("div");er.className="no";'
+            'var h=document.createElement("div");'
+            'var t=document.createElement("div");t.className="cwstep";'
+            't.textContent="step "+s.step;'
+            'var sh=document.createElement("span");sh.className="cwsha";'
+            'sh.textContent=(s.values_sha||"").slice(0,16);t.appendChild(sh);h.appendChild(t);'
+            'if(s.error){var er=document.createElement("div");er.className="cwerr";'
             'er.textContent="decrypt error: "+s.error;h.appendChild(er)}'
+            'var tbl=document.createElement("table");var body=document.createElement("tbody");'
+            'var vv=s.values||{};'
             'Object.keys(vv).sort().forEach(function(k){var tr=document.createElement("tr");'
-            'var kd=document.createElement("td");kd.textContent=k;var vd=document.createElement("td");'
-            'vd.className="t";vd.textContent=String(vv[k]);tr.appendChild(kd);tr.appendChild(vd);'
+            'var kd=document.createElement("td");kd.className="cwk";kd.textContent=k;'
+            'var vd=document.createElement("td");vd.className="cwv";vd.textContent=String(vv[k]);'
+            'tr.appendChild(kd);tr.appendChild(vd);'
             'body.appendChild(tr)});tbl.appendChild(body);h.appendChild(tbl);out.appendChild(h)})'
             '}).catch(function(e){out.textContent="fetch failed: "+e})});'
             '})();</script>')
@@ -1257,8 +1273,8 @@ def render_run(name, run_id, detail, has_svg=False, refresh=None):
                         'exact declared, non-secret inputs into the value-free chain. The values themselves are '
                         'encrypted at rest (tier-2 ledger); reveal decrypts them <b>live on the node</b> with its '
                         'recipient key (secrets never recorded — they stay <code>*_FILE</code> pointers).</p>'
-                        f'<button id="cw-reveal" data-node="{node_e}" data-run="{rid}">reveal tool-use detail ↗</button>'
-                        '<div id="cw-values" class="kv"></div>'
+                        f'<button id="cw-reveal" class="cwbtn" data-node="{node_e}" data-run="{rid}">reveal tool-use detail ↗</button>'
+                        '<div id="cw-values" class="cwvals"></div>'
                         + _values_reveal_script()) if any_values else "")
                + flow
                + _card("claim &amp; approval",
