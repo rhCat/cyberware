@@ -395,13 +395,21 @@ class Store:
         node with `value_ledger.enabled` false records exactly as before (no values persisted)."""
         self.value_key_file = None
         self.value_recipients = []            # raw X25519 pubkeys the blobs are sealed to (>=1 to record)
+        self._value_cfg = cfg                 # for a FRESH read-backend in decrypt_values (never the writer's cx)
         vc = cfg.get("value_ledger") or {}
         if not vc.get("enabled", True):       # default-on locally; the tier stays value-free-at-rest regardless
             return
         try:
             from infra.store import valuecrypt
-            self.value_key_file = os.path.expanduser(
-                vc.get("node_key_file") or os.path.join(self.root, ".value-key"))
+            keyfile = vc.get("node_key_file")
+            self.value_key_file = os.path.expanduser(keyfile or os.path.join(self.root, ".value-key"))
+            if not keyfile:
+                # KEY SITING: the decryption key must NOT live on the same replicated/backed-up path as the
+                # ciphertext (a backup with both defeats encryption-at-rest). The in-root default is a
+                # convenience fallback ONLY — the operator should set value_ledger.node_key_file to a
+                # non-replicated path and exclude it from cws-backup. Warn loudly so it is not missed.
+                sys.stderr.write(f"[govd] value-ledger: node key defaulting into the record root "
+                                 f"({self.value_key_file}); set value_ledger.node_key_file off the backup path.\n")
             node_pub = valuecrypt.generate_node_key(self.value_key_file)
             recips = [node_pub]
             for hx in (vc.get("recipients") or []):     # extra recipient pubkeys (hex) — e.g. mothership oversight
@@ -433,11 +441,18 @@ class Store:
         """Operator-side plaintext view of one run's tier-2 values (the monitor 'detail of each tool use').
         Decrypts each step's blob with the NODE's recipient key — available only where that key lives (this
         node). Returns [{step, ts, values_sha, values|error}] ordered by step; [] when the tier is inert."""
-        if not self.value_key_file:
+        if not self.value_key_file or not self.mirror.enabled():
             return []
+        from infra.store import backend as _sb
         from infra.store import valuecrypt
-        be = getattr(self.mirror, "backend", None)
-        if be is None:
+        # Read through a FRESH backend connection, never self.mirror.backend: the drain worker writes the shared
+        # cx, and PsycopgBackend is NOT thread-guarded — a monitor read racing a drain write on that one psycopg
+        # connection desyncs the protocol and can drop a tier-1 chain-index write. The reconciler uses the same
+        # own-connection discipline. sqlite readers are cheap + WAL-concurrent, so a per-call backend is fine.
+        try:
+            be = _sb.make_backend(self.root, self._value_cfg or {})
+        except Exception as e:
+            sys.stderr.write(f"[govd] value-ledger read backend unavailable: {e}\n")
             return []
         sk = valuecrypt.load_private(self.value_key_file)
         out = []
@@ -1433,11 +1448,6 @@ class Handler(BaseHTTPRequestHandler):
                                               if k in declared and k not in RESERVED_ENV
                                               and not k.startswith("CWS_SECRET_")
                                               and not (SECRET_KEY.search(k) and not k.endswith(POINTER_SUFFIX))}
-                            # tier-2 value ledger: record the (declared-subset, secret-filtered) values ENCRYPTED
-                            # at rest — this is the ONE place plaintext values exist server-side — and bind their
-                            # plaintext commitment `values_sha` into the tier-1 chain step event. The wire + the
-                            # value-free chain/monitor stay value-free; only the sha (a hash) crosses into them.
-                            values_sha = store.record_values(bound, step, now(), var_values)
                             d_reply, d_event = delegate.execute_step(
                                 rec0, step, psha, exod_socket=sock, grant_key=gk, exod_pub=epub,
                                 base=getattr(self.server, "exec_workspace", os.path.join(store.root, "_work")),
@@ -1447,8 +1457,18 @@ class Handler(BaseHTTPRequestHandler):
                             if d_event:
                                 ev = {**d_event, "ts": now(),
                                       "span": tracing.child_span((rec0 or {}).get("traceparent"))}
-                                if values_sha:
-                                    ev["values_sha"] = values_sha
+                                # tier-2 value ledger: record the (declared-subset, secret-filtered) values
+                                # ENCRYPTED at rest and bind their commitment `values_sha` into THIS chain event —
+                                # but ONLY for a step that actually RAN (a terminal step_result, ok OR error). A
+                                # refused step is retryable, so recording it would (a) orphan a value row for a
+                                # step with no execution event, and (b) let a retry with corrected values desync
+                                # the chain sha from the first-wins stored blob. Recording exactly when the step
+                                # is terminal makes it at-most-once, so the stored blob and the chain sha always
+                                # agree. The wire + value-free chain/monitor stay value-free; only the sha crosses.
+                                if d_event.get("type") == "step_result":
+                                    values_sha = store.record_values(bound, step, ev["ts"], var_values)
+                                    if values_sha:
+                                        ev["values_sha"] = values_sha
                                 store.append(bound, ev)
                             ws_send(self.wfile, json.dumps({"type": "executed", "step": msg.get("step"), **d_reply}))
                         finally:

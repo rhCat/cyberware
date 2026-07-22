@@ -34,20 +34,30 @@ _WRAP_INFO = b"cyberware/valuecrypt/dek-wrap/v1"       # HKDF domain separation 
 _BLOB_AAD = b"cyberware/valuecrypt/blob/v1"            # AES-GCM AAD binds the ciphertext to this scheme+version
 
 
+_SALT_LEN = 16                                        # per-blob commitment salt (defeats low-entropy preimage search)
+
+
 def canon(values: dict) -> bytes:
-    """The canonical plaintext bytes hashed into `values_sha` AND sealed as the blob. Stable: sorted keys,
-    tight separators — so the same {KEY:value} map always yields the same sha and the same sealed bytes."""
+    """The canonical plaintext bytes — SEALED as the blob and committed (salted) into the tier-1 chain. Stable:
+    sorted keys, tight separators — so the same {KEY:value} map always yields the same sealed bytes."""
     return json.dumps(values, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
-def values_sha(values: dict) -> str:
-    """sha256 of the canonical PLAINTEXT — the commitment bound into the tier-1 chain (never the ciphertext)."""
-    return hashlib.sha256(canon(values)).hexdigest()
+def commit(salt: bytes, pt: bytes) -> str:
+    """The tier-1 commitment = sha256(SALT || canonical-plaintext). SALTED on purpose: the commitment lands in
+    the value-free chain/index (the SAME db as the ciphertext), and the tier-2 values are deliberately
+    LOW-ENTROPY (LIMIT=50, SOURCE=/repos/curl, provider/model names). An UNsalted hash there is a preimage
+    oracle — a backup / replica / over-granted DB role brute-forces the values without ever touching the
+    envelope. The salt is sealed INSIDE the AEAD blob (never in the chain), so an at-rest attacker holding the
+    commitment cannot recover it; an authorized decryptor recovers salt+plaintext and re-verifies."""
+    return hashlib.sha256(salt + pt).hexdigest()
 
 
 def keyid(pub_raw: bytes) -> str:
-    """A short stable id for a recipient public key — the map key in `dek_wraps` and the audit label."""
-    return "x25519:" + hashlib.sha256(pub_raw).hexdigest()[:16]
+    """A stable id for a recipient public key — the map key in `dek_wraps` and the audit label. FULL sha256
+    (not truncated): the map key is an identity, and a truncated id lets a second recipient collide with and
+    evict an existing one in `rewrap` (a DoS). Full-width removes the collision entirely."""
+    return "x25519:" + hashlib.sha256(pub_raw).hexdigest()
 
 
 # ── key material ─────────────────────────────────────────────────────────────────────────────────────────
@@ -110,17 +120,17 @@ def encrypt(values: dict, recipient_pubs: list[bytes]) -> dict:
     if not recipient_pubs:
         raise ValueError("valuecrypt.encrypt: recipient set is empty — a value blob needs >=1 recipient")
     pt = canon(values)
+    salt = os.urandom(_SALT_LEN)
     dek = AESGCM.generate_key(bit_length=256)
     blob_nonce = os.urandom(12)
-    ct = AESGCM(dek).encrypt(blob_nonce, pt, _BLOB_AAD)
+    ct = AESGCM(dek).encrypt(blob_nonce, salt + pt, _BLOB_AAD)   # seal SALT||plaintext — the salt is at-rest-protected
     wraps = {}
     for pub in recipient_pubs:
         kek, eph_pub = _wrap_kek(pub)
         wrap_nonce = os.urandom(12)
         wrapped = AESGCM(kek).encrypt(wrap_nonce, dek, _WRAP_INFO)
         wraps[keyid(pub)] = {"eph": eph_pub.hex(), "nonce": wrap_nonce.hex(), "wrap": wrapped.hex()}
-    return {"v": 1, "sha": hashlib.sha256(pt).hexdigest(), "nonce": blob_nonce.hex(),
-            "ct": ct.hex(), "wraps": wraps}
+    return {"v": 1, "sha": commit(salt, pt), "nonce": blob_nonce.hex(), "ct": ct.hex(), "wraps": wraps}
 
 
 def rewrap(blob: dict, sk: X25519PrivateKey, new_recipient_pubs: list[bytes]) -> dict:
@@ -150,10 +160,11 @@ def _recover_dek(blob: dict, sk: X25519PrivateKey) -> bytes:
 
 
 def decrypt(blob: dict, sk: X25519PrivateKey) -> dict:
-    """Open a blob with a recipient private key -> the original `values` dict. Also re-verifies the plaintext
-    commitment (`sha`) so a tampered ciphertext is caught here, not silently returned."""
+    """Open a blob with a recipient private key -> the original `values` dict. Recovers the sealed SALT and
+    re-verifies the salted commitment (`sha`), so a tampered ciphertext is caught here, not silently returned."""
     dek = _recover_dek(blob, sk)
-    pt = AESGCM(dek).decrypt(bytes.fromhex(blob["nonce"]), bytes.fromhex(blob["ct"]), _BLOB_AAD)
-    if hashlib.sha256(pt).hexdigest() != blob.get("sha"):
-        raise ValueError("valuecrypt.decrypt: plaintext commitment mismatch — blob tampered")
+    sealed = AESGCM(dek).decrypt(bytes.fromhex(blob["nonce"]), bytes.fromhex(blob["ct"]), _BLOB_AAD)
+    salt, pt = sealed[:_SALT_LEN], sealed[_SALT_LEN:]
+    if commit(salt, pt) != blob.get("sha"):
+        raise ValueError("valuecrypt.decrypt: salted commitment mismatch — blob tampered")
     return json.loads(pt.decode("utf-8"))

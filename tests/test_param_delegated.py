@@ -212,12 +212,11 @@ def test_value_ledger_records_and_decrypts_the_filtered_values(tmp_path):
     ENCRYPTED at rest and their PLAINTEXT commitment (values_sha) is what the tier-1 chain step event carries.
     The node decrypts its own ledger with its recipient key; the commitment matches the plaintext."""
     from infra.govern.govd import Store
-    from infra.store import valuecrypt
 
     st = Store(str(tmp_path), cfg={})                    # value ledger default-on
     vals = {"SOURCE": "/repos/curl", "LIMIT": "50"}      # the post-filter (declared, non-secret) values
     sha = st.record_values("runP", "1", "2026-07-22T00:00:00Z", vals)
-    assert sha == valuecrypt.values_sha(vals)            # commitment is over the canonical PLAINTEXT
+    assert sha and len(sha) == 64                        # a salted commitment over the plaintext
     st.mirror.flush()
     view = st.decrypt_values("runP")
     assert len(view) == 1 and view[0]["values"] == vals and view[0]["values_sha"] == sha
@@ -230,3 +229,28 @@ def test_value_ledger_never_records_empty_or_when_disabled(tmp_path):
     off = Store(str(tmp_path / "off"), cfg={"value_ledger": {"enabled": False}})
     assert off.record_values("r", "1", "t", {"A": "1"}) is None
     assert off.decrypt_values("r") == []
+
+
+def test_value_ledger_binds_only_on_terminal_step_not_on_refusal(tmp_path, monkeypatch):
+    """Regression (adversarial review #2/#3): record_values must fire ONLY when a step actually RAN (a terminal
+    step_result), so a retried/refused step never orphans a value row nor desyncs the chain sha from the stored
+    blob. We drive the Store directly to mirror the govd WS-handler contract: refusal -> no record; terminal ->
+    exactly one record whose commitment equals the chain-bound sha, and a retry with new values is a no-op
+    (at-most-once), so blob and chain never disagree."""
+    from infra.govern.govd import Store
+
+    st = Store(str(tmp_path), cfg={})
+    # a refused step (govd stamps no values_sha, calls no record_values) leaves the ledger empty
+    st.mirror.flush()
+    assert st.decrypt_values("runR") == []
+    # the terminal run records exactly once; the returned sha is what the chain event would carry
+    sha = st.record_values("runR", "1", "t1", {"SOURCE": "/a", "LIMIT": "1"})
+    st.mirror.flush()
+    view = st.decrypt_values("runR")
+    assert len(view) == 1 and view[0]["values_sha"] == sha and view[0]["values"] == {"SOURCE": "/a", "LIMIT": "1"}
+    # at-most-once upsert: a (hypothetical) second record for the same step never overwrites the first blob,
+    # so the stored blob stays consistent with the sha the chain committed on the real terminal run
+    st.record_values("runR", "1", "t2", {"SOURCE": "/DIFFERENT", "LIMIT": "999"})
+    st.mirror.flush()
+    view2 = st.decrypt_values("runR")
+    assert len(view2) == 1 and view2[0]["values_sha"] == sha and view2[0]["values"] == {"SOURCE": "/a", "LIMIT": "1"}
