@@ -335,6 +335,31 @@ function runTab(panel, d){
   for(const s of states){ inSeq.add(String(s.n)); list.appendChild(block(s.n, s.tool, s.state, byStep[String(s.n)])); }
   for(const k of Object.keys(byStep)){ if(!inSeq.has(k)) list.appendChild(block(k==="?"?null:k, null, null, byStep[k])); }
   ss.b.appendChild(list); panel.appendChild(ss.s);
+  // Tier-2 tool-use DETAIL: each step's values_sha commits its declared, non-secret inputs into the value-free
+  // chain; the values live encrypted at rest and are decrypted here on request, node-side (the node holds the
+  // recipient key). Secrets are never recorded — they stay *_FILE pointers. Only shown when a run actually
+  // recorded values (a delegated, parameterized run).
+  const anyV=events.some(e=>e.type==="step_result"&&e.values_sha);
+  if(anyV){
+    const vs=sect("Tool-use detail — decrypted step inputs");
+    vs.b.appendChild(el("div","note","Each step's values_sha commits the exact declared, non-secret inputs. Reveal decrypts them here, node-side — secrets stay *_FILE pointers and are never recorded."));
+    const btn=el("button","efbtn","reveal tool-use detail ↗"), out=el("div","steps");
+    btn.onclick=()=>{ out.textContent="loading…";
+      fetch("/monitor/values/"+enc(d.run_id)+"?token="+enc(token),{cache:"no-store"})
+        .then(r=>r.json()).then(v=>{ out.textContent="";
+          const steps=(v&&v.steps)||[]; if(!steps.length){ out.appendChild(el("div","empty","no recorded values")); return; }
+          for(const s of steps){ const blk=el("div","stepblk"), hd=el("div","stephd");
+            hd.appendChild(el("span","pill","step "+s.step)); hd.appendChild(el("span","t",String(s.values_sha||"").slice(0,16))); blk.appendChild(hd);
+            const tl=el("div","tl");
+            if(s.error){ tl.appendChild(el("div","note","decrypt error: "+s.error)); }
+            const vv=s.values||{}; const keys=Object.keys(vv).sort();
+            if(!keys.length && !s.error) tl.appendChild(el("div","note","no values"));
+            for(const k of keys){ const row=el("div"); row.appendChild(el("span","ev",k)); row.appendChild(el("span",null,String(vv[k]))); tl.appendChild(row); }
+            blk.appendChild(tl); out.appendChild(blk);
+          }
+        }).catch(e=>{ out.textContent="fetch failed: "+e; }); };
+    vs.b.appendChild(btn); vs.b.appendChild(out); panel.appendChild(vs.s);
+  }
 }
 
 function flowTab(panel, d){

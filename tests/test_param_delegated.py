@@ -205,3 +205,28 @@ def test_exod_passes_caller_values_for_a_params_granted_actor():
     acl = {"skills": ["*"], "max_tier": "community", "secrets": False, "params": True}
     env = {**_FIXED, "MODEL_HANDLE": "nvidia/Qwen3.6-35B-A3B-NVFP4"}
     assert _pd_exod()._acl_check(_pd_req(acl, env), _pd_gbody(acl), now=1500) is None
+
+
+def test_value_ledger_records_and_decrypts_the_filtered_values(tmp_path):
+    """Tier-2 (docs/pg-provenance-ledger.md): the same declared, non-secret values that ride the WS are
+    ENCRYPTED at rest and their PLAINTEXT commitment (values_sha) is what the tier-1 chain step event carries.
+    The node decrypts its own ledger with its recipient key; the commitment matches the plaintext."""
+    from infra.govern.govd import Store
+    from infra.store import valuecrypt
+
+    st = Store(str(tmp_path), cfg={})                    # value ledger default-on
+    vals = {"SOURCE": "/repos/curl", "LIMIT": "50"}      # the post-filter (declared, non-secret) values
+    sha = st.record_values("runP", "1", "2026-07-22T00:00:00Z", vals)
+    assert sha == valuecrypt.values_sha(vals)            # commitment is over the canonical PLAINTEXT
+    st.mirror.flush()
+    view = st.decrypt_values("runP")
+    assert len(view) == 1 and view[0]["values"] == vals and view[0]["values_sha"] == sha
+
+
+def test_value_ledger_never_records_empty_or_when_disabled(tmp_path):
+    from infra.govern.govd import Store
+    st = Store(str(tmp_path / "on"), cfg={})
+    assert st.record_values("r", "1", "t", {}) is None   # empty filtered set -> nothing recorded, no sha
+    off = Store(str(tmp_path / "off"), cfg={"value_ledger": {"enabled": False}})
+    assert off.record_values("r", "1", "t", {"A": "1"}) is None
+    assert off.decrypt_values("r") == []
