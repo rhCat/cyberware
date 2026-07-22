@@ -143,7 +143,8 @@ _RUN_KEYS = ("run_id", "ts", "principal", "skill", "perk", "decision", "destruct
              "tlc", "tlc_tla", "tlc_log", "traceparent", "sources", "restored", "failed", "progress",
              "needs_approve")
 _EVENT_KEYS = ("type", "step", "status", "exit", "reason", "span", "authority", "keyid",
-               "snippet_shas", "meter", "ts", "traceparent", "result_nonce", "exod_keyid", "plan_sha")
+               "snippet_shas", "meter", "ts", "traceparent", "result_nonce", "exod_keyid", "plan_sha",
+               "values_sha")   # tier-2 commitment (a hash) — the value-free per-step link into the value ledger
 # the compact per-run row the accounting/risk feeds read — MUST include `cost`, or the fleet credit-spend
 # rollup (_spend_rollup / render_accounting) always reads 0 (the per-run detail carries it, the row dropped it).
 # Same trap for `needs_approve`/`approved`: the risk queue and the supersession pass read the FEED rows, so a
@@ -306,7 +307,7 @@ def load_run_svg(mirror_dir, name, run_id):
 
 # the ONLY node sub-paths fleetdash will proxy live (token-injected) — read-only inspection endpoints. The
 # target host is always the configured node (no SSRF to arbitrary hosts); this bounds it to safe read paths.
-_PROXY_PREFIX = ("trace/", "intoto/", "flow/run/", "ledger/", "monitor/run/")
+_PROXY_PREFIX = ("trace/", "intoto/", "flow/run/", "ledger/", "monitor/run/", "monitor/values/")
 _PROXY_EXACT = ("catalog", "oversight")
 
 
@@ -1128,6 +1129,33 @@ def _run_live(detail):
     return len(done) < len(detail.get("seq") or [])
 
 
+def _values_reveal_script():
+    """The reveal button's client script: fetch the node-proxied /monitor/values/<run_id> and render each
+    step's decrypted inputs. EVERY node-supplied string is written via textContent (never innerHTML) — the
+    inline-onclick / raw-interpolation XSS sink is deliberately avoided (see the fleetdash UX pass)."""
+    return ('<script>(function(){'
+            'var b=document.getElementById("cw-reveal");if(!b)return;'
+            'b.addEventListener("click",function(){'
+            'var out=document.getElementById("cw-values");out.textContent="loading…";'
+            'fetch("/proxy/"+b.dataset.node+"/monitor/values/"+b.dataset.run)'
+            '.then(function(r){return r.json()}).then(function(d){'
+            'out.textContent="";var steps=(d&&d.steps)||[];'
+            'if(!steps.length){out.textContent="no recorded values for this run";return}'
+            'steps.forEach(function(s){'
+            'var h=document.createElement("div");h.style.marginTop="8px";'
+            'var t=document.createElement("b");t.textContent="step "+s.step+" · "+(s.values_sha||"").slice(0,16);'
+            'h.appendChild(t);'
+            'var tbl=document.createElement("table");var body=document.createElement("tbody");'
+            'var vv=s.values||{};if(s.error){var er=document.createElement("div");er.className="no";'
+            'er.textContent="decrypt error: "+s.error;h.appendChild(er)}'
+            'Object.keys(vv).sort().forEach(function(k){var tr=document.createElement("tr");'
+            'var kd=document.createElement("td");kd.textContent=k;var vd=document.createElement("td");'
+            'vd.className="t";vd.textContent=String(vv[k]);tr.appendChild(kd);tr.appendChild(vd);'
+            'body.appendChild(tr)});tbl.appendChild(body);h.appendChild(tbl);out.appendChild(h)})'
+            '}).catch(function(e){out.textContent="fetch failed: "+e})});'
+            '})();</script>')
+
+
 def render_run(name, run_id, detail, has_svg=False, refresh=None):
     """Per-run LEDGER INSPECTION — local-monitor parity from the durable mirror: the full value-free record
     (claim + approval, the step plan, the event chain, plan + closure pins, the model-check + provenance) + the
@@ -1144,14 +1172,18 @@ def render_run(name, run_id, detail, has_svg=False, refresh=None):
     by_step = {e.get("step"): e for e in detail.get("events", []) if e.get("type") == "step_result"}
     granted = {e.get("step") for e in detail.get("events", []) if e.get("type") == "granted"}
     srows = []
+    any_values = False
     for i, tool in enumerate(detail.get("seq", []), 1):
         e = by_step.get(str(i))
         state = ("ok" if e and e.get("status") == "ok" else "error" if e
                  else "granted" if str(i) in granted else "pending")
         cls = {"ok": "ok", "error": "no", "granted": "warn"}.get(state, "")
+        vsha = (e or {}).get("values_sha")
+        any_values = any_values or bool(vsha)
         srows.append(f'<tr><td>{i}</td><td>{_esc(tool)}</td><td>{_esc((e or {}).get("authority", "—"))}</td>'
-                     f'<td>{_esc((e or {}).get("exit", "—"))}</td><td class="{cls}">{_esc(state)}</td></tr>')
-    steps = "".join(srows) or '<tr><td colspan="5" class="muted">no steps declared</td></tr>'
+                     f'<td>{_esc((e or {}).get("exit", "—"))}</td><td class="{cls}">{_esc(state)}</td>'
+                     f'<td class="t">{_cp(vsha, 16) if vsha else "—"}</td></tr>')
+    steps = "".join(srows) or '<tr><td colspan="6" class="muted">no steps declared</td></tr>'
 
     def ev_note(e):
         note = e.get("reason") or ""
@@ -1219,7 +1251,15 @@ def render_run(name, run_id, detail, has_svg=False, refresh=None):
                f'<a href="/raw/{node_e}/{rid}">raw ledger ↗</a></p>'
                + callout
                + _card("steps", f'<table><thead><tr><th>#</th><th>tool</th><th>exec (authority)</th><th>exit</th>'
-                       f'<th>state</th></tr></thead><tbody>{steps}</tbody></table>')
+                       f'<th>state</th><th>tool-use (values_sha)</th></tr></thead><tbody>{steps}</tbody></table>')
+               + (_card("tool-use detail — decrypted step inputs",
+                        f'<p class="kv" style="margin-top:0">Each step\'s <b>values_sha</b> above commits the '
+                        'exact declared, non-secret inputs into the value-free chain. The values themselves are '
+                        'encrypted at rest (tier-2 ledger); reveal decrypts them <b>live on the node</b> with its '
+                        'recipient key (secrets never recorded — they stay <code>*_FILE</code> pointers).</p>'
+                        f'<button id="cw-reveal" data-node="{node_e}" data-run="{rid}">reveal tool-use detail ↗</button>'
+                        '<div id="cw-values" class="kv"></div>'
+                        + _values_reveal_script()) if any_values else "")
                + flow
                + _card("claim &amp; approval",
                        f'<p class="kv" style="margin:0">destructive <b>{_esc(detail.get("destructive", False))}</b> · '

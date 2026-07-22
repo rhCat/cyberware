@@ -386,6 +386,84 @@ class Store:
         # exception-isolated. The in-memory runs + ledger.json remain the authoritative hot-path state.
         from infra.store.mirror import StoreMirror
         self.mirror = StoreMirror(self.root, cfg)
+        self._init_value_ledger(cfg or {})
+
+    def _init_value_ledger(self, cfg):
+        """Tier-2 value ledger (docs/pg-provenance-ledger.md): load/gen the node's X25519 recipient key and the
+        recipient set the per-step var_values are ENCRYPTED to. Standalone: the node's own key is the sole
+        recipient; a fleet handshake later appends the mothership oversight pubkey. INERT unless enabled — a
+        node with `value_ledger.enabled` false records exactly as before (no values persisted)."""
+        self.value_key_file = None
+        self.value_recipients = []            # raw X25519 pubkeys the blobs are sealed to (>=1 to record)
+        self._value_cfg = cfg                 # for a FRESH read-backend in decrypt_values (never the writer's cx)
+        vc = cfg.get("value_ledger") or {}
+        if not vc.get("enabled", True):       # default-on locally; the tier stays value-free-at-rest regardless
+            return
+        try:
+            from infra.store import valuecrypt
+            keyfile = vc.get("node_key_file")
+            self.value_key_file = os.path.expanduser(keyfile or os.path.join(self.root, ".value-key"))
+            if not keyfile:
+                # KEY SITING: the decryption key must NOT live on the same replicated/backed-up path as the
+                # ciphertext (a backup with both defeats encryption-at-rest). The in-root default is a
+                # convenience fallback ONLY — the operator should set value_ledger.node_key_file to a
+                # non-replicated path and exclude it from cws-backup. Warn loudly so it is not missed.
+                sys.stderr.write(f"[govd] value-ledger: node key defaulting into the record root "
+                                 f"({self.value_key_file}); set value_ledger.node_key_file off the backup path.\n")
+            node_pub = valuecrypt.generate_node_key(self.value_key_file)
+            recips = [node_pub]
+            for hx in (vc.get("recipients") or []):     # extra recipient pubkeys (hex) — e.g. mothership oversight
+                try:
+                    recips.append(bytes.fromhex(hx))
+                except ValueError:
+                    sys.stderr.write("[govd] value-ledger: ignoring malformed recipient pubkey\n")
+            self.value_recipients = recips
+        except Exception as e:                # never fail server boot on the optional value tier
+            sys.stderr.write(f"[govd] value ledger unavailable, continuing value-free only: {e}\n")
+            self.value_key_file, self.value_recipients = None, []
+
+    def record_values(self, run_id, step, ts, values):
+        """Encrypt the (already declared-subset, secret-filtered) per-step `values` to the recipient set and
+        enqueue them into the tier-2 ledger. Returns the plaintext commitment `values_sha` (to bind into the
+        tier-1 chain step event) or None when the tier is inert / empty. NEVER raises into the decision path."""
+        if not self.value_recipients or not values:
+            return None
+        try:
+            from infra.store import valuecrypt
+            blob = valuecrypt.encrypt(values, self.value_recipients)
+            self.mirror.record_values(run_id, step, ts, blob["sha"], blob)
+            return blob["sha"]
+        except Exception as e:
+            sys.stderr.write(f"[govd] value-ledger record (run {run_id} step {step}) skipped: {e}\n")
+            return None
+
+    def decrypt_values(self, run_id):
+        """Operator-side plaintext view of one run's tier-2 values (the monitor 'detail of each tool use').
+        Decrypts each step's blob with the NODE's recipient key — available only where that key lives (this
+        node). Returns [{step, ts, values_sha, values|error}] ordered by step; [] when the tier is inert."""
+        if not self.value_key_file or not self.mirror.enabled():
+            return []
+        from infra.store import backend as _sb
+        from infra.store import valuecrypt
+        # Read through a FRESH backend connection, never self.mirror.backend: the drain worker writes the shared
+        # cx, and PsycopgBackend is NOT thread-guarded — a monitor read racing a drain write on that one psycopg
+        # connection desyncs the protocol and can drop a tier-1 chain-index write. The reconciler uses the same
+        # own-connection discipline. sqlite readers are cheap + WAL-concurrent, so a per-call backend is fine.
+        try:
+            be = _sb.make_backend(self.root, self._value_cfg or {})
+        except Exception as e:
+            sys.stderr.write(f"[govd] value-ledger read backend unavailable: {e}\n")
+            return []
+        sk = valuecrypt.load_private(self.value_key_file)
+        out = []
+        for row in be.get_values(run_id):
+            item = {"step": row["step"], "ts": row["ts"], "values_sha": row["values_sha"]}
+            try:
+                item["values"] = valuecrypt.decrypt(row["blob"], sk)
+            except Exception as e:
+                item["error"] = f"{type(e).__name__}: {e}"[:200]
+            out.append(item)
+        return out
 
     def _path(self, run_id): return os.path.join(self.root, run_id, "ledger.json")
 
@@ -943,6 +1021,17 @@ class Handler(BaseHTTPRequestHandler):
             if detail:                                   # attach the porters this run runs (public chip code)
                 detail["sources"] = porter_sources(detail.get("skill"), detail.get("perk"), detail.get("seq"))
             return self._json(200 if detail else 404, detail or {"error": "unknown run_id"})
+        if path.startswith("/monitor/values/"):
+            # tier-2 DETAIL of each tool use: the DECRYPTED per-step var_values for one run. Operator-gated
+            # (monitor token) AND node-local — decryption needs the node's recipient key, which never leaves
+            # the node; a mothership decrypts its own replica app-side with the oversight key. The value-free
+            # /monitor/run is unchanged; this is the deliberate, authenticated plaintext view.
+            if not self._monitor_authed(cfg):
+                return self._json(403, {"error": "missing/invalid monitor token"})
+            rid = urllib.parse.unquote(path.split("/monitor/values/", 1)[1])
+            steps = store.decrypt_values(rid)
+            return self._json(200, {"run_id": rid, "steps": steps,
+                                    "note": "decrypted node-side; values are the declared, non-secret step inputs"})
         if path.startswith("/trace/"):
             # P5-T05: the run's cross-plane trace (claim→grant→step spans under one trace id) by run_id —
             # value-free, monitor-gated like /monitor/run.
@@ -1366,8 +1455,21 @@ class Handler(BaseHTTPRequestHandler):
                                 token_proof=msg.get("token_proof"),   # ACL M2: agent-relayed token-possession proof
                                 var_values=var_values)                # caller NON-secret values (declared subset, ACL-gated)
                             if d_event:
-                                store.append(bound, {**d_event, "ts": now(),
-                                                     "span": tracing.child_span((rec0 or {}).get("traceparent"))})
+                                ev = {**d_event, "ts": now(),
+                                      "span": tracing.child_span((rec0 or {}).get("traceparent"))}
+                                # tier-2 value ledger: record the (declared-subset, secret-filtered) values
+                                # ENCRYPTED at rest and bind their commitment `values_sha` into THIS chain event —
+                                # but ONLY for a step that actually RAN (a terminal step_result, ok OR error). A
+                                # refused step is retryable, so recording it would (a) orphan a value row for a
+                                # step with no execution event, and (b) let a retry with corrected values desync
+                                # the chain sha from the first-wins stored blob. Recording exactly when the step
+                                # is terminal makes it at-most-once, so the stored blob and the chain sha always
+                                # agree. The wire + value-free chain/monitor stay value-free; only the sha crosses.
+                                if d_event.get("type") == "step_result":
+                                    values_sha = store.record_values(bound, step, ev["ts"], var_values)
+                                    if values_sha:
+                                        ev["values_sha"] = values_sha
+                                store.append(bound, ev)
                             ws_send(self.wfile, json.dumps({"type": "executed", "step": msg.get("step"), **d_reply}))
                         finally:
                             store.release_step(bound, step)

@@ -78,12 +78,28 @@ read-time, backed by signature/chain verification, size caps, and the schema bou
 
 ## Crypto
 
-Envelope encryption with a **recipient set**: fresh per-blob DEK (AEAD, e.g. XChaCha20-Poly1305 or AES-256-GCM
-per what's already vendored); DEK wrapped to each recipient's X25519 public key. Standalone recipient set =
-{node}; post-handshake = {node, mothership-oversight}. Fleet join re-wraps *historical DEKs only* (bytes per
-blob — never re-encrypts data). Node recipient key: generated at boot if absent, `chmod 600`, beside govd's
-existing key material on the config mount — never in the DB, never on a replicated path. Rotation = new
-recipient key + lazy re-wrap; revocation = stop wrapping + rotate.
+Envelope encryption with a **recipient set**: fresh per-blob DEK (AES-256-GCM, from the already-required
+`cryptography`); DEK wrapped to each recipient's X25519 public key via ephemeral-static ECDH + HKDF-SHA256.
+Standalone recipient set = {node}; post-handshake = {node, mothership-oversight}. Fleet join re-wraps
+*historical DEKs only* (bytes per blob — never re-encrypts data). Node recipient key: generated at boot if
+absent, `chmod 600` from creation.
+
+**The commitment is SALTED.** `values_sha = sha256(salt ‖ canonical-plaintext)` with a fresh per-blob salt
+**sealed inside the AEAD blob** (never in the chain). An unsalted hash would be fatal here: the commitment
+lands in the value-free chain/index — the *same database* as the ciphertext — and the tier-2 values are
+deliberately **low-entropy** (`LIMIT=50`, `SOURCE=/repos/curl`, provider/model names). An unsalted hash there
+is a preimage oracle: a backup / replica / over-granted DB role brute-forces the values without touching the
+envelope, defeating encryption-at-rest for exactly the values the ledger records. Salting closes it — the
+at-rest attacker holds the commitment but not the salt (it needs the recipient key); an authorized decryptor
+recovers salt+plaintext and re-verifies. Trade-off: cross-run same-input detection by hash-equality is gone
+(identical inputs get distinct salts) — compare decrypted plaintexts instead. Recipient `keyid` is the
+**full** sha256 of the pubkey (not truncated) so two recipients can never collide + evict in `rewrap`.
+
+**KEY SITING (operator requirement):** the decryption key must NOT sit on the same replicated/backed-up path
+as the ciphertext — a backup holding both defeats encryption-at-rest. Set `value_ledger.node_key_file` to a
+non-replicated path and exclude it from `cws-backup`. The in-record-root default is a convenience fallback
+only; govd warns loudly when it is used. Rotation = new recipient key + lazy re-wrap; revocation = stop
+wrapping + rotate.
 
 **Honest limit (accepted residual):** govd sees values transiently (it is the writer); a fully compromised
 *live* govd host reads them regardless. Encrypt-at-rest defends at-rest surfaces — replicas, backups, stolen

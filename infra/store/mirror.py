@@ -27,7 +27,7 @@ import time
 _SAFE_RUN_KEYS = ("ts", "skill", "perk", "decision", "destructive", "approved", "plan_sha", "var_keys",
                   "principal", "cost", "snippet_shas", "traceparent")
 _SAFE_EVENT_KEYS = ("ts", "type", "step", "status", "exit", "reason", "span", "authority", "keyid",
-                    "snippet_shas", "meter", "traceparent")
+                    "snippet_shas", "meter", "traceparent", "values_sha")
 
 
 def value_free_run(rec):
@@ -97,6 +97,14 @@ class StoreMirror:
         """Enqueue one verdict for the decisions chain/index."""
         self._put({"op": "decision", "summary": summary})
 
+    def record_values(self, run_id, step, ts, values_sha, blob):
+        """Enqueue one ENCRYPTED tier-2 value blob for a step. Value-free-at-rest: the blob is already
+        ciphertext (infra/store/valuecrypt.py) and only its plaintext commitment `values_sha` — NOT the
+        values — is what also rides the tier-1 chain (as the step event's values_sha). Goes ONLY to the
+        derived backend, never the chain (the chain stays the value-free artifact of record)."""
+        self._put({"op": "values", "run_id": run_id, "step": str(step), "ts": ts,
+                   "values_sha": values_sha, "blob": blob})
+
     def _put(self, job):
         if self.chain is None:
             return
@@ -123,6 +131,11 @@ class StoreMirror:
                     self.chain.append_decision(job["summary"])
                     if self.backend is not None:
                         self.backend.index_decision(job["summary"])
+                elif job.get("op") == "values":
+                    # tier-2 encrypted value ledger — the DERIVED backend only, NEVER the value-free chain.
+                    if self.backend is not None:
+                        self.backend.record_values(job["run_id"], job["step"], job["ts"],
+                                                   job["values_sha"], job["blob"])
                 else:
                     rec = self.chain.append_record(job["run_id"], job["plan_sha"], job["kind"], job["fields"])
                     if self.backend is not None:

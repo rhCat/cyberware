@@ -41,6 +41,13 @@ class StoreBackend:
     def index_record(self, run_id, seq, prev, link_digest, kind, ts, plan_sha, fields) -> dict:
         raise NotImplementedError
     def index_decision(self, summary) -> dict: raise NotImplementedError
+    # tier-2 value ledger (docs/pg-provenance-ledger.md): the per-step var_values, ENVELOPE-ENCRYPTED at rest
+    # (infra/store/valuecrypt.py). `blob` is valuecrypt's self-describing dict (ciphertext + per-recipient DEK
+    # wraps); `values_sha` is the PLAINTEXT commitment also bound into the tier-1 chain. record_values is an
+    # UPSERT keyed on (run_id, step) — a re-sent step is a no-op duplicate. get_values returns the blobs
+    # (ciphertext) ONLY; decryption is the caller's, app-side, with a recipient key the store never holds.
+    def record_values(self, run_id, step, ts, values_sha, blob) -> dict: raise NotImplementedError
+    def get_values(self, run_id) -> list: raise NotImplementedError        # [{step, ts, values_sha, blob}] by step
     def rows(self, run_id) -> list: raise NotImplementedError              # ordered by seq
     def head(self, run_id): raise NotImplementedError                      # {seq, link_digest} | None
     def run_ids(self) -> list: raise NotImplementedError
@@ -100,6 +107,10 @@ class SqliteWalBackend(StoreBackend):
                 rid INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, ts TEXT, link_digest TEXT, fields TEXT)""")
             self.cx.execute("""CREATE TABLE IF NOT EXISTS idx_origin(
                 run_id TEXT PRIMARY KEY, plan_sha TEXT)""")
+            # tier-2 value ledger: ciphertext blob (JSON) + plaintext commitment. UPSERT on (run_id, step).
+            self.cx.execute("""CREATE TABLE IF NOT EXISTS run_values(
+                run_id TEXT, step TEXT, ts TEXT, values_sha TEXT, blob TEXT,
+                PRIMARY KEY(run_id, step))""")
         return self
 
     def set_origin(self, run_id, plan_sha):
@@ -127,6 +138,21 @@ class SqliteWalBackend(StoreBackend):
                             (summary.get("run_id"), summary.get("ts", ""), ld, _canon(summary)))
         return {"backend": self.name, "status": "indexed", "run_id": summary.get("run_id")}
 
+    def record_values(self, run_id, step, ts, values_sha, blob) -> dict:
+        with self._lock:
+            cur = self.cx.execute("INSERT OR IGNORE INTO run_values VALUES(?,?,?,?,?)",
+                                  (run_id, str(step), ts, values_sha, _canon(blob)))
+            rowcount = cur.rowcount
+        return {"backend": self.name, "run_id": run_id, "step": str(step),
+                "status": "indexed" if rowcount == 1 else "duplicate"}
+
+    def get_values(self, run_id) -> list:
+        with self._lock:
+            cur = self.cx.execute(
+                "SELECT step, ts, values_sha, blob FROM run_values WHERE run_id=? ORDER BY step", (run_id,))
+            fetched = cur.fetchall()
+        return [{"step": r[0], "ts": r[1], "values_sha": r[2], "blob": json.loads(r[3])} for r in fetched]
+
     def rows(self, run_id) -> list:
         with self._lock:
             cur = self.cx.execute(
@@ -148,7 +174,7 @@ class SqliteWalBackend(StoreBackend):
 
     def reset(self):
         with self._lock:
-            for t in ("idx_record", "idx_decision", "idx_origin"):
+            for t in ("idx_record", "idx_decision", "idx_origin", "run_values"):
                 self.cx.execute(f"DELETE FROM {t}")
 
     # ── P5-T04: the single-writer lease (advisory lock) — atomic via BEGIN IMMEDIATE ──────────────────────
@@ -328,6 +354,13 @@ class PsycopgBackend(StoreBackend):
             c.execute("""CREATE TABLE IF NOT EXISTS idx_decision(
                 rid BIGSERIAL PRIMARY KEY, run_id TEXT, ts TEXT, link_digest TEXT, fields JSONB)""")
             c.execute("""CREATE TABLE IF NOT EXISTS idx_origin(run_id TEXT PRIMARY KEY, plan_sha TEXT)""")
+            # tier-2 value ledger: raw ciphertext bytes (the hash-able artifact) + a queryable JSONB projection
+            # of the SAME blob (JSONB normalizes bytes, so it is never the verification input). node_id defaults
+            # to '' on a standalone node; the fleet publication stamps it at share time.
+            c.execute("""CREATE TABLE IF NOT EXISTS run_values(
+                node_id TEXT NOT NULL DEFAULT '', run_id TEXT, step TEXT, ts TEXT,
+                values_sha TEXT, blob_raw BYTEA, blob JSONB,
+                PRIMARY KEY(node_id, run_id, step))""")
         return self
 
     def _unconf(self, **kw):
@@ -372,6 +405,34 @@ class PsycopgBackend(StoreBackend):
                       (summary.get("run_id"), summary.get("ts", ""), ld, _canon(summary)))
         return {"backend": self.name, "status": "indexed", "run_id": summary.get("run_id")}
 
+    def record_values(self, run_id, step, ts, values_sha, blob) -> dict:
+        if not self.configured():
+            return self._unconf(run_id=run_id, step=str(step))
+        try:
+            raw = _canon(blob).encode()
+            with self.cx.cursor() as c:
+                c.execute("INSERT INTO run_values(node_id, run_id, step, ts, values_sha, blob_raw, blob) "
+                          "VALUES('', %s,%s,%s,%s,%s,%s) "
+                          "ON CONFLICT (node_id, run_id, step) DO NOTHING",
+                          (run_id, str(step), ts, values_sha, raw, _canon(blob)))
+                status = "indexed" if c.rowcount == 1 else "duplicate"
+            return {"backend": self.name, "run_id": run_id, "step": str(step), "status": status}
+        except Exception as e:
+            return {"backend": self.name, "status": "error", "detail": f"{type(e).__name__}: {e}"[:300]}
+
+    def get_values(self, run_id) -> list:
+        if not self.configured():
+            return []
+        with self.cx.cursor() as c:
+            c.execute("SELECT step, ts, values_sha, blob_raw FROM run_values WHERE run_id=%s ORDER BY step",
+                      (run_id,))
+            out = []
+            for r in c.fetchall():
+                raw = r[3]
+                blob = json.loads(raw.tobytes() if hasattr(raw, "tobytes") else raw)
+                out.append({"step": r[0], "ts": r[1], "values_sha": r[2], "blob": blob})
+        return out
+
     def rows(self, run_id) -> list:
         if not self.configured():
             return []
@@ -405,7 +466,7 @@ class PsycopgBackend(StoreBackend):
         if not self.configured():
             return
         with self.cx.cursor() as c:
-            for t in ("idx_record", "idx_decision", "idx_origin"):
+            for t in ("idx_record", "idx_decision", "idx_origin", "run_values"):
                 c.execute(f"DELETE FROM {t}")
 
     # ── P5-T04: the single-writer lease — ONE atomic conditional upsert (no race window) ──────────────────
