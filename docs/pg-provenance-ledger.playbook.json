@@ -1,0 +1,30 @@
+[
+  { "task_id": "m0-01-schema-conform",  "skill": "cws:cws-conform",    "perk": "schemas",  "vars": {}, "redeem": false },
+  { "task_id": "m0-02-labeling",        "skill": "cws:cws-conform",    "perk": "labeling", "vars": {}, "redeem": false },
+  { "task_id": "m0-03-modelcheck",      "skill": "cws:cws-modelcheck", "perk": "check",    "vars": { "TARGET_BLUEPRINT": "skillChip/cws/cws-observe/blueprint.json" }, "redeem": true },
+  { "task_id": "m0-04-impl-qc",         "skill": "general:py_qc",      "perk": "test",     "vars": { "PROJECT_DIR": "." }, "redeem": true },
+  { "task_id": "m0-05-secret-scan",     "skill": "general:sec",        "perk": "secrets",  "vars": { "SEARCH_DIR": "infra/store" }, "redeem": true },
+  { "task_id": "m0-06-sec-audit",       "skill": "general:sec",        "perk": "audit",    "vars": { "PROJECT_DIR": "infra/govern" }, "redeem": true },
+  { "task_id": "m0-07-mutate-store",    "skill": "cws:cws-mutate",     "perk": "mutate",   "vars": { "PROJECT_DIR": ".", "TARGET": "infra/store/backend.py", "TEST_CMD": "pytest -q tests/test_store_backend.py" }, "redeem": true },
+  { "task_id": "m0-08-redteam-values",  "skill": "cws:cws-redteam-sw", "perk": "rt-grant-forged",  "vars": {}, "redeem": true },
+
+  { "task_id": "m1-01-modelcheck-prove","skill": "cws:cws-modelcheck", "perk": "prove",    "vars": {}, "redeem": true },
+  { "task_id": "m1-02-backend-qc",      "skill": "general:py_qc",      "perk": "test",     "vars": { "PROJECT_DIR": "." }, "redeem": true },
+  { "task_id": "m1-03-backend-lint",    "skill": "general:py_qc",      "perk": "lint",     "vars": { "PROJECT_DIR": "." }, "redeem": true },
+  { "task_id": "m1-04-mutate-mirror",   "skill": "cws:cws-mutate",     "perk": "mutate",   "vars": { "PROJECT_DIR": ".", "TARGET": "infra/store/mirror.py", "TEST_CMD": "pytest -q tests/test_store_mirror.py" }, "redeem": true },
+  { "task_id": "m1-05-digestlint",      "skill": "cws:cws-conform",    "perk": "digestlint","vars": { "SCAN_ROOT": "skillChip" }, "redeem": true },
+
+  { "task_id": "m2-01-schema-fleet",    "skill": "cws:cws-conform",    "perk": "schemas",  "vars": {}, "redeem": false },
+  { "task_id": "m2-02-keystore",        "skill": "cws:cws-conform",    "perk": "keystore", "vars": {}, "redeem": true },
+  { "task_id": "m2-03-mutate-fleetd",   "skill": "cws:cws-mutate",     "perk": "mut-chain-verifier", "vars": { "PROJECT_DIR": "." }, "redeem": true },
+  { "task_id": "m2-04-redteam-admit",   "skill": "cws:cws-redteam-sw", "perk": "rt-grant-replay",  "vars": {}, "redeem": true },
+  { "task_id": "m2-05-redteam-toctou",  "skill": "cws:cws-redteam-sw", "perk": "rt-snippet-toctou","vars": {}, "redeem": true },
+  { "task_id": "m2-06-modelcheck-saga", "skill": "cws:cws-modelcheck", "perk": "saga",     "vars": {}, "redeem": true },
+
+  { "task_id": "m3-01-fleet-qc",        "skill": "general:py_qc",      "perk": "test",     "vars": { "PROJECT_DIR": "." }, "redeem": true },
+  { "task_id": "m3-02-chaos-revoke",    "skill": "cws:cws-chaos",      "perk": "drill",    "vars": {}, "redeem": false },
+  { "task_id": "m3-03-chaos-partition", "skill": "cws:cws-chaos",      "perk": "partition","vars": {}, "redeem": false },
+  { "task_id": "m3-04-chaos-crash",     "skill": "cws:cws-chaos",      "perk": "settlecrash","vars": {}, "redeem": false },
+  { "task_id": "m3-05-backup-canary",   "skill": "general:sec",        "perk": "secrets",  "vars": { "SEARCH_DIR": "infra" }, "redeem": true },
+  { "task_id": "m3-06-final-conform",   "skill": "cws:cws-conform",    "perk": "reprobuild","vars": {}, "redeem": false }
+]
