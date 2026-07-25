@@ -108,6 +108,10 @@ def load_config(path=None):
     # the monitor (dashboard) token — gates the dashboard. env > config; the default is filled by
     # ensure_monitor_token() once the FINAL mode is known (after any --mode override).
     cfg["monitor_token"] = os.environ.get("GOVD_MONITOR_TOKEN") or cfg.get("monitor_token") or None
+    # Identity SCHEME for Authorization: Bearer. "" / "token_sha" = the built-in bearer-secret match (default,
+    # unchanged). Any other value names a verifier registered via principals.register_verifier — the OAuth/OIDC
+    # seam. An unknown name fails CLOSED (no principal resolves), never falls back to the secret path.
+    cfg["auth_verifier"] = os.environ.get("GOVD_AUTH_VERIFIER") or cfg.get("auth_verifier") or ""
     # P1-T08: the principals registry (id -> token_sha -> quota). A present registry makes Authorization:
     # Bearer mandatory at /govern; absent (local dev) -> auth off, every record carries principal "local".
     pr_path = os.environ.get("GOVD_PRINCIPALS") or cfg.get("principals_path")
@@ -1164,7 +1168,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(503, {"error": "acl_strict requires a configured principals registry"})
         pid = cfg.get("node_name") or "local"            # unauthenticated local-mode runs attribute to the
         if reg:                                          # node's fleet name (GOVD_NODE_NAME), else generic "local"
-            pid = principals.authenticate(principals.bearer_of(self.headers.get("Authorization", "")), reg)
+            pid = principals.resolve_principal(
+                principals.bearer_of(self.headers.get("Authorization", "")), reg, cfg.get("auth_verifier", ""))
             if pid is None:
                 return self._json(401, {"error": "missing/invalid Authorization: Bearer token"})
             spec = reg[pid]

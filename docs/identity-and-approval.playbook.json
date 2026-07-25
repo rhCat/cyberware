@@ -1,0 +1,114 @@
+[
+  {
+    "task_id": "IDN-M0-01-no-plaintext-secrets",
+    "skill": "general:sec",
+    "perk": "secrets",
+    "vars": { "SEARCH_DIR": "/app" },
+    "redeem": false
+  },
+  {
+    "task_id": "IDN-M0-02-keystore-conform",
+    "skill": "cws:cws-conform",
+    "perk": "keystore",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "IDN-M0-03-chain-checkpoint",
+    "skill": "cws:cws-ledgercheck",
+    "perk": "checkpoint",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "IDN-M1-01-rt-grant-forged",
+    "skill": "cws:cws-redteam",
+    "perk": "rt-grant-forged",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "IDN-M1-02-rt-grant-replay",
+    "skill": "cws:cws-redteam",
+    "perk": "rt-grant-replay",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "IDN-M1-03-rt-grant-expired",
+    "skill": "cws:cws-redteam",
+    "perk": "rt-grant-expired",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "IDN-M1-04-rt-grant-wrong-run",
+    "skill": "cws:cws-redteam",
+    "perk": "rt-grant-wrong-run",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "IDN-M1-05-rt-no-capability",
+    "skill": "cws:cws-redteam",
+    "perk": "rt-no-capability",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "IDN-M1-06-rt-cap-mismatch",
+    "skill": "cws:cws-redteam",
+    "perk": "rt-cap-mismatch",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "IDN-M2-01-sw-grant-forged",
+    "skill": "cws:cws-redteam-sw",
+    "perk": "rt-grant-forged",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "IDN-M2-02-sw-grant-replay",
+    "skill": "cws:cws-redteam-sw",
+    "perk": "rt-grant-replay",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "IDN-M2-03-sw-grant-expired",
+    "skill": "cws:cws-redteam-sw",
+    "perk": "rt-grant-expired",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "IDN-M2-04-rt-ledger-tamper",
+    "skill": "cws:cws-redteam-sw",
+    "perk": "rt-ledger-tamper",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "IDN-M3-01-erasure",
+    "skill": "cws:cws-ledgercheck",
+    "perk": "erasure",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "IDN-M3-02-py-lint",
+    "skill": "general:py_qc",
+    "perk": "lint",
+    "vars": { "PROJECT_DIR": "/app" },
+    "redeem": false
+  },
+  {
+    "task_id": "IDN-M3-03-sec-audit",
+    "skill": "general:sec",
+    "perk": "audit",
+    "vars": { "PROJECT_DIR": "/app" },
+    "redeem": false
+  }
+]

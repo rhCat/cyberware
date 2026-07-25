@@ -298,7 +298,10 @@ class FleetHandler(BaseHTTPRequestHandler):
         reg = self.server.cfg.get("principals") or {}
         if not reg:
             return "local"
-        return principals.authenticate(principals.bearer_of(self.headers.get("Authorization", "")), reg)
+        # Same identity seam as govd (see principals.resolve_principal): default is the bearer-secret match.
+        cfg = getattr(self.server, "cfg", None) or {}
+        return principals.resolve_principal(
+            principals.bearer_of(self.headers.get("Authorization", "")), reg, cfg.get("auth_verifier", ""))
 
     def _rate_ok(self, pid) -> bool:
         reg = self.server.cfg.get("principals") or {}
