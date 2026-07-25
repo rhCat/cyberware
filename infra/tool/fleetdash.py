@@ -97,6 +97,39 @@ def _token(node):
     return os.environ.get("GOVD_MONITOR_TOKEN_" + str(node.get("name", "")).replace("-", "_").upper(), "")
 
 
+def _approve_token(node):
+    """PRINCIPAL credential used ONLY to answer a push_back — deliberately NOT the monitor token.
+
+    The monitor token is read-only by contract (`X-Govd-Monitor`, no govd write), and the dashboard has no
+    app-auth. Approving is a WRITE, so it needs a credential the operator provisions per node, on purpose:
+    `approve_token_file` in fleet.json, or GOVD_APPROVE_TOKEN_<NAME>. Absent (the default) => the node simply
+    has no approve affordance, and the read-only posture is unchanged. Never reuse the monitor token here.
+    """
+    f = _expand(node.get("approve_token_file"))
+    if f and os.path.isfile(f):
+        return open(f).read().strip()
+    return os.environ.get("GOVD_APPROVE_TOKEN_" + str(node.get("name", "")).replace("-", "_").upper(), "")
+
+
+def _post_json(url, body, token=None, timeout=10):
+    """POST JSON to a node with a principal Bearer. Returns (status, parsed). govd answers a verdict on
+    non-2xx (403 reject / 409 push_back), so a 4xx carrying a `decision` is a RESULT, not a transport error."""
+    data = json.dumps(body).encode()
+    req = urllib.request.Request(url, data=data, method="POST")
+    req.add_header("Content-Type", "application/json")
+    if token:
+        req.add_header("Authorization", "Bearer " + token)
+    opener = urllib.request.build_opener(_NoRedirect)
+    try:
+        with opener.open(req, timeout=timeout) as r:
+            return r.status, json.loads(r.read(_MAX_BODY).decode() or "{}")
+    except urllib.error.HTTPError as e:
+        try:
+            return e.code, json.loads(e.read(_MAX_BODY).decode() or "{}")
+        except Exception:
+            return e.code, {"error": "upstream"}
+
+
 _MAX_BODY = 8 * 1024 * 1024                                 # cap a node response we read into memory / mirror to disk
 
 
@@ -573,6 +606,10 @@ _STYLE = """
  .badge.b-reject{color:var(--reject);border-color:var(--reject)}
  .tag-dest{color:var(--destructive);border:1px solid var(--destructive);border-radius:6px;padding:0 6px;font-size:10px;white-space:nowrap}
  .tag-fail{color:var(--reject);border:1px solid var(--reject);border-radius:6px;padding:0 6px;font-size:10px}
+ button.approve{margin-left:8px;font:inherit;font-size:11px;cursor:pointer;color:var(--push);
+   background:transparent;border:1px solid var(--push);border-radius:6px;padding:1px 8px}
+ button.approve:hover{background:var(--push);color:var(--bg)}
+ button.approve[disabled]{opacity:.5;cursor:default}
  .banner{display:flex;gap:10px;margin:0 0 14px;flex-wrap:wrap}
  .bn{border-radius:8px;padding:9px 14px;font-weight:600;border:1px solid}
  .bn.approval{background:rgba(251,189,35,.08);border-color:var(--push);color:var(--push)}
@@ -951,10 +988,14 @@ def render_html(results, feed, risk, refresh=5, as_of=None):
                  risk_n=_risk_pending(risk), as_of=as_of)
 
 
-def render_risk(feed, risk, refresh=5, as_of=None):
+def render_risk(feed, risk, refresh=5, as_of=None, can_approve=None):
     """The /risk drill-down: every needs-approval / high-risk / rejected run across the fleet, grouped.
     Approval rows show their age and the approve-token list (value-free ids — WHAT to approve); entries a
-    later approved run answered sink to the bottom of their section, dimmed as `superseded`."""
+    later approved run answered sink to the bottom of their section, dimmed as `superseded`.
+
+    `can_approve(node_name) -> bool` gates the ANSWER affordance: a node with no operator-provisioned
+    approve credential renders the token list read-only, exactly as before. See `_approve_token`."""
+    can_approve = can_approve or (lambda _n: False)
     def row(x, extra=""):
         rid, node = _esc(x.get("run_id") or ""), _esc(x["node"])
         sup = " superseded" if x.get("_superseded") else ""
@@ -978,15 +1019,25 @@ def render_risk(feed, risk, refresh=5, as_of=None):
 
     def approve_of(x):
         toks = _as_list(x.get("needs_approve") or x.get("approved"))
-        return f'<code>{_esc(", ".join(toks))}</code>' if toks else "—"
+        if not toks:
+            return "—"
+        label = f'<code>{_esc(", ".join(toks))}</code>'
+        if x.get("_superseded") or not can_approve(x.get("node")):
+            return label                                      # no credential for this node => display only
+        rid, node = _esc(x.get("run_id") or ""), _esc(x.get("node") or "")
+        return (f'{label} <button class="approve" data-node="{node}" data-run="{rid}" '
+                f'title="re-submit this claim to govd carrying the approve token">approve</button>')
 
     content = ('<h1>high-risk &amp; approval queue</h1>' + _banner(risk)
                + section("approval", "needs approval",
                          "destructive claims govd PUSHED BACK — re-submit the claim with the listed approve "
                          "tokens to proceed (govd never auto-approves). `superseded` = a later approved run "
-                         "already answered this claim.", approve_of)
+                         "already answered this claim. <b>approve</b> re-submits the claim from THIS node's "
+                         "operator credential and is recorded in the signed chain — it authorizes the CLAIM; "
+                         "an agent that already gave up waiting is not resumed by it.", approve_of)
                + section("high", "high-risk (ran)", "destructive operations that were approved and executed — audit them.")
                + section("reject", "rejected", "claims govd refused (structural problems)."))
+    content += _approve_script()
     return _page("fleet — risk queue", content, refresh, nav="risk",
                  risk_n=_risk_pending(risk), as_of=as_of)
 
@@ -1139,6 +1190,28 @@ def _run_live(detail):
         return False                                             # an errored step is terminal — govd stops here
     done = {e.get("step") for e in results}
     return len(done) < len(detail.get("seq") or [])
+
+
+def _approve_script():
+    """The approve button's client script. Sends `X-Fleetdash-Approve: 1` — a custom header a cross-origin
+    page cannot set without a CORS preflight the server never answers, so a hostile site cannot drive-by POST
+    an approval at 127.0.0.1. Confirms first; every node-supplied string is written via textContent."""
+    return ('<script>(function(){'
+            'document.querySelectorAll("button.approve").forEach(function(b){'
+            'b.addEventListener("click",function(ev){'
+            'ev.stopPropagation();'
+            'if(!confirm("Approve this destructive claim on "+b.dataset.node+"?\\n\\n"'
+            '+"It re-submits the claim to govd with the approve token and is recorded in the signed chain."))return;'
+            'b.disabled=true;var old=b.textContent;b.textContent="approving…";'
+            'fetch("/approve",{method:"POST",headers:{"Content-Type":"application/json",'
+            '"X-Fleetdash-Approve":"1"},'
+            'body:JSON.stringify({node:b.dataset.node,run_id:b.dataset.run})})'
+            '.then(function(r){return r.json()}).then(function(d){'
+            'if(d&&d.ok){b.textContent="approved";setTimeout(function(){location.reload()},900)}'
+            'else{b.disabled=false;b.textContent=old;'
+            'alert("approve failed: "+((d&&(d.error||d.decision))||"unknown"))}})'
+            '.catch(function(e){b.disabled=false;b.textContent=old;alert("approve failed: "+e)})'
+            '})})})();</script>')
 
 
 def _values_reveal_script():
@@ -1313,7 +1386,7 @@ def _is_loopback(host):
         return host in ("localhost", "")
 
 
-def serve(nodes, port, refresh, mirror_dir, mirror_interval, bind="127.0.0.1"):
+def serve(nodes, port, refresh, mirror_dir, mirror_interval, bind="127.0.0.1", config_path=None):
     # FAIL CLOSED on a non-loopback bind — the dashboard has NO app-auth and carries a monitor-token-injecting
     # read proxy (/proxy, /embed, /flow), so binding a routable/tailnet/0.0.0.0 interface publishes every node's
     # ledger + that proxy to anyone who reaches :PORT. Mirror govd's require_closed_auth / fleetd's 0.0.0.0 gate:
@@ -1352,9 +1425,45 @@ def serve(nodes, port, refresh, mirror_dir, mirror_interval, bind="127.0.0.1"):
         with _snap_lock:
             return list(_snap["results"]), list(_snap["feed"]), _snap["as_of"]
 
+    # The ROSTER was previously frozen at process start: load_nodes() ran once in
+    # main() and _mirror_loop closed over the result, so a node added to
+    # fleet.json stayed invisible until the process was restarted (the
+    # mirror-interval only refreshed LEDGERS for already-known nodes, which made
+    # the dashboard look live while silently ignoring the edit). Re-stat the
+    # config each sweep and reload when it changes.
+    _cfg_mtime = [None]
+    if config_path:
+        try:
+            _cfg_mtime[0] = os.stat(_expand(config_path)).st_mtime
+        except OSError:
+            pass
+
+    def _reload_nodes_if_changed():
+        """Adopt an edited roster in place. Fail SOFT: a config that is missing or
+        mid-write (truncated JSON) keeps the last good roster rather than emptying
+        the dashboard."""
+        nonlocal nodes
+        if not config_path:
+            return
+        try:
+            m = os.stat(_expand(config_path)).st_mtime
+        except OSError:
+            return
+        if m == _cfg_mtime[0]:
+            return
+        try:
+            fresh = load_nodes(config_path)
+        except Exception:
+            return                                           # keep the last good roster; retry next sweep
+        if not fresh:
+            return                                           # never let a bad edit blank the fleet
+        _cfg_mtime[0] = m
+        nodes = fresh
+
     def _mirror_loop():                                      # keep the durable copy + the snapshot fresh in the background
         while True:
             try:
+                _reload_nodes_if_changed()
                 sums = mirror_all(nodes, mirror_dir)
                 # the slow live /health probe happens HERE, off the hot path
                 _refresh(live=True, sweeps={s.get("node"): s for s in sums})
@@ -1422,6 +1531,63 @@ def serve(nodes, port, refresh, mirror_dir, mirror_interval, bind="127.0.0.1"):
                 return self._bytes(200, "image/svg+xml; charset=utf-8", _sanitize_svg(data))
             return self._bytes(200, "application/json; charset=utf-8", data)
 
+        def _json(self, code, obj):
+            self._bytes(code, "application/json; charset=utf-8", json.dumps(obj).encode())
+
+        def do_POST(self):
+            """POST /approve {node, run_id} — answer a govd push_back.
+
+            The ONLY write this dashboard performs. Four gates, all fail-closed:
+              1. the custom X-Fleetdash-Approve header (a cross-origin page cannot set it without a CORS
+                 preflight we never answer) — blocks drive-by POSTs at 127.0.0.1;
+              2. an operator-provisioned `approve_token_file` for THAT node (absent => 403, and the button is
+                 never rendered either);
+              3. the run must exist in the mirror AND actually be a push_back — never approve blind;
+              4. govd re-checks everything anyway; this only re-submits the SAME claim carrying the token.
+            The claim's own skill/perk/var_keys are replayed from the mirrored record, so this cannot widen a
+            claim into something the agent never made.
+            """
+            up = urllib.parse.urlparse(self.path)
+            if up.path.rstrip("/") != "/approve":
+                return self._json(404, {"error": "not found"})
+            if self.headers.get("X-Fleetdash-Approve") != "1":
+                return self._json(403, {"error": "missing X-Fleetdash-Approve"})
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(min(n, 64 * 1024)).decode() or "{}")
+            except Exception:
+                return self._json(400, {"error": "bad body"})
+            node = by_name.get(str(body.get("node") or ""))
+            run_id = str(body.get("run_id") or "")
+            if not node or not re.fullmatch(r"[0-9a-f]{6,64}", run_id):
+                return self._json(400, {"error": "unknown node or malformed run_id"})
+            tok = _approve_token(node)
+            if not tok:
+                return self._json(403, {"error": "no approve credential provisioned for this node"})
+            if not mirror_dir:
+                # --no-mirror: there is no local record to replay the claim from, and approving a claim we
+                # cannot read would be approving blind. Refuse rather than reconstruct from the feed.
+                return self._json(409, {"error": "approval requires the ledger mirror (--no-mirror is set)"})
+            rec = _read_json(os.path.join(mirror_dir, _safe(node["name"]), "runs", _safe(run_id) + ".json"), None)
+            if not isinstance(rec, dict):
+                return self._json(404, {"error": "run not in mirror"})
+            if rec.get("decision") != "push_back":
+                return self._json(409, {"error": f"run is {rec.get('decision')!r}, not push_back"})
+            perks = _as_list(rec.get("needs_approve"))
+            if not perks:
+                return self._json(409, {"error": "no approve tokens on this run"})
+            claim = {"skill": rec.get("skill"), "perk": rec.get("perk"),
+                     "var_keys": _as_list(rec.get("var_keys")), "approve": perks}
+            try:
+                status, verdict = _post_json(node["url"].rstrip("/") + "/govern", claim, token=tok)
+            except Exception as e:
+                return self._json(502, {"error": f"node unreachable: {type(e).__name__}"})
+            ok = str(verdict.get("decision", "")).lower() == "allow"
+            return self._json(200 if ok else 409,
+                              {"ok": ok, "status": status, "decision": verdict.get("decision"),
+                               "run_id": verdict.get("run_id"), "problems": verdict.get("problems") or [],
+                               "approved": perks})
+
         def do_GET(self):
             up = urllib.parse.urlparse(self.path)
             if up.path.startswith("/embed/"):                       # the individual-monitor iframe + its proxy
@@ -1438,7 +1604,9 @@ def serve(nodes, port, refresh, mirror_dir, mirror_interval, bind="127.0.0.1"):
                 if parts[0] == "risk":                              # fleet-wide risk / approval queue
                     results, feed, as_of = _fleet()
                     risk = mark_superseded(feed, risk_summary(feed))
-                    return self._send(200, render_risk(feed, risk, refresh, as_of=as_of))
+                    return self._send(200, render_risk(
+                        feed, risk, refresh, as_of=as_of,
+                        can_approve=lambda n: bool(_approve_token(by_name.get(n) or {}))))
                 if parts[0] == "accounting":                        # fleet CREDIT accounting (spend by actor)
                     _, feed, as_of = _fleet()
                     return self._send(200, render_accounting(feed, refresh, as_of=as_of))
@@ -1537,7 +1705,7 @@ def main():
     nodes = load_nodes(a.config)
     mirror_dir = None if a.no_mirror else a.mirror_dir
     if a.serve:
-        serve(nodes, a.serve, a.refresh, mirror_dir, a.mirror_interval, a.bind)
+        serve(nodes, a.serve, a.refresh, mirror_dir, a.mirror_interval, a.bind, config_path=a.config)
     else:
         if mirror_dir:
             mirror_all(nodes, mirror_dir)                   # mirror once, then render the durable view
