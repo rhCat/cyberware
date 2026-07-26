@@ -155,3 +155,84 @@ def test_verifier_never_raises(verifier):
 def test_bearer_secret_does_not_authenticate_under_this_scheme(key):
     EA.install("t_ed4")
     assert P.resolve_principal("s3cret", _reg(key), "t_ed4") is None
+
+
+# ───────────────────────── govd wiring ─────────────────────────
+# A config key registers nothing on its own. Found by standing a real govd up with
+# auth_verifier="ed25519" and watching a valid assertion resolve to nobody: correct
+# fail-closed behaviour, and a silently unusable feature.
+
+def test_govd_installs_the_named_builtin_verifier():
+    from infra.govern import govd
+    from infra.govern import principals as PP
+    PP._VERIFIERS.pop("ed25519", None)
+    assert govd.install_builtin_verifier({"auth_verifier": "ed25519"}) is not None
+    assert "ed25519" in PP._VERIFIERS
+
+
+def test_govd_installs_nothing_for_the_default_or_an_unknown_name():
+    from infra.govern import govd
+    from infra.govern import principals as PP
+    for name in ("", "token_sha", "oidc-typo", None):
+        PP._VERIFIERS.pop("oidc-typo", None)
+        assert govd.install_builtin_verifier({"auth_verifier": name}) is None
+    # an unknown name must leave NOTHING registered — it must never fall back to bearer secrets
+    assert "oidc-typo" not in PP._VERIFIERS
+
+
+def test_serve_actually_wires_the_verifier_END_TO_END(tmp_path):
+    """Covers the CALL SITE, not just the function.
+
+    Mutation found that deleting `install_builtin_verifier(cfg)` from serve() left every unit test green —
+    the helper was tested, its invocation was not. This starts a real govd with auth_verifier=ed25519 and
+    authenticates a real claim over HTTP, so the wiring cannot silently disappear again.
+    """
+    import json as _json, os as _os, socket, subprocess, sys, time, urllib.error, urllib.request
+    from cryptography.hazmat.primitives import serialization
+
+    repo = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+    k = Ed25519PrivateKey.generate()
+    (tmp_path / "principals.json").write_text(_json.dumps({"principals": {
+        "alice": {"subject": EA.subject_for(EA._sign.public_raw(k)), "rate": 100, "burst": 100}}}))
+    (tmp_path / "govd.json").write_text(_json.dumps({
+        "mode": "local", "auth_verifier": "ed25519", "record_root": str(tmp_path / "rec")}))
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]
+
+    p = subprocess.Popen([sys.executable, "-m", "infra.govern.govd",
+                          "--config", str(tmp_path / "govd.json"), "--port", str(port)],
+                         cwd=repo, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         env={**_os.environ, "PYTHONPATH": repo,
+                              "GOVD_PRINCIPALS": str(tmp_path / "principals.json")})
+    try:
+        base = f"http://127.0.0.1:{port}"
+        for _ in range(80):
+            try:
+                cat = _json.loads(urllib.request.urlopen(base + "/catalog", timeout=1).read()); break
+            except Exception:
+                time.sleep(0.25)
+        else:
+            p.kill(); pytest.fail("govd did not start")
+
+        sk = next(s for s in cat["skills"] if s.get("verified")
+                  and any(not q.get("destructive") for q in s["perks"]))
+        perk = next(q for q in sk["perks"] if not q.get("destructive"))
+        claim = _json.dumps({"skill": sk["skill"], "perk": perk["id"],
+                             "var_keys": (perk.get("vars") or {}).get("required") or []}).encode()
+
+        def _post(bearer):
+            r = urllib.request.Request(base + "/govern", data=claim, method="POST")
+            r.add_header("Content-Type", "application/json")
+            if bearer:
+                r.add_header("Authorization", "Bearer " + bearer)
+            try:
+                return urllib.request.urlopen(r, timeout=10).status
+            except urllib.error.HTTPError as e:
+                return e.code
+
+        assert _post(EA.mint_assertion(k)) == 200, "a declared key must authenticate — is serve() wiring it?"
+        assert _post(EA.mint_assertion(Ed25519PrivateKey.generate())) == 401   # undeclared
+        assert _post("a-static-bearer-secret") == 401                          # wrong scheme
+        assert _post(None) == 401
+    finally:
+        p.kill()

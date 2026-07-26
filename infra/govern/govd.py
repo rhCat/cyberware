@@ -119,6 +119,28 @@ def load_config(path=None):
     return cfg
 
 
+def install_builtin_verifier(cfg):
+    """Register the built-in identity verifier NAMED by `auth_verifier`, if any.
+
+    The seam accepts any registered `bearer -> subject` resolver, but a resolver has to be REGISTERED to
+    exist — and a config key on its own registers nothing. Without this, setting `auth_verifier: "ed25519"`
+    would fail closed on every claim: correct, but silently unusable.
+
+    Only a name we ship is installed. An unknown name installs nothing and therefore resolves nobody, which
+    is the intended fail-closed behaviour for a typo — it must never fall back to the bearer-secret path.
+    Verifier CODE deliberately lives in the image, never on the mounted config: a verifier loaded from a
+    writable path would be ungoverned code executing inside the syscall boundary, which is the one thing
+    this system exists to prevent. The mount configures WHICH verifier and its parameters, never its body.
+    """
+    name = str(cfg.get("auth_verifier") or "")
+    if name in ("", "token_sha"):
+        return None                                      # the built-in bearer-secret path; nothing to install
+    if name == "ed25519":
+        from infra.govern import ed25519_auth
+        return ed25519_auth.install("ed25519")
+    return None                                          # unknown -> nothing registered -> resolves nobody
+
+
 def ensure_monitor_token(cfg):
     """Fill the monitor-token default by the final mode: a friendly 'admin' for LOCAL use, a strong random
     token for REMOTE (network-exposed) so it is never guessable. Override anytime with GOVD_MONITOR_TOKEN."""
@@ -1571,6 +1593,7 @@ def _load_exec_mode(cfg, httpd):
 def serve(cfg):
     Handler.timeout = cfg.get("socket_timeout", SOCKET_TIMEOUT)
     ensure_monitor_token(cfg)                            # final mode is known here (after --mode)
+    install_builtin_verifier(cfg)                        # wire the identity scheme BEFORE the first claim
     require_closed_auth(cfg)                              # refuse a network-exposed plane with auth off
     store = Store(cfg["record_root"], cfg=cfg)
     if cfg["mode"] == "remote":

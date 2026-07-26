@@ -920,3 +920,27 @@ def test_govern_propagates_cargo_only_on_allow_not_on_reject():
     v = govd.govern(ledger, {}, scope={"skills": ["*"]})
     assert v["decision"] == "reject" and v.get("cargo") is None
     assert any(p["id"] == "acl_cargo_denied" for p in v.get("problems", []))
+
+
+# ───────────────────────── identity scheme wiring ─────────────────────────
+# install_builtin_verifier lives in govd.py, so its proof belongs in govd.py's designated ratchet slice
+# (infra/govern/selfmonitor_policy.json). Covered here rather than only in test_ed25519_auth.py, where the
+# mutation ratchet would never see it — the `==` branch below survived precisely because of that.
+
+def test_install_builtin_verifier_registers_only_a_name_we_ship():
+    from infra.govern import govd as G
+    from infra.govern import principals as PP
+
+    PP._VERIFIERS.pop("ed25519", None)
+    assert G.install_builtin_verifier({"auth_verifier": "ed25519"}) is not None
+    assert "ed25519" in PP._VERIFIERS
+
+    # the default bearer-secret path installs nothing
+    assert G.install_builtin_verifier({"auth_verifier": ""}) is None
+    assert G.install_builtin_verifier({"auth_verifier": "token_sha"}) is None
+    assert G.install_builtin_verifier({}) is None
+
+    # an UNKNOWN name must register nothing — a typo must never quietly install a scheme, nor fall back
+    PP._VERIFIERS.pop("not-a-scheme", None)
+    assert G.install_builtin_verifier({"auth_verifier": "not-a-scheme"}) is None
+    assert "not-a-scheme" not in PP._VERIFIERS
