@@ -39,6 +39,68 @@ def authenticate(bearer: str, principals: dict):
     return None
 
 
+# ───────────────────────── the auth SEAM (OAuth/OIDC portability) ─────────────────────────
+#
+# `authenticate` answers ONE question — "which principal is this bearer?" — by hashing the token and matching
+# `token_sha`. That is a *bearer-secret* scheme: govd must have seen the secret to know the sha. An external
+# IdP (OAuth/OIDC) answers the same question differently — verify a signature, read a `sub`/`email` claim —
+# and govd never holds a secret at all.
+#
+# Both are the same shape: bearer -> SUBJECT -> principal_id. So the seam is a pluggable *subject resolver*,
+# and everything downstream (`acl_allows`, rate buckets, the provenance `principal`) is untouched, because it
+# already keys off a principal id and never off a token.
+#
+# A principal opts into an external scheme by declaring `subject`, e.g.
+#     {"alice": {"subject": "oidc:sub:1a2b3c", "acl": {...}}}
+# Registering a verifier is the whole integration:
+#     register_verifier("oidc", lambda bearer: verify_jwt_and_return("oidc:sub:" + claims["sub"]))
+#
+# DELIBERATELY NOT DONE HERE: no JWKS fetch, no JWT parsing, no network. A verifier that reaches the network
+# inside the syscall boundary is a new failure+latency mode for every claim, and belongs behind an explicit
+# cache the operator configures. This module only provides the seam and keeps the default behaviour identical.
+
+_VERIFIERS: dict = {}
+
+
+def register_verifier(name: str, fn) -> None:
+    """Register a subject resolver: ``fn(bearer) -> subject_str | None``. It MUST fail closed (return None)
+    on any doubt, and MUST NOT raise — `resolve_principal` treats a raising verifier as a refusal."""
+    _VERIFIERS[str(name)] = fn
+
+
+def subject_of(bearer: str, verifier: str):
+    """The external SUBJECT this bearer asserts, or None. `verifier` names a registered scheme; an unknown
+    scheme fails closed rather than silently falling back to the bearer-secret path."""
+    fn = _VERIFIERS.get(str(verifier or ""))
+    if fn is None or not bearer:
+        return None
+    try:
+        s = fn(bearer)
+    except Exception:
+        return None                                      # a raising verifier is a refusal, never an allow
+    return s or None
+
+
+def resolve_principal(bearer: str, principals: dict, verifier: str = ""):
+    """The principal id for this bearer under `verifier`, else None. THE single identity entry point.
+
+    verifier falsy / "token_sha"  -> the built-in bearer-secret scheme (unchanged default)
+    any registered name           -> subject match against each principal's declared `subject`
+
+    Subject comparison is constant-time and requires a NON-EMPTY declared subject, so a principal that has not
+    opted in can never be matched by an empty/absent claim."""
+    if not verifier or verifier == "token_sha":
+        return authenticate(bearer, principals)
+    subj = subject_of(bearer, verifier)
+    if not subj:
+        return None
+    for pid, spec in principals.items():
+        want = str((spec or {}).get("subject") or "")
+        if want and hmac.compare_digest(want, str(subj)):
+            return pid
+    return None
+
+
 def bearer_of(authorization: str) -> str:
     """Extract the token from an `Authorization: Bearer <token>` header (query tokens are NOT accepted)."""
     if not authorization:

@@ -1,0 +1,106 @@
+[
+  {
+    "task_id": "DEL-M0-01-no-plaintext-secrets",
+    "skill": "general:sec",
+    "perk": "secrets",
+    "vars": {
+      "SEARCH_DIR": "/app"
+    },
+    "redeem": false
+  },
+  {
+    "task_id": "DEL-M0-02-schemas-conform",
+    "skill": "cws:cws-conform",
+    "perk": "schemas",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "DEL-M0-03-chain-checkpoint-baseline",
+    "skill": "cws:cws-ledgercheck",
+    "perk": "checkpoint",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "DEL-M1-01-keystore-conform",
+    "skill": "cws:cws-conform",
+    "perk": "keystore",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "DEL-M1-02-erasure",
+    "skill": "cws:cws-ledgercheck",
+    "perk": "erasure",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "DEL-M1-03-modelcheck-prove",
+    "skill": "cws:cws-modelcheck",
+    "perk": "prove",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "DEL-M2-01-rt-grant-forged",
+    "skill": "cws:cws-redteam",
+    "perk": "rt-grant-forged",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "DEL-M2-02-rt-grant-replay",
+    "skill": "cws:cws-redteam",
+    "perk": "rt-grant-replay",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "DEL-M2-03-rt-forged-status",
+    "skill": "cws:cws-redteam",
+    "perk": "rt-forged-status",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "DEL-M2-04-rt-ledger-tamper",
+    "skill": "cws:cws-redteam-sw",
+    "perk": "rt-ledger-tamper",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "DEL-M2-05-rt-tamper-script",
+    "skill": "cws:cws-redteam-sw",
+    "perk": "rt-tamper-script",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "DEL-M2-06-rt-net-egress",
+    "skill": "cws:cws-redteam",
+    "perk": "rt-net-egress",
+    "vars": {},
+    "redeem": false
+  },
+  {
+    "task_id": "DEL-M3-01-py-lint",
+    "skill": "general:py_qc",
+    "perk": "lint",
+    "vars": {
+      "PROJECT_DIR": "/app"
+    },
+    "redeem": false
+  },
+  {
+    "task_id": "DEL-M3-05-sec-audit",
+    "skill": "general:sec",
+    "perk": "audit",
+    "vars": {
+      "PROJECT_DIR": "/app"
+    },
+    "redeem": false
+  }
+]
